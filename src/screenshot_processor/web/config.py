@@ -64,21 +64,19 @@ class Settings(AuthSettingsMixin, BaseSettings):
         description="API key required for the /upload endpoint",
     )
 
-    # Rate limiting - tuned based on benchmark results:
-    # - Sustained throughput: ~34 images/sec with batch uploads
-    # - Optimal batch size: 20-30 images
-    # - Single upload: ~20/sec
+    # Rate limiting - tuned for maximum upload throughput
+    # Bottleneck is typically network/disk I/O, not these limits
     RATE_LIMIT_DEFAULT: str = Field(
         default="100/minute",
         description="Default rate limit for API endpoints",
     )
     RATE_LIMIT_UPLOAD: str = Field(
-        default="120/minute",
-        description="Rate limit for single upload endpoint (2/sec with burst capacity)",
+        default="600/minute",
+        description="Rate limit for single upload endpoint (10/sec)",
     )
     RATE_LIMIT_BATCH_UPLOAD: str = Field(
-        default="60/minute",
-        description="Rate limit for batch upload endpoint (1/sec, ~1800 images/min with batch=30)",
+        default="300/minute",
+        description="Rate limit for batch upload endpoint (5/sec, ~9000 images/min with batch=30)",
     )
     RATE_LIMIT_REPROCESS: str = Field(
         default="30/minute",

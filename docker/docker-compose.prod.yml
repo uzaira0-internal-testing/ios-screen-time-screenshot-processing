@@ -106,7 +106,7 @@ services:
   celery-worker:
     image: ${BACKEND_IMAGE:-ios-screen-time-screenshot-processing-backend:latest}
     container_name: ios-screen-time-screenshot-processing-celery
-    command: celery -A src.screenshot_processor.web.celery_app worker --loglevel=info --concurrency=2
+    command: celery -A src.screenshot_processor.web.celery_app worker --loglevel=info --concurrency=4
     environment:
       PYTHONUNBUFFERED: "1"
       DATABASE_URL: postgresql+asyncpg://ios_screen_time_screenshot:${POSTGRES_PASSWORD}@postgres:5432/ios_screen_time_screenshot_processing

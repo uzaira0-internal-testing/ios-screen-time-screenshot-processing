@@ -35,11 +35,11 @@ celery_app.conf.update(
     # Task execution settings
     task_acks_late=True,  # Acknowledge task after completion (reliability)
     task_reject_on_worker_lost=True,  # Requeue if worker dies
-    # Rate limiting to prevent overwhelming the system
-    task_default_rate_limit="10/s",
+    # Rate limiting - high limit since upload speed is the priority
+    task_default_rate_limit="50/s",
     # Result expiration (1 hour)
     result_expires=3600,
     # Worker settings
     worker_prefetch_multiplier=1,  # Process one task at a time per worker
-    worker_concurrency=2,  # Number of concurrent workers
+    worker_concurrency=4,  # Number of concurrent workers
 )
