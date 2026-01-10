@@ -45,10 +45,14 @@ COPY --from=build /app/dist /usr/share/nginx/html
 # Copy nginx config (path relative to monorepo root context)
 COPY apps/ios-screen-time-screenshot-processing/docker/nginx/nginx.conf /etc/nginx/nginx.conf
 
+# Copy entrypoint script for BASE_PATH injection
+COPY apps/ios-screen-time-screenshot-processing/docker/frontend/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
 EXPOSE 80
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -f http://localhost/health || exit 1
 
-CMD ["nginx", "-g", "daemon off;"]
+ENTRYPOINT ["/docker-entrypoint.sh"]
