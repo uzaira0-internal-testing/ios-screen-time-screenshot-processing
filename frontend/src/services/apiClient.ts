@@ -47,16 +47,31 @@ apiClient.use({
       request.headers.set("X-Site-Password", sitePassword);
     }
 
+    // Debug logging (will appear in browser console)
+    if (config.isDev) {
+      console.log("[apiClient] Request:", request.url, {
+        hasUsername: !!username,
+        hasSitePassword: !!sitePassword,
+      });
+    }
+
     return request;
   },
   onResponse({ response }) {
     // Handle 401 responses by clearing auth state
-    // This ensures the user is prompted to re-authenticate if their password is invalid
+    // Only logout if not already on login page (prevents redirect loops)
+    // and if we're not checking auth status (prevents logout during initial auth check)
     if (response.status === 401) {
-      // Import dynamically to avoid circular dependency
-      import("@/store/authStore").then(({ useAuthStore }) => {
-        useAuthStore.getState().logout();
-      });
+      const isLoginPage = window.location.pathname.endsWith("/login");
+      const isAuthStatusCheck = response.url.includes("/auth/status");
+
+      if (!isLoginPage && !isAuthStatusCheck) {
+        console.warn("[apiClient] 401 response - logging out user");
+        // Import dynamically to avoid circular dependency
+        import("@/store/authStore").then(({ useAuthStore }) => {
+          useAuthStore.getState().logout();
+        });
+      }
     }
     return response;
   },
