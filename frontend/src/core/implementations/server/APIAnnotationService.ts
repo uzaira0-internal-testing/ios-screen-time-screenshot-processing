@@ -18,6 +18,10 @@ export class APIAnnotationService implements IAnnotationService {
       if (username && config.headers) {
         config.headers['X-Username'] = username;
       }
+      const sitePassword = localStorage.getItem('sitePassword');
+      if (sitePassword && config.headers) {
+        config.headers['X-Site-Password'] = sitePassword;
+      }
       return config;
     });
   }

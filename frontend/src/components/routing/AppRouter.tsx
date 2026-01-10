@@ -39,6 +39,17 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   return <>{children}</>;
 };
 
+// Redirect authenticated users away from login page
+const LoginRoute: React.FC = () => {
+  const { isAuthenticated } = useAuthStore();
+
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <LoginPage />;
+};
+
 export const AppRouter: React.FC = () => {
   const { mode } = useMode();
 
@@ -58,8 +69,15 @@ export const AppRouter: React.FC = () => {
   // Server mode routes - authentication required for most pages
   return (
     <Routes>
-      <Route path="/" element={<HomePage />} />
-      <Route path="/login" element={<LoginPage />} />
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <HomePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/login" element={<LoginRoute />} />
       <Route
         path="/annotate"
         element={
