@@ -12,7 +12,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from screenshot_processor.web.celery_app import celery_app
-from screenshot_processor.web.database.models import Screenshot
+from screenshot_processor.web.database.models import ProcessingStatus, Screenshot
 from screenshot_processor.web.services.processing_service import process_screenshot_sync
 
 logger = logging.getLogger(__name__)
@@ -48,6 +48,16 @@ def process_screenshot_task(self, screenshot_id: int, max_shift: int = 5) -> dic
         try:
             self.retry(exc=e)
         except self.MaxRetriesExceededError:
+            # Mark screenshot as FAILED so it doesn't stay stuck in PENDING
+            try:
+                screenshot = db.query(Screenshot).filter(Screenshot.id == screenshot_id).first()
+                if screenshot:
+                    screenshot.processing_status = ProcessingStatus.FAILED
+                    screenshot.processing_issues = [f"Max retries exceeded: {str(e)}"]
+                    db.commit()
+                    logger.info(f"Marked screenshot {screenshot_id} as FAILED after max retries")
+            except Exception as db_err:
+                logger.error(f"Failed to mark screenshot {screenshot_id} as FAILED: {db_err}")
             return {"success": False, "error": str(e), "max_retries_exceeded": True}
     finally:
         db.close()
@@ -77,6 +87,16 @@ def reprocess_screenshot_task(
         try:
             self.retry(exc=e)
         except self.MaxRetriesExceededError:
+            # Mark screenshot as FAILED so it doesn't stay stuck in PENDING
+            try:
+                screenshot = db.query(Screenshot).filter(Screenshot.id == screenshot_id).first()
+                if screenshot:
+                    screenshot.processing_status = ProcessingStatus.FAILED
+                    screenshot.processing_issues = [f"Max retries exceeded: {str(e)}"]
+                    db.commit()
+                    logger.info(f"Marked screenshot {screenshot_id} as FAILED after max retries")
+            except Exception as db_err:
+                logger.error(f"Failed to mark screenshot {screenshot_id} as FAILED: {db_err}")
             return {"success": False, "error": str(e), "max_retries_exceeded": True}
     finally:
         db.close()
