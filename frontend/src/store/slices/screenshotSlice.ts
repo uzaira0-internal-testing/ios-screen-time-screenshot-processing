@@ -1,5 +1,5 @@
 import type { StateCreator } from "zustand";
-import type { IScreenshotService, NavigationParams, ProcessingIssue } from "@/core";
+import type { IScreenshotService, NavigationParams, ProcessingIssue, Screenshot } from "@/core";
 import type { AnnotationState, ScreenshotSlice, UIAnnotation } from "./types";
 import { initialAnnotation } from "./types";
 import { filterToApiParams, isVerifiedByCurrentUser } from "./helpers";
@@ -123,7 +123,7 @@ export const createScreenshotSlice = (
       const { screenshotList, verificationFilter } = get();
       if (screenshotList && screenshotList.items.length > 0) {
         const currentIdx = screenshotList.items.findIndex(
-          (s) => s.id === processedScreenshot.id,
+          (s: Screenshot) => s.id === processedScreenshot.id,
         );
         if (currentIdx !== -1) {
           set({
@@ -229,7 +229,7 @@ export const createScreenshotSlice = (
       const { screenshotList, verificationFilter } = get();
       if (screenshotList && screenshotList.items.length > 0) {
         const currentIdx = screenshotList.items.findIndex(
-          (s) => s.id === screenshot.id,
+          (s: Screenshot) => s.id === screenshot.id,
         );
         if (currentIdx !== -1) {
           set({

@@ -210,7 +210,7 @@ export const ScreenshotSelector = ({
 
             {/* Screenshot List */}
             <div className="max-h-52 overflow-y-auto">
-              {screenshotList?.items.map((screenshot) => {
+              {screenshotList?.items.map((screenshot: Screenshot) => {
                 // Extract filename from file_path
                 const filename = screenshot.file_path?.split("/").pop() || "";
                 const dateStr = screenshot.screenshot_date || "";

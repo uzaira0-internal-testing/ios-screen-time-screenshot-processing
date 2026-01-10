@@ -45,9 +45,9 @@ export type ScreenshotUploadRequest =
   components["schemas"]["ScreenshotUploadRequest"];
 export type ScreenshotUploadResponse =
   components["schemas"]["ScreenshotUploadResponse"];
-// PaginatedResponse from fastapi-pagination package (regenerate types after backend update)
+// Paginated screenshot list response
 export type ScreenshotListResponse =
-  components["schemas"]["PaginatedResponse_ScreenshotRead_"];
+  components["schemas"]["ScreenshotListResponse"];
 
 // Group types
 export type Group = components["schemas"]["GroupRead"];
