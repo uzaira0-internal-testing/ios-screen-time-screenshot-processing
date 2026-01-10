@@ -19,14 +19,14 @@ ARG APP_PATH_PREFIX=/screenshot
 ENV VITE_API_BASE_URL=${APP_PATH_PREFIX}/api/v1
 ENV VITE_BASE_PATH=${APP_PATH_PREFIX}
 
-# Copy package files
-COPY frontend/package.json frontend/bun.lock* frontend/package-lock.json* ./
+# Copy package files (paths relative to monorepo root context)
+COPY apps/ios-screen-time-screenshot-processing/frontend/package.json apps/ios-screen-time-screenshot-processing/frontend/bun.lock* apps/ios-screen-time-screenshot-processing/frontend/package-lock.json* ./
 
 # Install dependencies
 RUN bun install
 
 # Copy source
-COPY frontend/ ./
+COPY apps/ios-screen-time-screenshot-processing/frontend/ ./
 
 # Build for production
 RUN bun run build
@@ -42,8 +42,8 @@ RUN apk add --no-cache curl
 # Copy built assets
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Copy nginx config
-COPY docker/nginx/nginx.conf /etc/nginx/nginx.conf
+# Copy nginx config (path relative to monorepo root context)
+COPY apps/ios-screen-time-screenshot-processing/docker/nginx/nginx.conf /etc/nginx/nginx.conf
 
 EXPOSE 80
 
