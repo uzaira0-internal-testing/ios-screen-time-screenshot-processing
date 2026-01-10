@@ -76,8 +76,8 @@ services:
       DEBUG: "false"
       USE_FRACTIONAL_HOURLY_VALUES: "false"
     volumes:
-      - ./uploads:/app/uploads
-      - ./output:/app/output
+      - uploads_data:/app/uploads
+      - output_data:/app/output
       - ${SCREENSHOT_SOURCE_PATH:-./screenshots}:/app/screenshots:ro
     depends_on:
       postgres:
@@ -115,8 +115,8 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       USE_FRACTIONAL_HOURLY_VALUES: "false"
     volumes:
-      - ./uploads:/app/uploads
-      - ./output:/app/output
+      - uploads_data:/app/uploads
+      - output_data:/app/output
       - ${SCREENSHOT_SOURCE_PATH:-./screenshots}:/app/screenshots:ro
     depends_on:
       postgres:
@@ -167,3 +167,5 @@ networks:
 volumes:
   postgres_data:
   redis_data:
+  uploads_data:
+  output_data:
