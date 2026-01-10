@@ -137,7 +137,7 @@ async function build() {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>iOS Screenshot Processing</title>
+    <title>iOS Screen Time Screenshot Processing</title>
     <link rel="stylesheet" href="./assets/index.css" />
     <link rel="manifest" href="./manifest.json" />
     <meta name="theme-color" content="#3b82f6" />
