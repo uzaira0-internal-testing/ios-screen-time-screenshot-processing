@@ -1463,9 +1463,15 @@ async def upload_screenshots_batch(
     # Phase 3: Bulk INSERT all screenshots
     t1 = time.perf_counter()
     inserted_ids = {}
-    duplicate_paths = set()
+    duplicate_paths: set[str] = set()
 
     if items_to_insert:
+        # Check which paths already exist (for duplicate detection)
+        all_paths = [str(item["file_path"]) for item in items_to_insert]
+        existing_result = await db.execute(
+            select(Screenshot.file_path).where(Screenshot.file_path.in_(all_paths))
+        )
+        duplicate_paths = {row[0] for row in existing_result.fetchall()}
         from sqlalchemy.dialects.postgresql import insert as pg_insert
 
         values = [
@@ -1505,19 +1511,16 @@ async def upload_screenshots_batch(
                     "processing_metadata": {"reprocessed": True},
                 },
             )
-            .returning(Screenshot.id, Screenshot.file_path, Screenshot.created_at, Screenshot.updated_at)
+            .returning(Screenshot.id, Screenshot.file_path)
         )
 
         try:
             result = await db.execute(insert_stmt)
             rows = result.fetchall()
 
-            # Map file_path to id and detect duplicates
+            # Map file_path to id
             for row in rows:
                 inserted_ids[row.file_path] = row.id
-                # Duplicate if created_at != updated_at
-                if row.created_at != row.updated_at:
-                    duplicate_paths.add(row.file_path)
 
             # Clear all data for duplicates
             if duplicate_paths:
