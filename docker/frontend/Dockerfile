@@ -10,7 +10,8 @@
 FROM oven/bun:1-alpine AS build
 
 # Install Python and build dependencies for native modules (better-sqlite3)
-RUN apk add --no-cache python3 make g++
+# Cache bust: 2025-01-09-22:30
+RUN apk add --no-cache python3 make g++ && echo "cache-bust-2025-01-09-v2"
 
 WORKDIR /app
 
