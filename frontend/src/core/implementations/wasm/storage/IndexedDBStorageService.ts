@@ -508,6 +508,7 @@ export class IndexedDBStorageService implements IStorageService {
           total,
           page,
           page_size: pageSize,
+          pages: Math.ceil(total / pageSize),
           has_next: offset + items.length < total,
           has_prev: page > 1,
         };
@@ -521,6 +522,7 @@ export class IndexedDBStorageService implements IStorageService {
         total,
         page,
         page_size: pageSize,
+        pages: Math.ceil(total / pageSize),
         has_next: offset + items.length < total,
         has_prev: page > 1,
       };

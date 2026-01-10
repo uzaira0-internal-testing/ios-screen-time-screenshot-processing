@@ -83,9 +83,7 @@ export const api = {
   // Authentication
   auth: {
     async isPasswordRequired(): Promise<boolean> {
-      const { data, error } = await apiClient.GET(
-        "/api/v1/auth/password-required",
-      );
+      const { data, error } = await apiClient.GET("/api/v1/auth/status");
       if (error) {
         console.warn("Failed to check password requirement:", error);
         return false;
