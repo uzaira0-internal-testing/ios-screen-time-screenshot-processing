@@ -86,8 +86,9 @@ async function build() {
   // Get the main bundle filename
   let mainBundle = "";
   for (const output of result.outputs) {
-    const name = output.path.split("/").pop() || "";
-    if (name.startsWith("main-") && name.endsWith(".js")) {
+    // Use path.basename for cross-platform compatibility (Windows uses \ not /)
+    const name = output.path.split(/[/\\]/).pop() || "";
+    if (name.startsWith("main-") && name.endsWith(".js") && !name.endsWith(".map")) {
       mainBundle = name;
     }
     console.log("  \x1b[32m✓\x1b[0m " + name + " (" + (output.size / 1024).toFixed(1) + " KB)");
@@ -129,6 +130,7 @@ async function build() {
   }
 
   // Generate index.html
+  // Use relative paths (./assets/) so it works with any base path prefix
   console.log("\n\x1b[33m[build]\x1b[0m Generating index.html...");
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -136,13 +138,13 @@ async function build() {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>iOS Screenshot Processing</title>
-    <link rel="stylesheet" href="/assets/index.css" />
-    <link rel="manifest" href="/manifest.json" />
+    <link rel="stylesheet" href="./assets/index.css" />
+    <link rel="manifest" href="./manifest.json" />
     <meta name="theme-color" content="#3b82f6" />
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/assets/${mainBundle}"></script>
+    <script type="module" src="./assets/${mainBundle}"></script>
   </body>
 </html>`;
 
