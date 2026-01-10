@@ -21,3 +21,4 @@ ReactDOM.createRoot(rootElement).render(
     </ServiceProvider>
   </React.StrictMode>,
 );
+
