@@ -1,19 +1,16 @@
 /**
- * Application Configuration
+ * Application Configuration (Server Mode Only)
  *
- * Provides configuration for the application based on detected environment
- * and user preferences. Uses the new environment detection system.
+ * WASM mode has been archived. This app runs in server mode exclusively.
  */
 
 import { environment, type AppMode } from "@/config/environment";
 
-export type ProcessingMode = AppMode; // Alias for backward compatibility
+export type ProcessingMode = AppMode;
 
 export interface AppConfig {
   mode: ProcessingMode;
-
   apiBaseUrl?: string;
-
   features: {
     offlineMode: boolean;
     autoProcessing: boolean;
@@ -22,35 +19,30 @@ export interface AppConfig {
 }
 
 /**
- * Detects the current processing mode
- * @deprecated Use environment.mode from @/config/environment instead
+ * @deprecated Use environment.mode directly
  */
 export function detectMode(): ProcessingMode {
-  return environment.mode;
+  return "server";
 }
 
 /**
- * Creates application configuration based on current environment
+ * Creates application configuration for server mode
  */
-export function createConfig(mode?: ProcessingMode): AppConfig {
-  const effectiveMode = mode || environment.mode;
-
+export function createConfig(): AppConfig {
   return {
-    mode: effectiveMode,
+    mode: "server",
     apiBaseUrl: environment.apiBaseUrl || undefined,
     features: {
-      offlineMode: effectiveMode === "wasm",
+      offlineMode: false,
       autoProcessing: true,
-      exportToFile: effectiveMode === "wasm",
+      exportToFile: false,
     },
   };
 }
 
 /**
- * Sets the application mode
- * @deprecated Use setAppMode from @/config/environment instead
+ * @deprecated Mode switching is no longer supported
  */
-export function setMode(mode: ProcessingMode): void {
-  localStorage.setItem("app-mode", mode);
-  window.location.reload();
+export function setMode(): void {
+  console.warn("Mode switching is no longer supported. App runs in server mode only.");
 }

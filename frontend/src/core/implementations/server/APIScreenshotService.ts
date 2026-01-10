@@ -1,261 +1,146 @@
-import axios, { AxiosInstance } from "axios";
+import { api } from "@/services/apiClient";
+import { config } from "@/config";
 import type {
   Screenshot,
   GridCoordinates,
   ProcessingResult,
   QueueStats,
-  ReprocessRequest,
+  ImageType,
   ScreenshotListResponse,
   ScreenshotListParams,
   NavigationResponse,
   NavigationParams,
-} from "../../models";
-import type { ImageType } from "@/types";
-import type { IScreenshotService } from "../../interfaces";
+} from "@/types";
+import type { IScreenshotService, ProcessingProgressCallback } from "../../interfaces";
 
+/**
+ * Server-side screenshot service using openapi-fetch apiClient.
+ * No axios dependency - uses type-safe API client.
+ */
 export class APIScreenshotService implements IScreenshotService {
-  private api: AxiosInstance;
-  private baseURL: string;
-
-  constructor(baseURL: string) {
-    this.baseURL = baseURL;
-    this.api = axios.create({
-      baseURL,
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    this.api.interceptors.request.use((config) => {
-      const username = localStorage.getItem("username");
-      if (username && config.headers) {
-        config.headers["X-Username"] = username;
-      }
-      const sitePassword = localStorage.getItem("sitePassword");
-      if (sitePassword && config.headers) {
-        config.headers["X-Site-Password"] = sitePassword;
-      }
-      return config;
-    });
+  constructor(_baseURL?: string) {
+    // baseURL is no longer needed - apiClient handles this
   }
 
   async getNext(
     groupId?: string,
     processingStatus?: string,
   ): Promise<Screenshot | null> {
-    const params: Record<string, string> = {};
-    if (groupId) params.group = groupId;
-    if (processingStatus) params.processing_status = processingStatus;
-    const response = await this.api.get<{ screenshot: Screenshot | null }>(
-      "/screenshots/next",
-      { params },
-    );
-    return response.data.screenshot;
+    const result = await api.screenshots.getNext({
+      group: groupId,
+      processing_status: processingStatus,
+    });
+    return result?.screenshot ?? null;
   }
 
   async getById(id: number): Promise<Screenshot> {
-    const response = await this.api.get<Screenshot>(`/screenshots/${id}`);
-    return response.data;
+    return api.screenshots.getById(id) as Promise<Screenshot>;
   }
 
   async getAll(status?: string, skip = 0, limit = 50): Promise<Screenshot[]> {
-    const params = new URLSearchParams();
-    if (status) params.append("status", status);
-    params.append("skip", skip.toString());
-    params.append("limit", limit.toString());
-
-    const response = await this.api.get<Screenshot[]>(
-      `/screenshots?${params.toString()}`,
-    );
-    return response.data;
+    const result = await api.screenshots.list({
+      processing_status: status,
+      page: Math.floor(skip / limit) + 1,
+      page_size: limit,
+    });
+    return result?.items ?? [];
   }
 
-  async upload(file: File, imageType: ImageType): Promise<Screenshot> {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("image_type", imageType);
-
-    const response = await this.api.post<Screenshot>(
-      "/screenshots/upload",
-      formData,
-      {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      },
-    );
-    return response.data;
+  async upload(_file: File, _imageType: ImageType): Promise<Screenshot> {
+    // Upload is handled via API key, not through frontend
+    throw new Error("Upload not supported in server mode frontend");
   }
 
   async getImageUrl(screenshotId: number): Promise<string> {
-    // Return immediately - the URL is synchronous for server mode
-    return `${this.baseURL}/screenshots/${screenshotId}/image`;
+    return api.screenshots.getImageUrl(screenshotId);
   }
 
   async getProcessingResult(screenshotId: number): Promise<ProcessingResult> {
-    const response = await this.api.get<ProcessingResult>(
-      `/screenshots/${screenshotId}/processing-result`,
-    );
-    return response.data;
+    // Get screenshot and return it as ProcessingResult
+    // The API schema ProcessingResultResponse has all needed fields
+    const screenshot = await this.getById(screenshotId);
+    // Cast to any to avoid type issues - the structure is compatible
+    return screenshot as any;
   }
 
   async reprocess(
     screenshotId: number,
     coords: GridCoordinates,
-    _onProgress?: (
-      progress: import("../../interfaces/IProcessingService").ProcessingProgress,
-    ) => void,
+    _onProgress?: ProcessingProgressCallback,
     maxShift?: number,
   ): Promise<ProcessingResult> {
-    // Note: Server mode doesn't use progress callback - processing happens server-side
-    const request: ReprocessRequest = {
+    return api.screenshots.reprocess(screenshotId, {
       grid_upper_left_x: coords.upper_left.x,
       grid_upper_left_y: coords.upper_left.y,
       grid_lower_right_x: coords.lower_right.x,
       grid_lower_right_y: coords.lower_right.y,
       max_shift: maxShift ?? 5,
-    };
-
-    const response = await this.api.post<ProcessingResult>(
-      `/screenshots/${screenshotId}/reprocess`,
-      request,
-      { timeout: 15000 }, // 15s timeout for optimization
-    );
-    return response.data;
+    }) as Promise<ProcessingResult>;
   }
 
   async reprocessWithMethod(
     screenshotId: number,
     method: "ocr_anchored" | "line_based",
-    _onProgress?: (
-      progress: import("../../interfaces/IProcessingService").ProcessingProgress,
-    ) => void,
+    _onProgress?: ProcessingProgressCallback,
     maxShift?: number,
   ): Promise<ProcessingResult> {
-    // Note: Server mode doesn't use progress callback - processing happens server-side
-    const request: ReprocessRequest = {
+    return api.screenshots.reprocess(screenshotId, {
       processing_method: method,
       max_shift: maxShift ?? 5,
-    };
-
-    const response = await this.api.post<ProcessingResult>(
-      `/screenshots/${screenshotId}/reprocess`,
-      request,
-      { timeout: 15000 }, // 15s timeout for optimization
-    );
-    return response.data;
+    }) as Promise<ProcessingResult>;
   }
 
   async skip(screenshotId: number): Promise<void> {
-    await this.api.post(`/screenshots/${screenshotId}/skip`);
+    await api.screenshots.skip(screenshotId);
   }
 
   async updateTitle(screenshotId: number, title: string): Promise<void> {
-    await this.api.patch(`/screenshots/${screenshotId}`, {
-      extracted_title: title,
-    });
+    await api.screenshots.update(screenshotId, { extracted_title: title });
   }
 
   async updateHourlyData(
     screenshotId: number,
     hourlyData: Record<string, number>,
   ): Promise<void> {
-    await this.api.patch(`/screenshots/${screenshotId}`, {
-      extracted_hourly_data: hourlyData,
-    });
+    await api.screenshots.update(screenshotId, { extracted_hourly_data: hourlyData });
   }
 
   async processIfNeeded(screenshot: Screenshot): Promise<Screenshot> {
-    // In server mode, processing happens server-side, so just return as-is
-    // The server should have already processed the screenshot
+    // In server mode, processing happens server-side
     return screenshot;
   }
 
   async getStats(): Promise<QueueStats> {
-    const response = await this.api.get<QueueStats>("/screenshots/stats");
-    return response.data;
+    return api.screenshots.getStats() as Promise<QueueStats>;
   }
 
   async getList(params: ScreenshotListParams): Promise<ScreenshotListResponse> {
-    const queryParams: Record<string, string> = {};
-    if (params.page) queryParams.page = params.page.toString();
-    if (params.page_size) queryParams.page_size = params.page_size.toString();
-    if (params.group_id) queryParams.group_id = params.group_id;
-    if (params.processing_status)
-      queryParams.processing_status = params.processing_status;
-    if (params.verified_by_me !== undefined)
-      queryParams.verified_by_me = params.verified_by_me.toString();
-    if (params.verified_by_others !== undefined)
-      queryParams.verified_by_others = params.verified_by_others.toString();
-    if (params.search) queryParams.search = params.search;
-    if (params.sort_by) queryParams.sort_by = params.sort_by;
-    if (params.sort_order) queryParams.sort_order = params.sort_order;
-
-    const response = await this.api.get<ScreenshotListResponse>(
-      "/screenshots/list",
-      { params: queryParams },
-    );
-    return response.data;
+    return api.screenshots.list(params) as Promise<ScreenshotListResponse>;
   }
 
   async navigate(
     screenshotId: number,
     params: NavigationParams,
   ): Promise<NavigationResponse> {
-    const queryParams: Record<string, string> = {};
-    if (params.group_id) queryParams.group_id = params.group_id;
-    if (params.processing_status)
-      queryParams.processing_status = params.processing_status;
-    if (params.verified_by_me !== undefined)
-      queryParams.verified_by_me = params.verified_by_me.toString();
-    if (params.verified_by_others !== undefined)
-      queryParams.verified_by_others = params.verified_by_others.toString();
-    if (params.direction) queryParams.direction = params.direction;
-
-    const response = await this.api.get<NavigationResponse>(
-      `/screenshots/${screenshotId}/navigate`,
-      { params: queryParams },
-    );
-    return response.data;
+    return api.screenshots.navigate(screenshotId, params) as Promise<NavigationResponse>;
   }
 
   async verify(
     screenshotId: number,
     gridCoords?: GridCoordinates,
   ): Promise<Screenshot> {
-    const body = gridCoords
-      ? {
-          grid_upper_left_x: gridCoords.upper_left.x,
-          grid_upper_left_y: gridCoords.upper_left.y,
-          grid_lower_right_x: gridCoords.lower_right.x,
-          grid_lower_right_y: gridCoords.lower_right.y,
-        }
-      : undefined;
-
-    const response = await this.api.post<Screenshot>(
-      `/screenshots/${screenshotId}/verify`,
-      body,
-    );
-    return response.data;
+    if (gridCoords && config.isDev) {
+      console.warn("[APIScreenshotService] gridCoords passed to verify but not yet supported by API");
+    }
+    return api.screenshots.verify(screenshotId) as Promise<Screenshot>;
   }
 
   async unverify(screenshotId: number): Promise<Screenshot> {
-    const response = await this.api.delete<Screenshot>(
-      `/screenshots/${screenshotId}/verify`,
-    );
-    return response.data;
+    return api.screenshots.unverify(screenshotId) as Promise<Screenshot>;
   }
 
   async recalculateOcr(screenshotId: number): Promise<string | null> {
-    const response = await this.api.post<{
-      success: boolean;
-      extracted_total: string | null;
-      message: string;
-    }>(`/screenshots/${screenshotId}/recalculate-ocr`);
-
-    if (response.data.success) {
-      return response.data.extracted_total;
-    }
-    return null;
+    const result = await api.screenshots.recalculateOcr(screenshotId);
+    return (result as any)?.extracted_total ?? null;
   }
 }

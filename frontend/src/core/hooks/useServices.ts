@@ -6,9 +6,7 @@ import type {
   IAnnotationService,
   IConsensusService,
   IStorageService,
-  IProcessingService,
 } from "../interfaces";
-import type { PrefetchService } from "../implementations/wasm/PrefetchService";
 
 function useServiceContainer() {
   const container = useContext(ServiceContext);
@@ -42,22 +40,11 @@ export function useStorageService(): IStorageService {
   return container.resolve<IStorageService>(TOKENS.STORAGE_SERVICE);
 }
 
-export function useProcessingService(): IProcessingService | null {
-  const container = useServiceContainer();
-
-  if (!container.has(TOKENS.PROCESSING_SERVICE)) {
-    return null;
-  }
-
-  return container.resolve<IProcessingService>(TOKENS.PROCESSING_SERVICE);
+// WASM-only services have been archived
+export function useProcessingService(): null {
+  return null;
 }
 
-export function usePrefetchService(): PrefetchService | null {
-  const container = useServiceContainer();
-
-  if (!container.has(TOKENS.PREFETCH_SERVICE)) {
-    return null;
-  }
-
-  return container.resolve<PrefetchService>(TOKENS.PREFETCH_SERVICE);
+export function usePrefetchService(): null {
+  return null;
 }

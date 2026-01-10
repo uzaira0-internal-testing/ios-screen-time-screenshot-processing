@@ -1,33 +1,20 @@
-import axios, { AxiosInstance } from 'axios';
-import type { Consensus } from '../../models';
-import type { IConsensusService } from '../../interfaces';
+import { api } from "@/services/apiClient";
+import type { Consensus } from "@/types";
+import type { IConsensusService } from "../../interfaces";
 
+/**
+ * Server-side consensus service using openapi-fetch apiClient.
+ * No axios dependency - uses type-safe API client.
+ */
 export class APIConsensusService implements IConsensusService {
-  private api: AxiosInstance;
-
-  constructor(baseURL: string) {
-    this.api = axios.create({
-      baseURL,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    this.api.interceptors.request.use((config) => {
-      const username = localStorage.getItem('username');
-      if (username && config.headers) {
-        config.headers['X-Username'] = username;
-      }
-      const sitePassword = localStorage.getItem('sitePassword');
-      if (sitePassword && config.headers) {
-        config.headers['X-Site-Password'] = sitePassword;
-      }
-      return config;
-    });
+  constructor(_baseURL?: string) {
+    // baseURL is no longer needed - apiClient handles this
   }
 
   async getForScreenshot(screenshotId: number): Promise<Consensus> {
-    const response = await this.api.get<Consensus>(`/consensus/${screenshotId}`);
-    return response.data;
+    const result = await api.consensus.getForScreenshot(screenshotId);
+    // The API response shape may differ from the Consensus interface
+    // Transform as needed
+    return result as unknown as Consensus;
   }
 }

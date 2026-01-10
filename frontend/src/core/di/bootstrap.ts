@@ -8,101 +8,40 @@ import { APIAnnotationService } from "../implementations/server/APIAnnotationSer
 import { APIConsensusService } from "../implementations/server/APIConsensusService";
 import { APIStorageService } from "../implementations/server/APIStorageService";
 
-import { WASMScreenshotService } from "../implementations/wasm/WASMScreenshotService";
-import { WASMAnnotationService } from "../implementations/wasm/WASMAnnotationService";
-import { WASMConsensusService } from "../implementations/wasm/WASMConsensusService";
-import { IndexedDBStorageService } from "../implementations/wasm/storage/IndexedDBStorageService";
-import { WASMProcessingService } from "../implementations/wasm/WASMProcessingService";
-import { DataExportService } from "../implementations/wasm/storage/ExportService";
-import { PrefetchService } from "../implementations/wasm/PrefetchService";
-
+/**
+ * Bootstrap services for server mode only.
+ * WASM mode has been archived - this app runs in server mode exclusively.
+ */
 export function bootstrapServices(config: AppConfig): ServiceContainer {
   const container = new ServiceContainer();
+  const apiBaseUrl = config.apiBaseUrl || "/api/v1";
 
   if (runtimeConfig.isDev) {
     console.log(
-      "[Bootstrap] Creating services for mode:",
-      config.mode,
-      "apiBaseUrl:",
-      config.apiBaseUrl,
+      "[Bootstrap] Registering server services with apiBaseUrl:",
+      apiBaseUrl,
     );
   }
 
-  if (config.mode === "server") {
-    const apiBaseUrl = config.apiBaseUrl || "/api/v1";
-    if (runtimeConfig.isDev) {
-      console.log(
-        "[Bootstrap] Registering server mode services with apiBaseUrl:",
-        apiBaseUrl,
-      );
-    }
+  container.registerSingleton(
+    TOKENS.SCREENSHOT_SERVICE,
+    () => new APIScreenshotService(apiBaseUrl),
+  );
 
-    container.registerSingleton(
-      TOKENS.SCREENSHOT_SERVICE,
-      () => new APIScreenshotService(apiBaseUrl),
-    );
+  container.registerSingleton(
+    TOKENS.ANNOTATION_SERVICE,
+    () => new APIAnnotationService(apiBaseUrl),
+  );
 
-    container.registerSingleton(
-      TOKENS.ANNOTATION_SERVICE,
-      () => new APIAnnotationService(apiBaseUrl),
-    );
+  container.registerSingleton(
+    TOKENS.CONSENSUS_SERVICE,
+    () => new APIConsensusService(apiBaseUrl),
+  );
 
-    container.registerSingleton(
-      TOKENS.CONSENSUS_SERVICE,
-      () => new APIConsensusService(apiBaseUrl),
-    );
-
-    container.registerSingleton(
-      TOKENS.STORAGE_SERVICE,
-      () => new APIStorageService(),
-    );
-  } else if (config.mode === "wasm") {
-    container.registerSingleton(
-      TOKENS.STORAGE_SERVICE,
-      () => new IndexedDBStorageService(),
-    );
-
-    container.registerSingleton(
-      TOKENS.PROCESSING_SERVICE,
-      () => new WASMProcessingService(),
-    );
-
-    container.registerSingleton(
-      TOKENS.SCREENSHOT_SERVICE,
-      () =>
-        new WASMScreenshotService(
-          container.resolve(TOKENS.STORAGE_SERVICE),
-          container.resolve(TOKENS.PROCESSING_SERVICE),
-        ),
-    );
-
-    container.registerSingleton(
-      TOKENS.ANNOTATION_SERVICE,
-      () =>
-        new WASMAnnotationService(container.resolve(TOKENS.STORAGE_SERVICE)),
-    );
-
-    container.registerSingleton(
-      TOKENS.CONSENSUS_SERVICE,
-      () => new WASMConsensusService(container.resolve(TOKENS.STORAGE_SERVICE)),
-    );
-
-    container.registerSingleton(
-      TOKENS.EXPORT_SERVICE,
-      () => new DataExportService(),
-    );
-
-    container.registerSingleton(
-      TOKENS.PREFETCH_SERVICE,
-      () =>
-        new PrefetchService(
-          container.resolve(TOKENS.STORAGE_SERVICE),
-          container.resolve(TOKENS.PROCESSING_SERVICE),
-        ),
-    );
-  } else {
-    throw new Error(`Invalid mode: ${config.mode}`);
-  }
+  container.registerSingleton(
+    TOKENS.STORAGE_SERVICE,
+    () => new APIStorageService(),
+  );
 
   if (runtimeConfig.isDev) {
     console.log(

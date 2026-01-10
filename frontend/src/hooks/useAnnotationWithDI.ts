@@ -4,7 +4,6 @@ import {
   useScreenshotService,
   useAnnotationService,
   useConsensusService,
-  usePrefetchService,
 } from "@/core";
 import { createAnnotationStore } from "@/store/createAnnotationStore";
 import { VerifiedScreenshotError } from "@/store/slices/processingSlice";
@@ -27,8 +26,6 @@ export const useAnnotation = (groupId?: string, processingStatus?: string) => {
   const screenshotService = useScreenshotService();
   const annotationService = useAnnotationService();
   const consensusService = useConsensusService();
-  const prefetchService = usePrefetchService();
-  const lastPrefetchedId = useRef<number | null>(null);
 
   // Track the cache key for cleanup
   const cacheKeyRef = useRef<string | null>(null);
@@ -138,21 +135,6 @@ export const useAnnotation = (groupId?: string, processingStatus?: string) => {
     maxShift,
     setMaxShift,
   } = store();
-
-  // Trigger prefetch when screenshot changes
-  useEffect(() => {
-    if (
-      currentScreenshot?.id &&
-      prefetchService &&
-      lastPrefetchedId.current !== currentScreenshot.id
-    ) {
-      lastPrefetchedId.current = currentScreenshot.id;
-      // Prefetch next screenshot in background (don't await)
-      prefetchService.prefetchNext(currentScreenshot.id).catch((err) => {
-        console.warn("[useAnnotation] Prefetch failed:", err);
-      });
-    }
-  }, [currentScreenshot?.id, prefetchService]);
 
   const handleSubmit = useCallback(
     async (notes?: string) => {

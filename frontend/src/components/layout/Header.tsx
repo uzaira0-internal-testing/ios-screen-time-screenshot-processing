@@ -1,11 +1,9 @@
 import { Link, useSearchParams, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { useMode } from "@/hooks/useMode";
 import { PROCESSING_STATUS_LABELS, type ProcessingStatus } from "@/constants/processingStatus";
 
 export const Header = () => {
   const { username, isAuthenticated, isAdmin, logout } = useAuth();
-  const { mode, isAvailable } = useMode();
   const [searchParams] = useSearchParams();
   const location = useLocation();
 
@@ -14,9 +12,6 @@ export const Header = () => {
   const participantId = searchParams.get("participant_id");
   const processingStatus = searchParams.get("processing_status");
   const isAnnotatePage = location.pathname === "/annotate";
-
-  // Only show server-mode features when server is available
-  const showServerFeatures = mode === "server" && isAvailable("server");
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
@@ -28,20 +23,8 @@ export const Header = () => {
               iOS Screen Time
             </Link>
 
-            {/* WASM mode navigation */}
-            {mode === "wasm" && (
-              <nav className="hidden md:flex space-x-4">
-                <Link
-                  to="/"
-                  className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                >
-                  Groups
-                </Link>
-              </nav>
-            )}
-
-            {/* Server mode navigation */}
-            {showServerFeatures && isAuthenticated && (
+            {/* Navigation */}
+            {isAuthenticated && (
               <nav className="hidden md:flex space-x-4">
                 <Link
                   to="/"
@@ -89,7 +72,7 @@ export const Header = () => {
                 <>
                   <span className="text-gray-500">Status:</span>
                   <span
-                    className={`font-medium ${
+                    className={"font-medium " + (
                       processingStatus === "completed"
                         ? "text-green-600"
                         : processingStatus === "failed"
@@ -97,7 +80,7 @@ export const Header = () => {
                           : processingStatus === "pending"
                             ? "text-blue-600"
                             : "text-gray-600"
-                    }`}
+                    )}
                   >
                     {PROCESSING_STATUS_LABELS[processingStatus as ProcessingStatus] || processingStatus}
                   </span>
@@ -108,29 +91,25 @@ export const Header = () => {
 
           {/* Right: User info */}
           <div className="flex items-center space-x-4">
-            {showServerFeatures && (
+            {isAuthenticated && username ? (
               <>
-                {isAuthenticated && username ? (
-                  <>
-                    <span className="text-sm text-gray-700">
-                      Welcome, <span className="font-medium">{username}</span>
-                    </span>
-                    <button
-                      onClick={logout}
-                      className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md text-sm font-medium transition-colors"
-                    >
-                      Logout
-                    </button>
-                  </>
-                ) : (
-                  <Link
-                    to="/login"
-                    className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
-                  >
-                    Login
-                  </Link>
-                )}
+                <span className="text-sm text-gray-700">
+                  Welcome, <span className="font-medium">{username}</span>
+                </span>
+                <button
+                  onClick={logout}
+                  className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                >
+                  Logout
+                </button>
               </>
+            ) : (
+              <Link
+                to="/login"
+                className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+              >
+                Login
+              </Link>
             )}
           </div>
         </div>

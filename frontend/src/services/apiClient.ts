@@ -207,6 +207,58 @@ export const api = {
       throwIfError(error, "Failed to reprocess screenshot");
       return data;
     },
+
+    async navigate(
+      id: number,
+      params: {
+        group_id?: string;
+        processing_status?: string;
+        verified_by_me?: boolean;
+        verified_by_others?: boolean;
+        direction?: "next" | "prev" | "current";
+      },
+    ) {
+      const { data, error } = await apiClient.GET(
+        "/api/v1/screenshots/{screenshot_id}/navigate",
+        {
+          params: {
+            path: { screenshot_id: id },
+            query: params,
+          },
+        },
+      );
+      throwIfError(error, "Failed to navigate screenshots");
+      return data;
+    },
+
+    async update(
+      id: number,
+      updates: {
+        extracted_title?: string | null;
+        extracted_hourly_data?: Record<string, number> | null;
+      },
+    ) {
+      const { data, error } = await apiClient.PATCH(
+        "/api/v1/screenshots/{screenshot_id}",
+        {
+          params: { path: { screenshot_id: id } },
+          body: updates,
+        },
+      );
+      throwIfError(error, "Failed to update screenshot");
+      return data;
+    },
+
+    async recalculateOcr(id: number) {
+      const { data, error } = await apiClient.POST(
+        "/api/v1/screenshots/{screenshot_id}/recalculate-ocr",
+        {
+          params: { path: { screenshot_id: id } },
+        },
+      );
+      throwIfError(error, "Failed to recalculate OCR");
+      return data;
+    },
   },
 
   // Annotations

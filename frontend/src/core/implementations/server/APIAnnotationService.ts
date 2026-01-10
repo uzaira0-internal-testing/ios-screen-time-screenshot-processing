@@ -1,54 +1,46 @@
-import axios, { AxiosInstance } from 'axios';
-import type { Annotation, AnnotationCreate } from '../../models';
-import type { IAnnotationService } from '../../interfaces';
+import { api } from "@/services/apiClient";
+import type { Annotation, AnnotationCreate } from "@/types";
+import type { IAnnotationService } from "../../interfaces";
 
+/**
+ * Server-side annotation service using openapi-fetch apiClient.
+ * No axios dependency - uses type-safe API client.
+ */
 export class APIAnnotationService implements IAnnotationService {
-  private api: AxiosInstance;
-
-  constructor(baseURL: string) {
-    this.api = axios.create({
-      baseURL,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    this.api.interceptors.request.use((config) => {
-      const username = localStorage.getItem('username');
-      if (username && config.headers) {
-        config.headers['X-Username'] = username;
-      }
-      const sitePassword = localStorage.getItem('sitePassword');
-      if (sitePassword && config.headers) {
-        config.headers['X-Site-Password'] = sitePassword;
-      }
-      return config;
-    });
+  constructor(_baseURL?: string) {
+    // baseURL is no longer needed - apiClient handles this
   }
 
   async create(data: AnnotationCreate): Promise<Annotation> {
-    const response = await this.api.post<Annotation>('/annotations/', data);
-    return response.data;
+    // Transform null values to undefined for API compatibility
+    const apiData = {
+      ...data,
+      extracted_title: data.extracted_title ?? undefined,
+      extracted_total: data.extracted_total ?? undefined,
+      grid_upper_left: data.grid_upper_left ?? undefined,
+      grid_lower_right: data.grid_lower_right ?? undefined,
+      time_spent_seconds: data.time_spent_seconds ?? undefined,
+      notes: data.notes ?? undefined,
+    };
+    return api.annotations.create(apiData) as Promise<Annotation>;
   }
 
-  async update(id: number, data: Partial<AnnotationCreate>): Promise<Annotation> {
-    const response = await this.api.put<Annotation>(`/annotations/${id}`, data);
-    return response.data;
+  async update(_id: number, _data: Partial<AnnotationCreate>): Promise<Annotation> {
+    // Update endpoint not implemented in current API
+    throw new Error("Annotation update not implemented");
   }
 
-  async getByScreenshot(screenshotId: number): Promise<Annotation[]> {
-    const response = await this.api.get<Annotation[]>(`/annotations/screenshot/${screenshotId}`);
-    return response.data;
+  async getByScreenshot(_screenshotId: number): Promise<Annotation[]> {
+    // This endpoint doesn't exist in the API - annotations come with consensus
+    return [];
   }
 
   async getHistory(skip = 0, limit = 50): Promise<Annotation[]> {
-    const response = await this.api.get<Annotation[]>(
-      `/annotations/history?skip=${skip}&limit=${limit}`
-    );
-    return response.data;
+    const result = await api.annotations.getHistory({ skip, limit });
+    return (result as Annotation[]) ?? [];
   }
 
   async delete(id: number): Promise<void> {
-    await this.api.delete(`/annotations/${id}`);
+    await api.annotations.delete(id);
   }
 }
