@@ -1,0 +1,285 @@
+import type { StateCreator } from "zustand";
+import type {
+  IScreenshotService,
+  GridCoordinates,
+  ProcessingProgress,
+  Screenshot,
+} from "@/core";
+import type { AnnotationState, ProcessingSlice, UIAnnotation } from "./types";
+import { isVerifiedByCurrentUser } from "./helpers";
+
+/**
+ * Error thrown when user tries to reprocess a verified screenshot.
+ * The UI should catch this and show a user-friendly message.
+ */
+export class VerifiedScreenshotError extends Error {
+  constructor() {
+    super("Cannot reprocess: you have already verified this screenshot");
+    this.name = "VerifiedScreenshotError";
+  }
+}
+
+/**
+ * Helper to update screenshot state from reprocess result.
+ * Centralizes the duplicated state update logic.
+ */
+function createStateUpdateFromResult(
+  state: AnnotationState,
+  result: {
+    extracted_hourly_data?: Record<string, number> | null;
+    extracted_title?: string | null;
+    extracted_total?: string | null;
+    processing_status?: string;
+    issues?: any[];
+    has_blocking_issues?: boolean;
+    alignment_score?: number | null;
+    processing_method?: string | null;
+    grid_detection_confidence?: number | null;
+    grid_upper_left_x?: number | null;
+    grid_upper_left_y?: number | null;
+    grid_lower_right_x?: number | null;
+    grid_lower_right_y?: number | null;
+  },
+  gridCoords?: GridCoordinates,
+): Partial<AnnotationState> {
+  const newGridCoords: GridCoordinates | undefined =
+    gridCoords ||
+    (result.grid_upper_left_x != null
+      ? {
+          upper_left: {
+            x: result.grid_upper_left_x,
+            y: result.grid_upper_left_y || 0,
+          },
+          lower_right: {
+            x: result.grid_lower_right_x || 0,
+            y: result.grid_lower_right_y || 0,
+          },
+        }
+      : undefined);
+
+  return {
+    currentAnnotation: {
+      ...state.currentAnnotation,
+      hourly_values: result.extracted_hourly_data || {},
+      grid_coords: newGridCoords || state.currentAnnotation?.grid_coords,
+    } as UIAnnotation,
+    currentScreenshot: state.currentScreenshot
+      ? ({
+          ...state.currentScreenshot,
+          processing_status: result.processing_status,
+          extracted_hourly_data: result.extracted_hourly_data,
+          extracted_title: result.extracted_title,
+          extracted_total: result.extracted_total,
+          processing_issues: result.issues,
+          has_blocking_issues: result.has_blocking_issues,
+          alignment_score: result.alignment_score ?? null,
+          processing_method: result.processing_method,
+          grid_detection_confidence: result.grid_detection_confidence,
+          grid_upper_left_x: newGridCoords?.upper_left.x ?? null,
+          grid_upper_left_y: newGridCoords?.upper_left.y ?? null,
+          grid_lower_right_x: newGridCoords?.lower_right.x ?? null,
+          grid_lower_right_y: newGridCoords?.lower_right.y ?? null,
+        } as Screenshot)
+      : null,
+    processingIssues: result.issues || [],
+    isAutoProcessed: true,
+  };
+}
+
+export const createProcessingSlice = (
+  screenshotService: IScreenshotService,
+): StateCreator<AnnotationState, [], [], ProcessingSlice> => (set, get) => ({
+  // State
+  processingProgress: null,
+  isTesseractInitialized: false,
+  isInitializingTesseract: false,
+  maxShift: 5, // Default: try ±5 pixels
+
+  // Actions
+  reprocessWithGrid: async (coords: GridCoordinates) => {
+    const { currentScreenshot } = get();
+    if (!currentScreenshot) {
+      throw new Error("No screenshot loaded");
+    }
+
+    // Throw error if user has already verified - UI should catch and show toast
+    if (isVerifiedByCurrentUser(currentScreenshot)) {
+      throw new VerifiedScreenshotError();
+    }
+
+    // Skip reprocessing if grid coordinates unchanged
+    const hasExistingGrid =
+      currentScreenshot.grid_upper_left_x !== null &&
+      currentScreenshot.grid_lower_right_x !== null;
+    const gridUnchanged =
+      hasExistingGrid &&
+      coords.upper_left.x === currentScreenshot.grid_upper_left_x &&
+      coords.upper_left.y === currentScreenshot.grid_upper_left_y &&
+      coords.lower_right.x === currentScreenshot.grid_lower_right_x &&
+      coords.lower_right.y === currentScreenshot.grid_lower_right_y;
+
+    if (gridUnchanged) {
+      set({ isLoading: false, processingProgress: null });
+      return;
+    }
+
+    set({ isLoading: true, error: null, processingProgress: null });
+    try {
+      // Grid adjustment does NOT use optimization - only button clicks do
+      const result = await screenshotService.reprocess(
+        currentScreenshot.id,
+        coords,
+        (progress) => {
+          set({ processingProgress: progress });
+        },
+        0, // No optimization when manually adjusting grid
+      );
+
+      if (result.success && result.extracted_hourly_data) {
+        set((state) => createStateUpdateFromResult(state, result, coords));
+      } else {
+        set({ processingIssues: result.issues || [] });
+      }
+    } catch (error: any) {
+      const message =
+        error.response?.data?.detail ||
+        error.message ||
+        "Failed to reprocess screenshot";
+      set({ error: message });
+      throw error;
+    } finally {
+      set({ isLoading: false, processingProgress: null });
+    }
+  },
+
+  reprocessWithLineBased: async () => {
+    const { currentScreenshot } = get();
+    if (!currentScreenshot) {
+      throw new Error("No screenshot loaded");
+    }
+
+    // Throw error if user has already verified - UI should catch and show toast
+    if (isVerifiedByCurrentUser(currentScreenshot)) {
+      throw new VerifiedScreenshotError();
+    }
+
+    set({ isLoading: true, error: null, processingProgress: null });
+    try {
+      const { maxShift } = get();
+      const result = await screenshotService.reprocessWithMethod(
+        currentScreenshot.id,
+        "line_based",
+        (progress) => {
+          set({ processingProgress: progress });
+        },
+        maxShift,
+      );
+
+      if (result.success && result.extracted_hourly_data) {
+        set((state) => createStateUpdateFromResult(state, result));
+      } else {
+        set({ processingIssues: result.issues || [] });
+      }
+    } catch (error: any) {
+      const message =
+        error.response?.data?.detail ||
+        error.message ||
+        "Failed to reprocess with line-based detection";
+      set({ error: message });
+      throw error;
+    } finally {
+      set({ isLoading: false, processingProgress: null });
+    }
+  },
+
+  reprocessWithOcrAnchored: async () => {
+    const { currentScreenshot } = get();
+    if (!currentScreenshot) {
+      throw new Error("No screenshot loaded");
+    }
+
+    // Throw error if user has already verified - UI should catch and show toast
+    if (isVerifiedByCurrentUser(currentScreenshot)) {
+      throw new VerifiedScreenshotError();
+    }
+
+    set({ isLoading: true, error: null, processingProgress: null });
+    try {
+      const { maxShift } = get();
+      const result = await screenshotService.reprocessWithMethod(
+        currentScreenshot.id,
+        "ocr_anchored",
+        (progress) => {
+          set({ processingProgress: progress });
+        },
+        maxShift,
+      );
+
+      if (result.success && result.extracted_hourly_data) {
+        set((state) => createStateUpdateFromResult(state, result));
+      } else {
+        set({ processingIssues: result.issues || [] });
+      }
+    } catch (error: any) {
+      const message =
+        error.response?.data?.detail ||
+        error.message ||
+        "Failed to reprocess with OCR-anchored detection";
+      set({ error: message });
+      throw error;
+    } finally {
+      set({ isLoading: false, processingProgress: null });
+    }
+  },
+
+  recalculateOcrTotal: async () => {
+    const { currentScreenshot } = get();
+    if (!currentScreenshot) return null;
+
+    try {
+      const newTotal = await screenshotService.recalculateOcr(
+        currentScreenshot.id,
+      );
+
+      if (newTotal) {
+        set({
+          currentScreenshot: {
+            ...currentScreenshot,
+            extracted_total: newTotal,
+          },
+        });
+      }
+
+      return newTotal;
+    } catch (error: any) {
+      const message =
+        error.response?.data?.detail ||
+        error.message ||
+        "Failed to recalculate OCR total";
+      set({ error: message });
+      return null;
+    }
+  },
+
+  setProcessingProgress: (progress: ProcessingProgress | null) => {
+    set({ processingProgress: progress });
+  },
+
+  clearProcessingProgress: () => {
+    set({ processingProgress: null });
+  },
+
+  setTesseractInitialized: (initialized: boolean) => {
+    set({ isTesseractInitialized: initialized });
+  },
+
+  setInitializingTesseract: (initializing: boolean) => {
+    set({ isInitializingTesseract: initializing });
+  },
+
+  setMaxShift: (value: number) => {
+    // Clamp to valid range (0-10)
+    const clamped = Math.max(0, Math.min(10, value));
+    set({ maxShift: clamped });
+  },
+});

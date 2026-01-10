@@ -1,0 +1,23 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build and deploy
+        working-directory: docker
+        run: |
+          # Use .env file from server, only rebuild app containers
+          docker compose -p ios-screen-time-screenshot-processing --env-file /opt/ios-screen-time-screenshot-processing/docker/.env build backend frontend celery-worker
+          docker compose -p ios-screen-time-screenshot-processing --env-file /opt/ios-screen-time-screenshot-processing/docker/.env up -d --no-deps backend frontend celery-worker
+
+      - name: Cleanup old images
+        run: docker image prune -f
