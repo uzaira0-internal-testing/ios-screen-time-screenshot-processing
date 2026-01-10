@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useScreenshotService } from "@/core/hooks/useServices";
+import { config } from "@/config";
 
 /**
  * Hook to get the image URL for a screenshot, handling both server and WASM modes
@@ -9,7 +10,7 @@ export function useScreenshotImage(screenshotId: number): string | null {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (import.meta.env.DEV) {
+    if (config.isDev) {
       console.log(
         `[useScreenshotImage] Effect triggered, screenshotId:`,
         screenshotId,
@@ -18,7 +19,7 @@ export function useScreenshotImage(screenshotId: number): string | null {
 
     // Don't try to load if screenshotId is 0 or invalid
     if (!screenshotId) {
-      if (import.meta.env.DEV) {
+      if (config.isDev) {
         console.log(`[useScreenshotImage] Invalid screenshotId, clearing URL`);
       }
       setImageUrl(null);
@@ -29,14 +30,14 @@ export function useScreenshotImage(screenshotId: number): string | null {
 
     const loadImage = async () => {
       try {
-        if (import.meta.env.DEV) {
+        if (config.isDev) {
           console.log(
             `[useScreenshotImage] Loading image for screenshot ${screenshotId}...`,
           );
         }
         // getImageUrl always returns Promise<string> now
         const resolvedUrl = await screenshotService.getImageUrl(screenshotId);
-        if (import.meta.env.DEV) {
+        if (config.isDev) {
           console.log(`[useScreenshotImage] Resolved URL:`, resolvedUrl);
         }
         setImageUrl(resolvedUrl);

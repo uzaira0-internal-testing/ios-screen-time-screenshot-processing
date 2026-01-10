@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import { ServiceContainer, bootstrapServices } from "../di";
 import { createConfig, AppConfig } from "../config";
+import { config as runtimeConfig } from "@/config";
 
 export const ServiceContext = createContext<ServiceContainer | null>(null);
 
@@ -22,14 +23,14 @@ function getOrCreateContainer(config: AppConfig): ServiceContainer {
     globalConfig.mode === config.mode &&
     globalConfig.apiBaseUrl === config.apiBaseUrl
   ) {
-    if (import.meta.env.DEV) {
+    if (runtimeConfig.isDev) {
       console.log("[ServiceProvider] Reusing existing global container");
     }
     return globalContainer;
   }
 
   // Otherwise create a new one
-  if (import.meta.env.DEV) {
+  if (runtimeConfig.isDev) {
     console.log(
       "[ServiceProvider] Creating new global container, mode:",
       config.mode,
@@ -60,7 +61,7 @@ export const ServiceProvider: React.FC<ServiceProviderProps> = ({
 
   useEffect(() => {
     mountCountRef.current++;
-    if (import.meta.env.DEV) {
+    if (runtimeConfig.isDev) {
       console.log("[ServiceProvider] Mounted, count:", mountCountRef.current);
     }
 
@@ -68,7 +69,7 @@ export const ServiceProvider: React.FC<ServiceProviderProps> = ({
     // In production, cleanup is important. In dev with StrictMode, we skip cleanup
     // to avoid the double-mount issue destroying services
     return () => {
-      if (import.meta.env.DEV) {
+      if (runtimeConfig.isDev) {
         console.log(
           "[ServiceProvider] Cleanup called, mount count:",
           mountCountRef.current,
@@ -77,8 +78,8 @@ export const ServiceProvider: React.FC<ServiceProviderProps> = ({
       // In development, don't destroy services on unmount because StrictMode
       // will immediately remount and the services would be gone
       // In production (no StrictMode), this cleanup is fine
-      if (import.meta.env.PROD) {
-        if (import.meta.env.DEV) {
+      if (runtimeConfig.isProd) {
+        if (runtimeConfig.isDev) {
           console.log("[ServiceProvider] Production mode - destroying services");
         }
         if (globalContainer) {
@@ -87,7 +88,7 @@ export const ServiceProvider: React.FC<ServiceProviderProps> = ({
           globalConfig = null;
         }
       } else {
-        if (import.meta.env.DEV) {
+        if (runtimeConfig.isDev) {
           console.log(
             "[ServiceProvider] Dev mode - keeping services for StrictMode compatibility",
           );

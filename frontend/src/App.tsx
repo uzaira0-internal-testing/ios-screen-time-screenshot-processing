@@ -11,6 +11,7 @@ import { Onboarding } from "./components/pwa/Onboarding";
 import { InitializationScreen } from "./components/common/InitializationScreen";
 import { preloadTesseract } from "./core/implementations/wasm/lazyLoad";
 import { initAPIMessageHandler } from "./core/implementations/wasm/APIMessageHandler";
+import { config } from "./config";
 import type {
   AnnotationSubmittedEvent,
   ScreenshotCompletedEvent,
@@ -148,8 +149,8 @@ function App() {
     return <InitializationScreen progress={initProgress} error={initError} />;
   }
 
-  // Get base path from Vite env (set during Docker build)
-  const basePath = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
+  // Get base path from runtime config (injected by docker-entrypoint.sh)
+  const basePath = config.basePath;
 
   return (
     <BrowserRouter basename={basePath}>

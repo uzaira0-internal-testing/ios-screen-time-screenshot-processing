@@ -3,6 +3,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/services/apiClient";
 import toast from "react-hot-toast";
+import { config } from "@/config";
 
 export const useAuth = () => {
   const {
@@ -25,7 +26,7 @@ export const useAuth = () => {
         .getMe()
         .then((user) => {
           if (user?.id && user.id !== userId) {
-            if (import.meta.env.DEV) {
+            if (config.isDev) {
               console.log(
                 `[useAuth] Updating stale userId: ${userId} -> ${user.id}`,
               );
@@ -34,7 +35,7 @@ export const useAuth = () => {
           }
           // Always update role from server (handles promotions/demotions)
           if (user?.role && user.role !== role) {
-            if (import.meta.env.DEV) {
+            if (config.isDev) {
               console.log(
                 `[useAuth] Updating role: ${role} -> ${user.role}`,
               );

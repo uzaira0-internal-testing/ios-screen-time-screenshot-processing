@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { api, GroupVerificationSummary } from "@/services/apiClient";
 import type { Group } from "@/types";
 import toast from "react-hot-toast";
+import { config } from "@/config";
 
 // Map group ID to verification tier data
 type VerificationTiersMap = Record<string, GroupVerificationSummary>;
@@ -26,7 +27,7 @@ export const HomePage = () => {
       const groupsData = await api.groups.list();
       setGroups(groupsData ?? []);
     } catch (error) {
-      if (import.meta.env.DEV) {
+      if (config.isDev) {
         console.error("Failed to load groups:", error);
       }
     } finally {
@@ -44,7 +45,7 @@ export const HomePage = () => {
       });
       setVerificationTiers(tiersMap);
     } catch (error) {
-      if (import.meta.env.DEV) {
+      if (config.isDev) {
         console.error("Failed to load verification tiers:", error);
       }
     }
@@ -116,7 +117,7 @@ export const HomePage = () => {
 
       toast.success("Exported as CSV");
     } catch (error) {
-      if (import.meta.env.DEV) {
+      if (config.isDev) {
         console.error("Export failed:", error);
       }
       toast.error("Export failed. Please try again.");
@@ -135,7 +136,7 @@ export const HomePage = () => {
       setDeleteConfirm(null);
       loadGroups(false);
     } catch (error) {
-      if (import.meta.env.DEV) {
+      if (config.isDev) {
         console.error("Delete failed:", error);
       }
       toast.error(

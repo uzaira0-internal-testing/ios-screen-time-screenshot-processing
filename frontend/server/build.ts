@@ -61,11 +61,6 @@ async function build() {
   // Bundle JavaScript
   console.log("\x1b[33m[build]\x1b[0m Bundling JavaScript...");
 
-  // Environment variables for the build
-  // These replicate what Vite's import.meta.env provides
-  const basePath = process.env.VITE_BASE_PATH || "/ios-screen-time-screenshot-processing";
-  const apiBaseUrl = process.env.VITE_API_BASE_URL || `${basePath}/api/v1`;
-
   const result = await Bun.build({
     entrypoints: [join(SRC_DIR, "main.tsx")],
     outdir: join(DIST_DIR, "assets"),
@@ -78,15 +73,6 @@ async function build() {
     plugins: [pathAliasPlugin],
     define: {
       "process.env.NODE_ENV": JSON.stringify("production"),
-      // Replicate Vite's import.meta.env
-      "import.meta.env.MODE": JSON.stringify("production"),
-      "import.meta.env.DEV": "false",
-      "import.meta.env.PROD": "true",
-      "import.meta.env.SSR": "false",
-      "import.meta.env.BASE_URL": JSON.stringify(basePath + "/"),
-      "import.meta.env.VITE_API_BASE_URL": JSON.stringify(apiBaseUrl),
-      "import.meta.env.VITE_BASE_PATH": JSON.stringify(basePath),
-      "import.meta.env.VITE_WS_URL": JSON.stringify(""),
     },
   });
 
@@ -159,6 +145,7 @@ async function build() {
   </head>
   <body>
     <div id="root"></div>
+    <script src="./config.js"></script>
     <script type="module" src="./assets/${mainBundle}"></script>
   </body>
 </html>`;

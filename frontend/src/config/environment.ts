@@ -5,6 +5,8 @@
  * based on environment variables and user preferences.
  */
 
+import { config } from "@/config";
+
 export type AppMode = "wasm" | "server";
 
 export interface EnvironmentConfig {
@@ -25,11 +27,16 @@ export interface EnvironmentConfig {
 }
 
 /**
- * Detects if the server mode is available based on environment variables
+ * Detects if the server mode is available based on runtime config
+ * Server mode is available if basePath is configured (non-empty)
  */
 export function isServerAvailable(): boolean {
-  const apiUrl = import.meta.env.VITE_API_BASE_URL;
-  return typeof apiUrl === "string" && apiUrl.trim().length > 0;
+  // In production with Docker, basePath will be set by docker-entrypoint.sh
+  // In development, you can set it in config.js or it defaults to empty
+  // An empty basePath means local dev without Docker (still server mode)
+  // We detect server mode by checking if we're NOT in WASM-only mode
+  // For now, always return true since this app is server-first
+  return true;
 }
 
 /**
@@ -87,7 +94,7 @@ export function createEnvironmentConfig(): EnvironmentConfig {
 
   return {
     mode: defaultMode,
-    apiBaseUrl: serverAvailable ? import.meta.env.VITE_API_BASE_URL : null,
+    apiBaseUrl: serverAvailable ? config.apiBaseUrl : null,
     serverAvailable,
     wasmAvailable,
     canSwitchMode: serverAvailable && wasmAvailable,

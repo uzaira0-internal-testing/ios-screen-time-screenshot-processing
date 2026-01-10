@@ -1,4 +1,5 @@
 import { WebSocketEvent } from '../types/websocket';
+import { config } from '@/config';
 
 type EventListener = (data: any) => void;
 
@@ -206,10 +207,7 @@ let webSocketService: WebSocketService | null = null;
 
 export const getWebSocketService = (): WebSocketService => {
   if (!webSocketService) {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    const wsUrl = import.meta.env.VITE_WS_URL || `${protocol}//${host}/api/ws`;
-    webSocketService = new WebSocketService(wsUrl);
+    webSocketService = new WebSocketService(config.wsUrl);
   }
   return webSocketService;
 };

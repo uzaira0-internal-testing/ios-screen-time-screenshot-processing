@@ -1,6 +1,7 @@
 import { ServiceContainer } from "./Container";
 import { TOKENS } from "./tokens";
 import type { AppConfig } from "../config";
+import { config as runtimeConfig } from "@/config";
 
 import { APIScreenshotService } from "../implementations/server/APIScreenshotService";
 import { APIAnnotationService } from "../implementations/server/APIAnnotationService";
@@ -18,7 +19,7 @@ import { PrefetchService } from "../implementations/wasm/PrefetchService";
 export function bootstrapServices(config: AppConfig): ServiceContainer {
   const container = new ServiceContainer();
 
-  if (import.meta.env.DEV) {
+  if (runtimeConfig.isDev) {
     console.log(
       "[Bootstrap] Creating services for mode:",
       config.mode,
@@ -29,7 +30,7 @@ export function bootstrapServices(config: AppConfig): ServiceContainer {
 
   if (config.mode === "server") {
     const apiBaseUrl = config.apiBaseUrl || "/api/v1";
-    if (import.meta.env.DEV) {
+    if (runtimeConfig.isDev) {
       console.log(
         "[Bootstrap] Registering server mode services with apiBaseUrl:",
         apiBaseUrl,
@@ -103,7 +104,7 @@ export function bootstrapServices(config: AppConfig): ServiceContainer {
     throw new Error(`Invalid mode: ${config.mode}`);
   }
 
-  if (import.meta.env.DEV) {
+  if (runtimeConfig.isDev) {
     console.log(
       "[Bootstrap] Services registered. Container has SCREENSHOT_SERVICE:",
       container.has(TOKENS.SCREENSHOT_SERVICE),

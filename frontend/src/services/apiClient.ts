@@ -8,6 +8,7 @@
 
 import createClient from "openapi-fetch";
 import type { paths, components } from "@/types/api-schema";
+import { config } from "@/config";
 
 // Re-export types from OpenAPI schema for convenience
 export type GroupVerificationSummary = components["schemas"]["GroupVerificationSummary"];
@@ -22,12 +23,12 @@ export type ResolveDisputeResponse = components["schemas"]["ResolveDisputeRespon
 // (e.g., "/api/v1/auth/login", "/api/v1/screenshots/next")
 // Therefore, baseUrl should be the app prefix only (e.g., "/screenshot").
 //
-// VITE_BASE_PATH is the app prefix (e.g., "/screenshot")
-// VITE_API_BASE_URL is the full API path (e.g., "/screenshot/api/v1")
-const API_BASE_URL = import.meta.env.VITE_BASE_PATH || "";
+// config.basePath is the app prefix (e.g., "/ios-screen-time-screenshot-processing")
+// config.apiBaseUrl is the full API path (e.g., "/ios-screen-time-screenshot-processing/api/v1")
+const API_BASE_URL = config.basePath;
 
 // For image URLs that need the full prefix
-const LEGACY_API_PREFIX = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+const LEGACY_API_PREFIX = config.apiBaseUrl;
 
 // Create type-safe client
 export const apiClient = createClient<paths>({ baseUrl: API_BASE_URL });

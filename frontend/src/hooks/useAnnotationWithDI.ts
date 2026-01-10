@@ -10,6 +10,7 @@ import { createAnnotationStore } from "@/store/createAnnotationStore";
 import { VerifiedScreenshotError } from "@/store/slices/processingSlice";
 import toast from "react-hot-toast";
 import { toastErrorWithRetry } from "@/utils/toastWithRetry";
+import { config } from "@/config";
 
 // Store instances keyed by groupId + processingStatus (undefined = no filter)
 // Each entry tracks the store and its reference count
@@ -74,7 +75,7 @@ export const useAnnotation = (groupId?: string, processingStatus?: string) => {
           entry.refCount--;
           if (entry.refCount <= 0) {
             storeInstances.delete(currentKey);
-            if (import.meta.env.DEV) {
+            if (config.isDev) {
               console.log(
                 `[useAnnotation] Cleaned up store for key: ${currentKey}`,
               );
@@ -156,16 +157,16 @@ export const useAnnotation = (groupId?: string, processingStatus?: string) => {
   const handleSubmit = useCallback(
     async (notes?: string) => {
       try {
-        if (import.meta.env.DEV) {
+        if (config.isDev) {
           console.log("[useAnnotation.handleSubmit] Starting submission...");
         }
         await submitAnnotation(notes);
         toast.success("Annotation submitted successfully!");
-        if (import.meta.env.DEV) {
+        if (config.isDev) {
           console.log("[useAnnotation.handleSubmit] Loading next screenshot...");
         }
         await loadNextScreenshot();
-        if (import.meta.env.DEV) {
+        if (config.isDev) {
           console.log("[useAnnotation.handleSubmit] Next screenshot loaded");
         }
       } catch (err: unknown) {
@@ -198,12 +199,12 @@ export const useAnnotation = (groupId?: string, processingStatus?: string) => {
 
   const handleSkip = useCallback(async () => {
     try {
-      if (import.meta.env.DEV) {
+      if (config.isDev) {
         console.log("[useAnnotation.handleSkip] Starting skip...");
       }
       await skipScreenshot();
       toast.success("Screenshot skipped");
-      if (import.meta.env.DEV) {
+      if (config.isDev) {
         console.log("[useAnnotation.handleSkip] Skip completed");
       }
     } catch (err: unknown) {
