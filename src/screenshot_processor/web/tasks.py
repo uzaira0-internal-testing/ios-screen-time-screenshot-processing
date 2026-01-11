@@ -39,6 +39,10 @@ def process_screenshot_task(self, screenshot_id: int, max_shift: int = 5) -> dic
         if not screenshot:
             return {"success": False, "error": "Screenshot not found"}
 
+        # Record when processing actually starts (for timing metrics)
+        screenshot.processing_started_at = datetime.now(timezone.utc)
+        db.commit()
+
         result = process_screenshot_sync(db, screenshot, max_shift=max_shift)
         return {"success": True, "screenshot_id": screenshot_id, "processing_status": result["processing_status"]}
 
@@ -75,6 +79,10 @@ def reprocess_screenshot_task(
         screenshot = db.query(Screenshot).filter(Screenshot.id == screenshot_id).first()
         if not screenshot:
             return {"success": False, "error": "Screenshot not found"}
+
+        # Record when processing actually starts (for timing metrics)
+        screenshot.processing_started_at = datetime.now(timezone.utc)
+        db.commit()
 
         result = process_screenshot_sync(
             db, screenshot, processing_method=processing_method, max_shift=max_shift

@@ -136,6 +136,7 @@ class Screenshot(Base):
     screenshot_date: Mapped[datetime.date | None] = mapped_column(Date, nullable=True, index=True)
 
     processed_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    processing_started_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # OCR processing status
     processing_status: Mapped[ProcessingStatus] = mapped_column(
         SQLEnum(ProcessingStatus, native_enum=False), nullable=False, default=ProcessingStatus.PENDING, index=True

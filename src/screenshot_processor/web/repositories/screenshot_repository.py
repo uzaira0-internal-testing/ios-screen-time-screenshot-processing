@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Sequence
 
-from sqlalchemy import String, and_, case, cast, func, or_, select
+from sqlalchemy import String, and_, case, cast, extract, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from screenshot_processor.web.database import (
@@ -363,6 +363,23 @@ class ScreenshotRepository:
 
     async def list_groups(self) -> list[GroupRead]:
         """List all groups with screenshot counts by processing status."""
+        # Compute processing time in seconds: processed_at - processing_started_at
+        processing_time_expr = extract(
+            "epoch",
+            Screenshot.processed_at - Screenshot.processing_started_at
+        )
+        # Only count processing time for screenshots that have both timestamps
+        valid_time_case = case(
+            (
+                and_(
+                    Screenshot.processing_started_at.isnot(None),
+                    Screenshot.processed_at.isnot(None),
+                ),
+                processing_time_expr,
+            ),
+            else_=None,
+        )
+
         stmt = (
             select(
                 Group,
@@ -379,6 +396,11 @@ class ScreenshotRepository:
                 func.count(
                     case((Screenshot.processing_status == ProcessingStatus.SKIPPED, 1))
                 ).label("skipped"),
+                # Processing time metrics
+                func.sum(valid_time_case).label("total_processing_time"),
+                func.avg(valid_time_case).label("avg_processing_time"),
+                func.min(valid_time_case).label("min_processing_time"),
+                func.max(valid_time_case).label("max_processing_time"),
             )
             .outerjoin(Screenshot, Screenshot.group_id == Group.id)
             .group_by(Group.id)
@@ -397,12 +419,33 @@ class ScreenshotRepository:
                 processing_completed=row.completed,
                 processing_failed=row.failed,
                 processing_skipped=row.skipped,
+                total_processing_time_seconds=float(row.total_processing_time) if row.total_processing_time else None,
+                avg_processing_time_seconds=float(row.avg_processing_time) if row.avg_processing_time else None,
+                min_processing_time_seconds=float(row.min_processing_time) if row.min_processing_time else None,
+                max_processing_time_seconds=float(row.max_processing_time) if row.max_processing_time else None,
             )
             for row in rows
         ]
 
     async def get_group(self, group_id: str) -> GroupRead | None:
         """Get a single group by ID with screenshot counts."""
+        # Compute processing time in seconds: processed_at - processing_started_at
+        processing_time_expr = extract(
+            "epoch",
+            Screenshot.processed_at - Screenshot.processing_started_at
+        )
+        # Only count processing time for screenshots that have both timestamps
+        valid_time_case = case(
+            (
+                and_(
+                    Screenshot.processing_started_at.isnot(None),
+                    Screenshot.processed_at.isnot(None),
+                ),
+                processing_time_expr,
+            ),
+            else_=None,
+        )
+
         stmt = (
             select(
                 Group,
@@ -419,6 +462,11 @@ class ScreenshotRepository:
                 func.count(
                     case((Screenshot.processing_status == ProcessingStatus.SKIPPED, 1))
                 ).label("skipped"),
+                # Processing time metrics
+                func.sum(valid_time_case).label("total_processing_time"),
+                func.avg(valid_time_case).label("avg_processing_time"),
+                func.min(valid_time_case).label("min_processing_time"),
+                func.max(valid_time_case).label("max_processing_time"),
             )
             .outerjoin(Screenshot, Screenshot.group_id == Group.id)
             .where(Group.id == group_id)
@@ -440,6 +488,10 @@ class ScreenshotRepository:
             processing_completed=row.completed,
             processing_failed=row.failed,
             processing_skipped=row.skipped,
+            total_processing_time_seconds=float(row.total_processing_time) if row.total_processing_time else None,
+            avg_processing_time_seconds=float(row.avg_processing_time) if row.avg_processing_time else None,
+            min_processing_time_seconds=float(row.min_processing_time) if row.min_processing_time else None,
+            max_processing_time_seconds=float(row.max_processing_time) if row.max_processing_time else None,
         )
 
     async def get_annotation_count(self, screenshot_id: int) -> int:

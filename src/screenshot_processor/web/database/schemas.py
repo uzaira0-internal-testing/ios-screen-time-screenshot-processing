@@ -574,6 +574,11 @@ class GroupRead(GroupBase):
     processing_failed: int = 0
     processing_skipped: int = 0
     processing_deleted: int = 0
+    # Processing time metrics (in seconds) - computed from screenshots
+    total_processing_time_seconds: float | None = None
+    avg_processing_time_seconds: float | None = None
+    min_processing_time_seconds: float | None = None
+    max_processing_time_seconds: float | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
