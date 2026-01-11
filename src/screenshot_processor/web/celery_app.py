@@ -40,6 +40,6 @@ celery_app.conf.update(
     # Result expiration (1 hour)
     result_expires=3600,
     # Worker settings
-    worker_prefetch_multiplier=1,  # Process one task at a time per worker
-    worker_concurrency=4,  # Number of concurrent workers
+    worker_prefetch_multiplier=2,  # Prefetch 2 tasks per worker for better throughput
+    worker_concurrency=8,  # Number of concurrent workers
 )
