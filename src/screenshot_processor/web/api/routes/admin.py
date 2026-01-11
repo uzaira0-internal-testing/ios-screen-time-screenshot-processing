@@ -574,6 +574,134 @@ async def get_bulk_reprocess_status(
 
 
 # ============================================================================
+# Retry Stuck Screenshots - Admin Only
+# ============================================================================
+
+
+class RetryStuckResponse(BaseModel):
+    success: bool
+    pending_count: int
+    processing_count: int
+    requeued: int
+    marked_failed: int
+    message: str
+
+
+@router.post("/retry-stuck", response_model=RetryStuckResponse)
+@limiter.limit(ADMIN_DESTRUCTIVE_RATE_LIMIT)
+async def retry_stuck_screenshots(
+    request: Request,
+    db: DatabaseSession,
+    admin: User = AdminUser,
+    group_id: str | None = Query(default=None, description="Filter by group ID"),
+    mark_processing_as_failed: bool = Query(
+        default=True,
+        description="Mark screenshots stuck in PROCESSING as FAILED before requeuing PENDING ones",
+    ),
+):
+    """
+    Retry screenshots stuck in PENDING or PROCESSING status.
+
+    This endpoint:
+    1. Optionally marks all PROCESSING screenshots as FAILED (they're stuck/orphaned)
+    2. Requeues all PENDING screenshots to Celery for processing
+
+    Use this when screenshots are stuck and not being processed by Celery workers.
+    Admin only.
+    """
+    from datetime import datetime, timezone
+    from sqlalchemy import update
+    from screenshot_processor.web.database import ProcessingStatus
+
+    try:
+        # Count current stuck screenshots
+        pending_query = select(func.count(Screenshot.id)).where(
+            Screenshot.processing_status == ProcessingStatus.PENDING,
+        )
+        processing_query = select(func.count(Screenshot.id)).where(
+            Screenshot.processing_status == ProcessingStatus.PROCESSING,
+        )
+
+        if group_id:
+            pending_query = pending_query.where(Screenshot.group_id == group_id)
+            processing_query = processing_query.where(Screenshot.group_id == group_id)
+
+        pending_result = await db.execute(pending_query)
+        pending_count = pending_result.scalar() or 0
+
+        processing_result = await db.execute(processing_query)
+        processing_count = processing_result.scalar() or 0
+
+        marked_failed = 0
+
+        # Step 1: Mark PROCESSING screenshots as FAILED (they're orphaned)
+        if mark_processing_as_failed and processing_count > 0:
+            update_query = (
+                update(Screenshot)
+                .where(Screenshot.processing_status == ProcessingStatus.PROCESSING)
+                .values(
+                    processing_status=ProcessingStatus.FAILED,
+                    processing_issues=["Marked as failed by admin: stuck in PROCESSING status"],
+                    processed_at=datetime.now(timezone.utc),
+                )
+            )
+            if group_id:
+                update_query = update_query.where(Screenshot.group_id == group_id)
+
+            result = await db.execute(update_query)
+            marked_failed = result.rowcount
+            await db.commit()
+
+            logger.info(f"Marked {marked_failed} stuck PROCESSING screenshots as FAILED")
+
+        # Step 2: Get all PENDING screenshot IDs and requeue them
+        ids_query = select(Screenshot.id).where(
+            Screenshot.processing_status == ProcessingStatus.PENDING,
+        )
+        if group_id:
+            ids_query = ids_query.where(Screenshot.group_id == group_id)
+
+        ids_result = await db.execute(ids_query)
+        screenshot_ids = [row[0] for row in ids_result.fetchall()]
+
+        requeued = 0
+        if screenshot_ids:
+            from celery import group as celery_group
+            from screenshot_processor.web.tasks import process_screenshot_task
+
+            task_group = celery_group(
+                process_screenshot_task.s(sid) for sid in screenshot_ids
+            )
+            task_group.apply_async()
+            requeued = len(screenshot_ids)
+
+            logger.info(f"Requeued {requeued} PENDING screenshots to Celery")
+
+        logger.info(
+            f"AUDIT: Admin {admin.username} retried stuck screenshots: "
+            f"group={group_id}, pending={pending_count}, processing={processing_count}, "
+            f"marked_failed={marked_failed}, requeued={requeued}"
+        )
+
+        return RetryStuckResponse(
+            success=True,
+            pending_count=pending_count,
+            processing_count=processing_count,
+            requeued=requeued,
+            marked_failed=marked_failed,
+            message=f"Marked {marked_failed} as failed, requeued {requeued} pending screenshots",
+        )
+
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Failed to retry stuck screenshots: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retry stuck screenshots: {str(e)}",
+        )
+
+
+# ============================================================================
 # Database Cleanup - Admin Only
 # ============================================================================
 
