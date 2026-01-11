@@ -73,5 +73,6 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Default command - initialize database and start server
-CMD ["sh", "-c", "python -c 'from src.screenshot_processor.web.database.database import init_db; import asyncio; asyncio.run(init_db())' && uvicorn src.screenshot_processor.web.api.main:app --host 0.0.0.0 --port 8000"]
+# Default command - run migrations and start server
+# Alembic migrations handle all schema changes automatically on deploy
+CMD ["sh", "-c", "alembic upgrade head && uvicorn src.screenshot_processor.web.api.main:app --host 0.0.0.0 --port 8000"]
