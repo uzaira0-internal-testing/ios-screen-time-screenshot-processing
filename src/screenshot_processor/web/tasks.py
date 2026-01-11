@@ -8,12 +8,17 @@ import logging
 import os
 from datetime import datetime, timezone
 
+from celery.exceptions import SoftTimeLimitExceeded
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from screenshot_processor.web.celery_app import celery_app
 from screenshot_processor.web.database.models import ProcessingStatus, Screenshot
 from screenshot_processor.web.services.processing_service import process_screenshot_sync
+
+# Task timeout settings (in seconds)
+SOFT_TIME_LIMIT = 60  # Raise exception after 60s
+HARD_TIME_LIMIT = 90  # Kill task after 90s (fallback)
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +33,13 @@ engine = create_engine(SYNC_DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+@celery_app.task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+    soft_time_limit=SOFT_TIME_LIMIT,
+    time_limit=HARD_TIME_LIMIT,
+)
 def process_screenshot_task(self, screenshot_id: int, max_shift: int = 5) -> dict:
     """Process a screenshot with grid optimization."""
     logger.info(f"Processing screenshot {screenshot_id} with max_shift={max_shift}")
@@ -45,6 +56,21 @@ def process_screenshot_task(self, screenshot_id: int, max_shift: int = 5) -> dic
 
         result = process_screenshot_sync(db, screenshot, max_shift=max_shift)
         return {"success": True, "screenshot_id": screenshot_id, "processing_status": result["processing_status"]}
+
+    except SoftTimeLimitExceeded:
+        # Task timed out - mark as FAILED so it doesn't stay stuck in PROCESSING
+        logger.error(f"Screenshot {screenshot_id} timed out after {SOFT_TIME_LIMIT}s")
+        try:
+            screenshot = db.query(Screenshot).filter(Screenshot.id == screenshot_id).first()
+            if screenshot:
+                screenshot.processing_status = ProcessingStatus.FAILED
+                screenshot.processing_issues = [f"Processing timed out after {SOFT_TIME_LIMIT} seconds"]
+                screenshot.processed_at = datetime.now(timezone.utc)
+                db.commit()
+                logger.info(f"Marked screenshot {screenshot_id} as FAILED due to timeout")
+        except Exception as db_err:
+            logger.error(f"Failed to mark screenshot {screenshot_id} as FAILED: {db_err}")
+        return {"success": False, "error": "timeout", "screenshot_id": screenshot_id}
 
     except Exception as e:
         db.rollback()
@@ -67,7 +93,13 @@ def process_screenshot_task(self, screenshot_id: int, max_shift: int = 5) -> dic
         db.close()
 
 
-@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+@celery_app.task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+    soft_time_limit=SOFT_TIME_LIMIT,
+    time_limit=HARD_TIME_LIMIT,
+)
 def reprocess_screenshot_task(
     self, screenshot_id: int, processing_method: str | None = None, max_shift: int = 5
 ) -> dict:
@@ -88,6 +120,21 @@ def reprocess_screenshot_task(
             db, screenshot, processing_method=processing_method, max_shift=max_shift
         )
         return {"success": True, "screenshot_id": screenshot_id, "processing_status": result["processing_status"]}
+
+    except SoftTimeLimitExceeded:
+        # Task timed out - mark as FAILED so it doesn't stay stuck in PROCESSING
+        logger.error(f"Screenshot {screenshot_id} timed out after {SOFT_TIME_LIMIT}s")
+        try:
+            screenshot = db.query(Screenshot).filter(Screenshot.id == screenshot_id).first()
+            if screenshot:
+                screenshot.processing_status = ProcessingStatus.FAILED
+                screenshot.processing_issues = [f"Processing timed out after {SOFT_TIME_LIMIT} seconds"]
+                screenshot.processed_at = datetime.now(timezone.utc)
+                db.commit()
+                logger.info(f"Marked screenshot {screenshot_id} as FAILED due to timeout")
+        except Exception as db_err:
+            logger.error(f"Failed to mark screenshot {screenshot_id} as FAILED: {db_err}")
+        return {"success": False, "error": "timeout", "screenshot_id": screenshot_id}
 
     except Exception as e:
         db.rollback()
