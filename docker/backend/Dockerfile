@@ -73,6 +73,9 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Default command - run migrations and start server
-# Alembic migrations handle all schema changes automatically on deploy
-CMD ["sh", "-c", "alembic upgrade head && uvicorn src.screenshot_processor.web.api.main:app --host 0.0.0.0 --port 8000"]
+# Copy and set up entrypoint script
+COPY apps/ios-screen-time-screenshot-processing/docker/backend/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Default command - entrypoint handles migrations automatically
+CMD ["/entrypoint.sh"]
