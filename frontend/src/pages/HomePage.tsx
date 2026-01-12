@@ -92,6 +92,7 @@ export const HomePage = () => {
       const response = await fetch(csvUrl, {
         headers: {
           "X-Username": localStorage.getItem("username") || "",
+          "X-Site-Password": localStorage.getItem("sitePassword") || "",
         },
       });
 
