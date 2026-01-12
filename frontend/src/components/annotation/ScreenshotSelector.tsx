@@ -14,7 +14,7 @@ interface ScreenshotSelectorProps {
   onSelectScreenshot: (id: number) => void;
   onSearch: (search: string) => void;
   isLoading: boolean;
-  currentUserId: number | null;
+  currentUsername: string | null;
 }
 
 export const ScreenshotSelector = ({
@@ -29,7 +29,7 @@ export const ScreenshotSelector = ({
   onSelectScreenshot,
   onSearch,
   isLoading,
-  currentUserId,
+  currentUsername,
 }: ScreenshotSelectorProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -74,10 +74,10 @@ export const ScreenshotSelector = ({
   };
 
   const getVerificationBadge = (screenshot: Screenshot) => {
-    const verifierIds = screenshot.verified_by_user_ids || [];
-    const verifierCount = verifierIds.length;
+    const verifierUsernames = screenshot.verified_by_usernames || [];
+    const verifierCount = verifierUsernames.length;
     const isVerifiedByMe =
-      currentUserId !== null && verifierIds.includes(currentUserId);
+      currentUsername !== null && verifierUsernames.includes(currentUsername);
 
     if (verifierCount === 0) {
       return null;
@@ -155,13 +155,13 @@ export const ScreenshotSelector = ({
                 {currentScreenshot.screenshot_date && ` · ${currentScreenshot.screenshot_date}`}
               </span>
               {(() => {
-                const verifierIds =
-                  currentScreenshot.verified_by_user_ids || [];
-                const verifierCount = verifierIds.length;
+                const verifierUsernames =
+                  currentScreenshot.verified_by_usernames || [];
+                const verifierCount = verifierUsernames.length;
                 if (verifierCount === 0) return null;
                 const isVerifiedByMe =
-                  currentUserId !== null &&
-                  verifierIds.includes(currentUserId);
+                  currentUsername !== null &&
+                  verifierUsernames.includes(currentUsername);
                 const colorClasses = isVerifiedByMe
                   ? "bg-green-100 text-green-700"
                   : "bg-yellow-100 text-yellow-700";

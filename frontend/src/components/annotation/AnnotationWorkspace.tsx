@@ -35,7 +35,7 @@ export const AnnotationWorkspace = ({
   initialScreenshotId,
 }: AnnotationWorkspaceProps) => {
   const navigate = useNavigate();
-  const { userId } = useAuth();
+  const { username } = useAuth();
   const {
     screenshot,
     annotation,
@@ -78,9 +78,10 @@ export const AnnotationWorkspace = ({
     useState<ProcessingMethod | null>(null);
 
   // Check if THIS USER has verified the screenshot (read-only mode for them)
+  // Use username-based check as it's more reliable than userId which can get stale
   const isVerifiedByMe = !!(
-    userId &&
-    screenshot?.verified_by_user_ids?.includes(userId)
+    username &&
+    screenshot?.verified_by_usernames?.includes(username)
   );
 
   // Get ALL verifiers' usernames
@@ -361,7 +362,7 @@ export const AnnotationWorkspace = ({
                 onSelectScreenshot={loadById}
                 onSearch={(search) => loadScreenshotList({ search })}
                 isLoading={isLoading}
-                currentUserId={userId}
+                currentUsername={username}
               />
             </div>
 
