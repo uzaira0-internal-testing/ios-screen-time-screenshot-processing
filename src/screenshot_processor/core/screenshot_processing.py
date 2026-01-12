@@ -65,14 +65,23 @@ class ProcessingResult:
 
     def to_dict(self) -> dict:
         """Convert to dictionary for API response."""
+        # Convert numpy types to native Python types for JSON/DB serialization
+        confidence = self.grid_detection_confidence
+        if confidence is not None and hasattr(confidence, "item"):
+            confidence = float(confidence)
+
+        alignment = self.alignment_score
+        if alignment is not None and hasattr(alignment, "item"):
+            alignment = float(alignment)
+
         return {
             "success": self.success,
             "processing_status": self.processing_status,
             "grid_coords": self.grid_bounds.to_dict() if self.grid_bounds else None,
             "processing_method": self.grid_detection_method.value if self.grid_detection_method else None,
-            "grid_detection_confidence": self.grid_detection_confidence,
+            "grid_detection_confidence": confidence,
             "extracted_hourly_data": self.hourly_values,
-            "alignment_score": self.alignment_score,
+            "alignment_score": alignment,
             "extracted_title": self.extracted_title,
             "extracted_total": self.extracted_total,
             "title_y_position": self.title_y_position,
