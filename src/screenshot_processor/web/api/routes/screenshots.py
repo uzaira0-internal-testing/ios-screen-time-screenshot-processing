@@ -1712,7 +1712,9 @@ async def export_consensus_csv(
             "Verified By Count",
             "Annotation Count",
             "Has Consensus",
-            "Consensus Total",
+            "Title",
+            "OCR Total",
+            "Computed Total",
             "Disagreement Count",
             *[f"Hour {i}" for i in range(24)],
         ]
@@ -1720,7 +1722,7 @@ async def export_consensus_csv(
 
     for screenshot, consensus in rows:
         hourly_values = [""] * 24
-        consensus_total = ""
+        computed_total = ""
         disagreement_count = 0
 
         # Priority: resolved (admin dispute resolution) > extracted (single-rater) > consensus (multi-rater)
@@ -1731,6 +1733,12 @@ async def export_consensus_csv(
             hourly_data_source = screenshot.extracted_hourly_data
         elif consensus and consensus.consensus_values:
             hourly_data_source = consensus.consensus_values
+
+        # Title: resolved > extracted
+        title = screenshot.resolved_title or screenshot.extracted_title or ""
+
+        # OCR Total: resolved > extracted
+        ocr_total = screenshot.resolved_total or screenshot.extracted_total or ""
 
         if hourly_data_source:
             total_minutes = 0
@@ -1745,7 +1753,7 @@ async def export_consensus_csv(
                     pass
             hours = int(total_minutes // 60)
             mins = int(total_minutes % 60)
-            consensus_total = f"{hours}h {mins}m" if hours > 0 else f"{mins}m"
+            computed_total = f"{hours}h {mins}m" if hours > 0 else f"{mins}m"
 
         # Count disagreements if consensus exists
         if consensus and consensus.disagreement_details:
@@ -1771,7 +1779,9 @@ async def export_consensus_csv(
                 len(verified_ids),
                 screenshot.current_annotation_count,
                 "Yes" if screenshot.has_consensus else "No",
-                consensus_total,
+                title,
+                ocr_total,
+                computed_total,
                 disagreement_count,
                 *hourly_values,
             ]
