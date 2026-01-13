@@ -1723,10 +1723,11 @@ async def export_consensus_csv(
         consensus_total = ""
         disagreement_count = 0
 
-        # Primary source: screenshot's extracted_hourly_data (single-rater workflow)
-        # Fallback: consensus.consensus_values (multi-rater workflow)
+        # Priority: resolved (admin dispute resolution) > extracted (single-rater) > consensus (multi-rater)
         hourly_data_source = None
-        if screenshot.extracted_hourly_data:
+        if screenshot.resolved_hourly_data:
+            hourly_data_source = screenshot.resolved_hourly_data
+        elif screenshot.extracted_hourly_data:
             hourly_data_source = screenshot.extracted_hourly_data
         elif consensus and consensus.consensus_values:
             hourly_data_source = consensus.consensus_values
