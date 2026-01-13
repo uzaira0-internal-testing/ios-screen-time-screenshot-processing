@@ -71,6 +71,90 @@ def parse_ocr_total(ocr_total: str) -> int | None:
     return total_minutes if total_minutes > 0 else None
 
 
+def generate_7_to_1_alternatives(ocr_total: str) -> list[tuple[str, str]]:
+    """
+    Generate alternative OCR total strings by replacing 7 with 1.
+
+    OCR commonly confuses 7 and 1. This generates all possible alternatives
+    by replacing each 7 with 1.
+
+    Args:
+        ocr_total: Original OCR total string (e.g., "7h 31m")
+
+    Returns:
+        List of (corrected_string, description) tuples.
+        First element is always the original.
+    """
+    if not ocr_total:
+        return []
+
+    alternatives = [(ocr_total, "original")]
+
+    # Find all positions of '7' in the string
+    positions = [i for i, c in enumerate(ocr_total) if c == "7"]
+
+    if not positions:
+        return alternatives
+
+    # Generate alternatives by replacing each 7 with 1
+    for pos in positions:
+        alt = ocr_total[:pos] + "1" + ocr_total[pos + 1 :]
+        desc = f"7->1 at position {pos}"
+        alternatives.append((alt, desc))
+
+    # Also try replacing ALL 7s with 1s if there are multiple
+    if len(positions) > 1:
+        alt = ocr_total.replace("7", "1")
+        alternatives.append((alt, "all 7->1"))
+
+    return alternatives
+
+
+def correct_ocr_total_with_bar_hint(
+    ocr_total: str,
+    bar_total_minutes: int,
+) -> tuple[str, int]:
+    """
+    Correct OCR total using the bar total as a hint for 7/1 confusion.
+
+    If the OCR reads a 7 but replacing it with 1 gives a closer match
+    to the bar total, use the corrected value.
+
+    Args:
+        ocr_total: Original OCR total string (e.g., "7h 31m")
+        bar_total_minutes: Sum of hourly bar values in minutes
+
+    Returns:
+        Tuple of (corrected_ocr_total, corrected_minutes)
+    """
+    alternatives = generate_7_to_1_alternatives(ocr_total)
+
+    if not alternatives:
+        parsed = parse_ocr_total(ocr_total)
+        return ocr_total, parsed or 0
+
+    best_total = ocr_total
+    best_minutes = parse_ocr_total(ocr_total) or 0
+    best_diff = abs(best_minutes - bar_total_minutes)
+
+    for alt_total, desc in alternatives[1:]:  # Skip original (already processed)
+        alt_minutes = parse_ocr_total(alt_total)
+        if alt_minutes is None:
+            continue
+
+        diff = abs(alt_minutes - bar_total_minutes)
+        if diff < best_diff:
+            logger.info(
+                f"OCR 7->1 correction: '{ocr_total}' ({best_minutes}m) -> '{alt_total}' ({alt_minutes}m) "
+                f"[bar={bar_total_minutes}m, diff {best_diff}->{diff}] ({desc})"
+            )
+            best_total = alt_total
+            best_minutes = alt_minutes
+            best_diff = diff
+
+    return best_total, best_minutes
+
+
 def optimize_boundaries(
     image: np.ndarray,
     initial_bounds: GridBounds,
@@ -195,18 +279,24 @@ def optimize_boundaries(
                             converged=True,
                         )
 
+    # Apply OCR 7->1 correction using bar total as a hint
+    corrected_ocr_total, corrected_minutes = correct_ocr_total_with_bar_hint(
+        ocr_total, int(best_bar_total)
+    )
+    final_diff = abs(int(best_bar_total) - corrected_minutes)
+
     logger.debug(
         f"Optimization complete: shift=({best_shift_x}, {best_shift_y}, {best_shift_width}), "
-        f"bar_total={best_bar_total}, ocr_total={target_minutes}, diff={best_diff}"
+        f"bar_total={best_bar_total}, ocr_total={corrected_minutes} (original: {target_minutes}), diff={final_diff}"
     )
 
     return OptimizationResult(
         bounds=best_bounds,
         bar_total_minutes=int(best_bar_total),
-        ocr_total_minutes=target_minutes,
+        ocr_total_minutes=corrected_minutes,
         shift_x=best_shift_x,
         shift_y=best_shift_y,
         shift_width=best_shift_width,
         iterations=iterations,
-        converged=best_diff <= 1,  # Within 1 minute is considered converged
+        converged=final_diff <= 1,  # Within 1 minute is considered converged
     )
