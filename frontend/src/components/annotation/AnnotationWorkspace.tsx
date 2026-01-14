@@ -13,9 +13,11 @@ import { IssueDisplay } from "./IssueDisplay";
 import { DuplicateWarning } from "./DuplicateWarning";
 import { ScreenshotSelector } from "./ScreenshotSelector";
 import { VerificationFilter } from "./VerificationFilter";
+import { ProcessingStatusFilter } from "./ProcessingStatusFilter";
 import { SaveStatusIndicator } from "./SaveStatusIndicator";
 import { TotalsDisplay } from "./TotalsDisplay";
 import { AlignmentWarning } from "./AlignmentWarning";
+import type { ProcessingStatus } from "@/constants/processingStatus";
 import { useScreenshotImage } from "@/hooks/useScreenshotImage";
 import toast from "react-hot-toast";
 
@@ -214,6 +216,18 @@ export const AnnotationWorkspace = ({
     unverifyCurrentScreenshot,
   ]);
 
+  // Handler for changing processing status filter
+  const handleProcessingStatusChange = useCallback(
+    (newStatus: ProcessingStatus | "all") => {
+      const searchParams = new URLSearchParams();
+      if (groupId) searchParams.set("group", groupId);
+      if (newStatus !== "all") searchParams.set("processing_status", newStatus);
+      const search = searchParams.toString();
+      navigate(`/annotate${search ? `?${search}` : ""}`, { replace: false });
+    },
+    [groupId, navigate]
+  );
+
   useKeyboardShortcuts([
     {
       key: "Escape",
@@ -242,17 +256,43 @@ export const AnnotationWorkspace = ({
   if (noScreenshots) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="text-center">
+        <div className="text-center max-w-md">
           <div className="text-6xl mb-4">All Done!</div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            No Screenshots Available
+            No Screenshots in Queue
           </h2>
-          <p className="text-gray-600 mb-4">
-            There are no screenshots in the queue to annotate.
+          <p className="text-gray-600 mb-6">
+            {groupId ? (
+              <>No screenshots match the current filter for group <span className="font-semibold">{groupId}</span>.</>
+            ) : (
+              "No screenshots match the current filter."
+            )}
           </p>
-          <p className="text-sm text-gray-500">
-            An admin needs to upload screenshots first.
-          </p>
+
+          {/* Filter controls */}
+          <div className="bg-gray-50 rounded-lg p-4 space-y-4 text-left">
+            <div>
+              <div className="text-xs text-gray-500 mb-2 font-medium">Processing Status</div>
+              <ProcessingStatusFilter
+                value={(processingStatus as ProcessingStatus) || "all"}
+                onChange={handleProcessingStatusChange}
+              />
+            </div>
+            <div>
+              <div className="text-xs text-gray-500 mb-2 font-medium">Verification Status</div>
+              <VerificationFilter
+                value={verificationFilter}
+                onChange={setVerificationFilter}
+              />
+            </div>
+          </div>
+
+          <button
+            onClick={() => navigate("/")}
+            className="mt-6 px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+          >
+            Back to Groups
+          </button>
         </div>
       </div>
     );
@@ -366,13 +406,22 @@ export const AnnotationWorkspace = ({
               />
             </div>
 
-            {/* Verification Filter */}
-            <div className="border-b border-gray-100 pb-2">
-              <div className="text-xs text-gray-500 mb-1">Filter</div>
-              <VerificationFilter
-                value={verificationFilter}
-                onChange={setVerificationFilter}
-              />
+            {/* Filters */}
+            <div className="border-b border-gray-100 pb-2 space-y-2">
+              <div>
+                <div className="text-xs text-gray-500 mb-1">Status</div>
+                <ProcessingStatusFilter
+                  value={(processingStatus as ProcessingStatus) || "all"}
+                  onChange={handleProcessingStatusChange}
+                />
+              </div>
+              <div>
+                <div className="text-xs text-gray-500 mb-1">Verified</div>
+                <VerificationFilter
+                  value={verificationFilter}
+                  onChange={setVerificationFilter}
+                />
+              </div>
             </div>
 
             {/* Alignment Score Warning */}
