@@ -1725,20 +1725,10 @@ async def export_consensus_csv(
         computed_total = ""
         disagreement_count = 0
 
-        # Priority: resolved (admin dispute resolution) > extracted (single-rater) > consensus (multi-rater)
-        hourly_data_source = None
-        if screenshot.resolved_hourly_data:
-            hourly_data_source = screenshot.resolved_hourly_data
-        elif screenshot.extracted_hourly_data:
-            hourly_data_source = screenshot.extracted_hourly_data
-        elif consensus and consensus.consensus_values:
-            hourly_data_source = consensus.consensus_values
-
-        # Title: resolved > extracted
-        title = screenshot.resolved_title or screenshot.extracted_title or ""
-
-        # OCR Total: resolved > extracted
-        ocr_total = screenshot.resolved_total or screenshot.extracted_total or ""
+        # Use extracted_* fields directly - dispute resolution updates these in place
+        hourly_data_source = screenshot.extracted_hourly_data
+        title = screenshot.extracted_title or ""
+        ocr_total = screenshot.extracted_total or ""
 
         if hourly_data_source:
             total_minutes = 0

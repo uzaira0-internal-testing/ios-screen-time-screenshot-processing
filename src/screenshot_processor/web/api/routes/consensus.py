@@ -336,8 +336,9 @@ async def resolve_dispute(
     """
     Resolve a dispute by setting the final agreed-upon values.
 
-    Requires admin role. Original annotations are preserved - resolved values
-    are stored separately on the screenshot.
+    Requires admin role. Updates the screenshot's extracted_* fields directly
+    (like a normal GUI edit), so changes are immediately visible everywhere.
+    Original OCR values are preserved in resolved_* fields for audit/rollback.
     """
     # Admin-only
     if current_user.role != UserRole.ADMIN.value:
@@ -360,12 +361,17 @@ async def resolve_dispute(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Screenshot does not have multiple verifiers to resolve"
         )
 
-    # Store resolved values separately - DO NOT modify original annotations
-    screenshot.resolved_hourly_data = request.hourly_values
+    # Store ORIGINAL values in resolved_* fields for audit/rollback
+    screenshot.resolved_hourly_data = screenshot.extracted_hourly_data
+    screenshot.resolved_title = screenshot.extracted_title
+    screenshot.resolved_total = screenshot.extracted_total
+
+    # Update extracted_* fields directly (like a GUI edit) - visible everywhere immediately
+    screenshot.extracted_hourly_data = request.hourly_values
     if request.extracted_title is not None:
-        screenshot.resolved_title = request.extracted_title
+        screenshot.extracted_title = request.extracted_title
     if request.extracted_total is not None:
-        screenshot.resolved_total = request.extracted_total
+        screenshot.extracted_total = request.extracted_total
 
     # Track who resolved and when
     screenshot.resolved_at = datetime.datetime.now(datetime.timezone.utc)
@@ -376,7 +382,7 @@ async def resolve_dispute(
     return ResolveDisputeResponse(
         success=True,
         screenshot_id=screenshot_id,
-        message="Dispute resolved successfully. Original annotations preserved, resolved values stored separately.",
+        message="Dispute resolved. Values updated and visible in queue. Original OCR values preserved for rollback.",
         resolved_at=screenshot.resolved_at,
         resolved_by_user_id=current_user.id,
         resolved_by_username=current_user.username,
