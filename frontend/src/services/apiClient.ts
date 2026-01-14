@@ -154,6 +154,7 @@ export const api = {
       group_id?: string;
       processing_status?: string;
       verified_by_me?: boolean;
+      verified_by_others?: boolean;
       search?: string;
       sort_by?: string;
       sort_order?: string;
