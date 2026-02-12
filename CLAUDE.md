@@ -70,6 +70,33 @@ docker compose -f docker/docker-compose.wasm.yml up -d
 cd docker && docker compose -f docker-compose.dev.yml up -d
 ```
 
+### Database Backups
+
+Automated daily backups run at 2:00 AM via systemd timer. Backups are stored on the **host filesystem** (`/home/uzair/backups/ios-screen-time/`), completely outside Docker volumes.
+
+```bash
+# Manual backup (DB + uploaded files)
+./scripts/backup-db.sh
+
+# Database-only backup
+./scripts/backup-db.sh --db-only
+
+# List available backups
+./scripts/restore-db.sh --list
+
+# Restore latest backup (interactive — asks for confirmation)
+./scripts/restore-db.sh
+
+# Restore specific backup
+./scripts/restore-db.sh /home/uzair/backups/ios-screen-time/db/<file>.dump
+
+# Check timer status
+systemctl --user status screenshot-backup.timer
+
+# View backup logs
+cat /home/uzair/backups/ios-screen-time/logs/backup.log
+```
+
 ### Docker Directory Structure
 
 ```
@@ -346,7 +373,6 @@ The following items were identified during code reviews (see `docs/reviews/` fol
 
 | Item | Effort | Description |
 |------|--------|-------------|
-| Backup Strategy | 2h | Document and implement automated backup for PostgreSQL and uploaded files |
 | Structured Logging | 2h | Add JSON-formatted logging for production log aggregation |
 | Remove duplicate hook | 30m | Remove legacy `hooks/useAnnotation.ts` (replaced by `useAnnotationWithDI.ts`) |
 
