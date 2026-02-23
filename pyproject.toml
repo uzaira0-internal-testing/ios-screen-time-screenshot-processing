@@ -63,9 +63,9 @@ ocr = [
 ]
 
 preprocessing = [
-    "ios-device-detector @ file:///opt/research-pipeline/temp/packages/ios-device-detector",
-    "ipad-screenshot-cropper @ file:///opt/research-pipeline/temp/packages/ipad-screenshot-cropper",
-    "phi-detector-remover @ file:///opt/research-pipeline/temp/packages/phi-detector-remover",
+    "ios-device-detector @ file:///opt/packages/ios-device-detector",
+    "ipad-screenshot-cropper @ file:///opt/packages/ipad-screenshot-cropper",
+    "phi-detector-remover @ file:///opt/packages/phi-detector-remover",
 ]
 
 dev = [

@@ -40,6 +40,9 @@ COPY packages/fastapi-tasks /app/packages/fastapi-tasks
 # Copy app dependency files
 COPY apps/ios-screen-time-screenshot-processing/pyproject.toml ./
 
+# Copy preprocessing packages (local dependencies)
+COPY docker/backend/packages/ /opt/packages/
+
 # Create minimal src structure needed for editable install
 RUN mkdir -p src/screenshot_processor && \
     touch src/screenshot_processor/__init__.py

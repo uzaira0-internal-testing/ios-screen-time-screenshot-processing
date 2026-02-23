@@ -195,17 +195,20 @@ def detect_phi(
         pipeline = builder_fn().build()
         result = pipeline.process(image_bytes)
 
+        # PipelineResult API: .has_phi, .region_count, .aggregated_regions, .get_regions_for_redaction()
+        regions = result.get_regions_for_redaction()
+
         detector_results: dict[str, float] = {}
-        for region in result.regions:
-            detector_name = getattr(region, "detector_name", "unknown")
-            confidence = getattr(region, "confidence", 0.0)
+        for region in regions:
+            detector_name = getattr(region, "source", "unknown")
+            confidence = getattr(region, "score", 0.0)
             if detector_name not in detector_results or confidence > detector_results[detector_name]:
                 detector_results[detector_name] = confidence
 
         return PHIDetectionResult(
-            phi_detected=len(result.regions) > 0,
-            regions_count=len(result.regions),
-            regions=list(result.regions),
+            phi_detected=result.has_phi,
+            regions_count=result.region_count,
+            regions=regions,
             detector_results=detector_results,
         )
 
@@ -401,7 +404,9 @@ def preprocess_screenshot_sync(
     effective_phi_preset = phi_pipeline_preset or getattr(settings, "PHI_PIPELINE_PRESET", "hipaa_compliant")
     effective_phi_method = phi_redaction_method or getattr(settings, "PHI_REDACTION_METHOD", "redbox")
 
-    file_path = screenshot.file_path
+    # Always preprocess from the original file, not a previously preprocessed version
+    existing_preprocessing = (screenshot.processing_metadata or {}).get("preprocessing", {})
+    file_path = existing_preprocessing.get("original_file_path", screenshot.file_path)
     logger.info(f"Preprocessing screenshot {screenshot.id}: {file_path}")
 
     # Run preprocessing pipeline

@@ -18,7 +18,7 @@ export type ProcessingIssueRead = components["schemas"]["ProcessingIssueRead"];
 
 // User types
 export type User = components["schemas"]["UserRead"];
-export type UserLogin = components["schemas"]["UserLoginRequest"];
+export type UserLogin = components["schemas"]["UserLogin"];
 export type UserStatsRead = components["schemas"]["UserStatsRead"];
 export type UserUpdateResponse = components["schemas"]["UserUpdateResponse"];
 

@@ -47,7 +47,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/auth/status": {
+    "/api/v1/auth/password-required": {
         parameters: {
             query?: never;
             header?: never;
@@ -55,37 +55,12 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Auth Status
-         * @description Check if authentication is required.
-         *
-         *     Public endpoint - frontend uses this to determine if login is needed.
+         * Password Required
+         * @description Check if password is required for login.
          */
-        get: operations["auth_status_api_v1_auth_status_get"];
+        get: operations["password_required_api_v1_auth_password_required_get"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/verify": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Verify Password
-         * @description Verify site password (stateless check).
-         *
-         *     Does not create a session - frontend should store password
-         *     and send via X-Site-Password header on subsequent requests.
-         */
-        post: operations["verify_password_api_v1_auth_verify_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -103,9 +78,10 @@ export interface paths {
         put?: never;
         /**
          * Login
-         * @description Login with username and optional password.
+         * @description Simple session-based login. Returns user info.
+         *     Frontend stores username and sends it via x-username header on subsequent requests.
          *
-         *     Auto-creates user on first login. Returns user info.
+         *     If ACCESS_PASSWORD is configured, the password must match.
          */
         post: operations["login_api_v1_auth_login_post"];
         delete?: never;
@@ -121,13 +97,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get Me
-         * @description Get current user info.
-         *
-         *     Requires X-Username header (and X-Site-Password if configured).
-         */
-        get: operations["get_me_api_v1_auth_me_get"];
+        /** Get Current User Info */
+        get: operations["get_current_user_info_api_v1_auth_me_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -754,9 +725,8 @@ export interface paths {
          * Resolve Dispute
          * @description Resolve a dispute by setting the final agreed-upon values.
          *
-         *     Requires admin role. Updates the screenshot's extracted_* fields directly
-         *     (like a normal GUI edit), so changes are immediately visible everywhere.
-         *     Original OCR values are preserved in resolved_* fields for audit/rollback.
+         *     Requires admin role. Original annotations are preserved - resolved values
+         *     are stored separately on the screenshot.
          */
         post: operations["resolve_dispute_api_v1_consensus_screenshots__screenshot_id__resolve_post"];
         delete?: never;
@@ -794,7 +764,7 @@ export interface paths {
         };
         /**
          * Get Consensus Analysis
-         * @description Get consensus analysis for a specific screenshot.
+         * @description Get consensus analysis for a specific screenshot (legacy endpoint).
          */
         get: operations["get_consensus_analysis_api_v1_consensus__screenshot_id__get"];
         put?: never;
@@ -816,7 +786,7 @@ export interface paths {
         put?: never;
         /**
          * Recalculate Consensus
-         * @description Recalculate consensus for a specific screenshot.
+         * @description Recalculate consensus for a specific screenshot (legacy endpoint).
          */
         post: operations["recalculate_consensus_api_v1_consensus__screenshot_id__recalculate_post"];
         delete?: never;
@@ -984,33 +954,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/admin/retry-stuck": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Retry Stuck Screenshots
-         * @description Retry screenshots stuck in PENDING or PROCESSING status.
-         *
-         *     This endpoint:
-         *     1. Optionally marks all PROCESSING screenshots as FAILED (they're stuck/orphaned)
-         *     2. Requeues all PENDING screenshots to Celery for processing
-         *
-         *     Use this when screenshots are stuck and not being processed by Celery workers.
-         *     Admin only.
-         */
-        post: operations["retry_stuck_screenshots_api_v1_admin_retry_stuck_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/admin/orphaned-entries": {
         parameters: {
             query?: never;
@@ -1047,74 +990,6 @@ export interface paths {
          *     Admin only.
          */
         post: operations["cleanup_orphaned_entries_api_v1_admin_cleanup_orphaned_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/session/login": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Session Login
-         * @description Login with username and optional password, get session cookie.
-         *
-         *     Creates a session and sets an HTTP-only secure cookie.
-         *     Frontend should redirect here if no valid session exists.
-         */
-        post: operations["session_login_api_v1_auth_session_login_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/session/logout": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Session Logout
-         * @description Logout and clear session cookie.
-         *
-         *     Deletes the session from storage and clears the cookie.
-         */
-        post: operations["session_logout_api_v1_auth_session_logout_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/session/me": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Session Me
-         * @description Get current session info.
-         *
-         *     Returns the username from the current session.
-         *     Requires valid session (enforced by middleware).
-         */
-        get: operations["session_me_api_v1_auth_session_me_get"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1251,17 +1126,6 @@ export interface components {
              * @default []
              */
             issues: components["schemas"]["ProcessingIssueRead"][];
-        };
-        /**
-         * AuthStatusResponse
-         * @description Response for auth status check.
-         */
-        AuthStatusResponse: {
-            /**
-             * Password Required
-             * @description Whether password is required
-             */
-            password_required: boolean;
         };
         /**
          * BatchItemResult
@@ -1694,30 +1558,11 @@ export interface components {
             /** Screenshots Without Group */
             screenshots_without_group: number;
         };
-        /**
-         * PasswordVerifyRequest
-         * @description Request body for password verification.
-         */
-        PasswordVerifyRequest: {
-            /**
-             * Password
-             * @description Site password to verify
-             */
-            password: string;
-        };
-        /**
-         * PasswordVerifyResponse
-         * @description Response from password verification.
-         */
-        PasswordVerifyResponse: {
-            /**
-             * Valid
-             * @description Whether the password is valid
-             */
-            valid: boolean;
+        /** PasswordRequiredResponse */
+        PasswordRequiredResponse: {
             /**
              * Password Required
-             * @description Whether password is required
+             * @description Whether password is required for login
              */
             password_required: boolean;
         };
@@ -1993,21 +1838,6 @@ export interface components {
             resolved_by_user_id?: number | null;
             /** Resolved By Username */
             resolved_by_username?: string | null;
-        };
-        /** RetryStuckResponse */
-        RetryStuckResponse: {
-            /** Success */
-            success: boolean;
-            /** Pending Count */
-            pending_count: number;
-            /** Processing Count */
-            processing_count: number;
-            /** Requeued */
-            requeued: number;
-            /** Marked Failed */
-            marked_failed: number;
-            /** Message */
-            message: string;
         };
         /**
          * RootResponse
@@ -2460,40 +2290,6 @@ export interface components {
             /** Idempotency Key */
             idempotency_key?: string | null;
         };
-        /**
-         * SessionLoginRequest
-         * @description Request body for session-based login.
-         */
-        SessionLoginRequest: {
-            /** Username */
-            username: string;
-            /**
-             * Password
-             * @description Site password. Required if SITE_PASSWORD is configured.
-             */
-            password?: string | null;
-        };
-        /**
-         * SessionLoginResponse
-         * @description Response from session login.
-         */
-        SessionLoginResponse: {
-            /**
-             * Success
-             * @description Whether login was successful
-             */
-            success: boolean;
-            /**
-             * Username
-             * @description The logged-in username
-             */
-            username: string;
-            /**
-             * Expires In Seconds
-             * @description Session lifetime in seconds
-             */
-            expires_in_seconds: number;
-        };
         /** StatsResponse */
         StatsResponse: {
             /** Total Screenshots */
@@ -2554,16 +2350,13 @@ export interface components {
          * @enum {string}
          */
         UploadErrorCode: "invalid_api_key" | "invalid_base64" | "unsupported_format" | "image_too_large" | "checksum_mismatch" | "invalid_callback_url" | "batch_too_large" | "rate_limited" | "storage_error" | "database_error";
-        /**
-         * UserLoginRequest
-         * @description Request body for user login (Variant B).
-         */
-        UserLoginRequest: {
+        /** UserLogin */
+        UserLogin: {
             /** Username */
             username: string;
             /**
              * Password
-             * @description Site password. Required if SITE_PASSWORD is configured.
+             * @description Shared access password. Required if ACCESS_PASSWORD is set in server config.
              */
             password?: string | null;
         };
@@ -2631,6 +2424,10 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+            /** Input */
+            input?: unknown;
+            /** Context */
+            ctx?: Record<string, never>;
         };
         /**
          * VerifierAnnotation
@@ -2729,7 +2526,7 @@ export interface operations {
             };
         };
     };
-    auth_status_api_v1_auth_status_get: {
+    password_required_api_v1_auth_password_required_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2744,40 +2541,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AuthStatusResponse"];
-                };
-            };
-        };
-    };
-    verify_password_api_v1_auth_verify_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PasswordVerifyRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PasswordVerifyResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["PasswordRequiredResponse"];
                 };
             };
         };
@@ -2791,7 +2555,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["UserLoginRequest"];
+                "application/json": components["schemas"]["UserLogin"];
             };
         };
         responses: {
@@ -2815,12 +2579,11 @@ export interface operations {
             };
         };
     };
-    get_me_api_v1_auth_me_get: {
+    get_current_user_info_api_v1_auth_me_get: {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -2909,8 +2672,7 @@ export interface operations {
                 browse?: boolean;
             };
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -2941,8 +2703,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -2973,8 +2734,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -3024,8 +2784,7 @@ export interface operations {
                 sort_order?: string;
             };
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -3056,8 +2815,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -3090,8 +2848,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -3132,8 +2889,7 @@ export interface operations {
                 status?: string | null;
             };
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -3164,8 +2920,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -3196,8 +2951,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -3230,8 +2984,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -3268,8 +3021,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -3313,8 +3065,7 @@ export interface operations {
                 direction?: string;
             };
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -3378,8 +3129,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -3412,8 +3162,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -3446,8 +3195,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -3556,8 +3304,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -3590,8 +3337,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -3628,8 +3374,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -3673,8 +3418,7 @@ export interface operations {
                 processing_status?: string | null;
             };
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -3705,8 +3449,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -3744,8 +3487,7 @@ export interface operations {
                 limit?: number;
             };
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -3776,8 +3518,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path: {
                 annotation_id: number;
@@ -3810,8 +3551,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path: {
                 annotation_id: number;
@@ -3848,8 +3588,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path: {
                 annotation_id: number;
@@ -3880,8 +3619,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -3915,8 +3653,7 @@ export interface operations {
                 tier: "single_verified" | "agreed" | "disputed";
             };
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path: {
                 group_id: string;
@@ -3949,8 +3686,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -3983,8 +3719,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -4021,8 +3756,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -4053,8 +3787,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -4087,8 +3820,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -4121,8 +3853,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -4156,8 +3887,7 @@ export interface operations {
                 role?: string | null;
             };
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path: {
                 user_id: number;
@@ -4190,8 +3920,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -4222,8 +3951,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path: {
                 group_id: string;
@@ -4261,8 +3989,7 @@ export interface operations {
                 group_id?: string | null;
             };
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -4302,8 +4029,7 @@ export interface operations {
                 limit?: number;
             };
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -4337,8 +4063,7 @@ export interface operations {
                 group_id?: string | null;
             };
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -4365,49 +4090,11 @@ export interface operations {
             };
         };
     };
-    retry_stuck_screenshots_api_v1_admin_retry_stuck_post: {
-        parameters: {
-            query?: {
-                /** @description Filter by group ID */
-                group_id?: string | null;
-                /** @description Mark screenshots stuck in PROCESSING as FAILED before requeuing PENDING ones */
-                mark_processing_as_failed?: boolean;
-            };
-            header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RetryStuckResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     find_orphaned_entries_api_v1_admin_orphaned_entries_get: {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -4438,8 +4125,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
+                "x-username"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -4462,83 +4148,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    session_login_api_v1_auth_session_login_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SessionLoginRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SessionLoginResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    session_logout_api_v1_auth_session_logout_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: boolean;
-                    };
-                };
-            };
-        };
-    };
-    session_me_api_v1_auth_session_me_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: string | null;
-                    };
                 };
             };
         };
