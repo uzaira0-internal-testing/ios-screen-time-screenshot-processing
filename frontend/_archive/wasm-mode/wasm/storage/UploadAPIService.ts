@@ -109,6 +109,7 @@ export class UploadAPIService {
       group_created: groupCreated,
       duplicate: false,
       processing_queued: false,
+      preprocessing_queued: false,
     };
   }
 

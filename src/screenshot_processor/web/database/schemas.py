@@ -208,6 +208,8 @@ class ScreenshotRead(ScreenshotBase):
     resolved_by_user_id: int | None = None
     # Potential duplicate detection (same participant + date + title + total)
     potential_duplicate_of: int | None = None  # ID of the other screenshot
+    # Processing metadata (preprocessing results, callback URLs, etc.)
+    processing_metadata: dict | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -530,6 +532,68 @@ class ReprocessRequest(BaseModel):
 
 
 # =============================================================================
+# Preprocessing Schemas
+# =============================================================================
+
+
+class PreprocessRequest(BaseModel):
+    """Request to run preprocessing on a single screenshot."""
+
+    phi_pipeline_preset: str = Field(
+        default="hipaa_compliant",
+        description="PHI detection pipeline preset: fast, balanced, hipaa_compliant, thorough",
+    )
+    phi_redaction_method: str = Field(
+        default="redbox",
+        description="PHI redaction method: redbox, blackbox, pixelate",
+    )
+    phi_detection_enabled: bool = Field(
+        default=True,
+        description="Whether to run PHI detection/redaction",
+    )
+    run_ocr_after: bool = Field(
+        default=False,
+        description="Whether to chain OCR processing after preprocessing",
+    )
+
+
+class BatchPreprocessRequest(BaseModel):
+    """Request to run preprocessing on multiple screenshots in a group."""
+
+    group_id: str = Field(..., min_length=1, max_length=100)
+    screenshot_ids: list[int] | None = Field(
+        default=None,
+        description="Specific screenshot IDs to preprocess. If None, all screenshots in the group are processed.",
+    )
+    phi_pipeline_preset: str = Field(default="hipaa_compliant")
+    phi_redaction_method: str = Field(default="redbox")
+    phi_detection_enabled: bool = Field(default=True)
+    run_ocr_after: bool = Field(default=False)
+
+
+class BatchPreprocessResponse(BaseModel):
+    """Response from batch preprocessing request."""
+
+    queued_count: int
+    screenshot_ids: list[int]
+    message: str
+
+
+class PreprocessingDetailsResponse(BaseModel):
+    """Typed view of preprocessing results from processing_metadata."""
+
+    has_preprocessing: bool = False
+    device_detection: dict | None = None
+    cropping: dict | None = None
+    phi_detection: dict | None = None
+    phi_redaction: dict | None = None
+    preprocessing_timestamp: str | None = None
+    original_file_path: str | None = None
+    preprocessed_file_path: str | None = None
+    skip_reason: str | None = None
+
+
+# =============================================================================
 # Navigation Schemas
 # =============================================================================
 
@@ -631,6 +695,10 @@ class ScreenshotUploadRequest(BaseModel):
         max_length=500,
         description="URL to POST processing results when complete",
     )
+    preprocess: bool = Field(
+        default=False,
+        description="Run preprocessing pipeline (device detection, iPad cropping, PHI redaction) before OCR processing",
+    )
 
 
 class ScreenshotUploadResponse(BaseModel):
@@ -651,6 +719,7 @@ class ScreenshotUploadResponse(BaseModel):
     image_dimensions: tuple[int, int] | None = Field(None, description="(width, height) in pixels")
     device_type_detected: str | None = None
     processing_queued: bool = False
+    preprocessing_queued: bool = False
     idempotency_key: str | None = None
 
 
@@ -724,6 +793,10 @@ class BatchUploadRequest(BaseModel):
         None,
         max_length=64,
         description="Unique key for idempotent batch uploads",
+    )
+    preprocess: bool = Field(
+        default=False,
+        description="Run preprocessing pipeline before OCR processing",
     )
 
 

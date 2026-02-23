@@ -746,7 +746,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PaginatedResponse_ScreenshotRead_"
+                  "$ref": "#/components/schemas/ScreenshotListResponse"
                 }
               }
             }
@@ -1880,6 +1880,242 @@
         }
       }
     },
+    "/api/v1/screenshots/{screenshot_id}/preprocessing": {
+      "get": {
+        "tags": [
+          "Screenshots"
+        ],
+        "summary": "Get Preprocessing Details",
+        "description": "Get preprocessing details for a screenshot from its processing_metadata.",
+        "operationId": "get_preprocessing_details_api_v1_screenshots__screenshot_id__preprocessing_get",
+        "parameters": [
+          {
+            "name": "screenshot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Screenshot Id"
+            }
+          },
+          {
+            "name": "X-Username",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Username"
+            }
+          },
+          {
+            "name": "X-Site-Password",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Site-Password"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreprocessingDetailsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/screenshots/{screenshot_id}/preprocess": {
+      "post": {
+        "tags": [
+          "Screenshots"
+        ],
+        "summary": "Preprocess Screenshot",
+        "description": "Queue preprocessing task for a single screenshot.",
+        "operationId": "preprocess_screenshot_api_v1_screenshots__screenshot_id__preprocess_post",
+        "parameters": [
+          {
+            "name": "screenshot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Screenshot Id"
+            }
+          },
+          {
+            "name": "X-Username",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Username"
+            }
+          },
+          {
+            "name": "X-Site-Password",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Site-Password"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreprocessRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchPreprocessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/screenshots/preprocess-batch": {
+      "post": {
+        "tags": [
+          "Screenshots"
+        ],
+        "summary": "Preprocess Screenshots Batch",
+        "description": "Queue preprocessing tasks for multiple screenshots in a group.",
+        "operationId": "preprocess_screenshots_batch_api_v1_screenshots_preprocess_batch_post",
+        "parameters": [
+          {
+            "name": "X-Username",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Username"
+            }
+          },
+          {
+            "name": "X-Site-Password",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Site-Password"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchPreprocessRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchPreprocessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/screenshots/export/csv": {
       "get": {
         "tags": [
@@ -2640,7 +2876,7 @@
           "Consensus"
         ],
         "summary": "Resolve Dispute",
-        "description": "Resolve a dispute by setting the final agreed-upon values.\n\nRequires admin role. Original annotations are preserved - resolved values\nare stored separately on the screenshot.",
+        "description": "Resolve a dispute by setting the final agreed-upon values.\n\nRequires admin role. Updates the screenshot's extracted_* fields directly\n(like a normal GUI edit), so changes are immediately visible everywhere.\nOriginal OCR values are preserved in resolved_* fields for audit/rollback.",
         "operationId": "resolve_dispute_api_v1_consensus_screenshots__screenshot_id__resolve_post",
         "parameters": [
           {
@@ -3573,6 +3809,102 @@
         }
       }
     },
+    "/api/v1/admin/retry-stuck": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Retry Stuck Screenshots",
+        "description": "Retry screenshots stuck in PENDING or PROCESSING status.\n\nThis endpoint:\n1. Optionally marks all PROCESSING screenshots as FAILED (they're stuck/orphaned)\n2. Requeues all PENDING screenshots to Celery for processing\n\nUse this when screenshots are stuck and not being processed by Celery workers.\nAdmin only.",
+        "operationId": "retry_stuck_screenshots_api_v1_admin_retry_stuck_post",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by group ID",
+              "title": "Group Id"
+            },
+            "description": "Filter by group ID"
+          },
+          {
+            "name": "mark_processing_as_failed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Mark screenshots stuck in PROCESSING as FAILED before requeuing PENDING ones",
+              "default": true,
+              "title": "Mark Processing As Failed"
+            },
+            "description": "Mark screenshots stuck in PROCESSING as FAILED before requeuing PENDING ones"
+          },
+          {
+            "name": "X-Username",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Username"
+            }
+          },
+          {
+            "name": "X-Site-Password",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Site-Password"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetryStuckResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/orphaned-entries": {
       "get": {
         "tags": [
@@ -4339,6 +4671,84 @@
         "title": "BatchItemResult",
         "description": "Result for a single item in batch upload."
       },
+      "BatchPreprocessRequest": {
+        "properties": {
+          "group_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Group Id"
+          },
+          "screenshot_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Screenshot Ids",
+            "description": "Specific screenshot IDs to preprocess. If None, all screenshots in the group are processed."
+          },
+          "phi_pipeline_preset": {
+            "type": "string",
+            "title": "Phi Pipeline Preset",
+            "default": "hipaa_compliant"
+          },
+          "phi_redaction_method": {
+            "type": "string",
+            "title": "Phi Redaction Method",
+            "default": "redbox"
+          },
+          "phi_detection_enabled": {
+            "type": "boolean",
+            "title": "Phi Detection Enabled",
+            "default": true
+          },
+          "run_ocr_after": {
+            "type": "boolean",
+            "title": "Run Ocr After",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "group_id"
+        ],
+        "title": "BatchPreprocessRequest",
+        "description": "Request to run preprocessing on multiple screenshots in a group."
+      },
+      "BatchPreprocessResponse": {
+        "properties": {
+          "queued_count": {
+            "type": "integer",
+            "title": "Queued Count"
+          },
+          "screenshot_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Screenshot Ids"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "queued_count",
+          "screenshot_ids",
+          "message"
+        ],
+        "title": "BatchPreprocessResponse",
+        "description": "Response from batch preprocessing request."
+      },
       "BatchScreenshotItem": {
         "properties": {
           "screenshot": {
@@ -4490,6 +4900,12 @@
             ],
             "title": "Idempotency Key",
             "description": "Unique key for idempotent batch uploads"
+          },
+          "preprocess": {
+            "type": "boolean",
+            "title": "Preprocess",
+            "description": "Run preprocessing pipeline before OCR processing",
+            "default": false
           }
         },
         "type": "object",
@@ -5126,58 +5542,6 @@
         ],
         "title": "OrphanedEntriesResponse"
       },
-      "PaginatedResponse_ScreenshotRead_": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/ScreenshotRead"
-            },
-            "type": "array",
-            "title": "Items"
-          },
-          "total": {
-            "type": "integer",
-            "title": "Total"
-          },
-          "page": {
-            "type": "integer",
-            "title": "Page"
-          },
-          "page_size": {
-            "type": "integer",
-            "title": "Page Size"
-          },
-          "pages": {
-            "type": "integer",
-            "title": "Pages",
-            "description": "Total number of pages.",
-            "readOnly": true
-          },
-          "has_next": {
-            "type": "boolean",
-            "title": "Has Next",
-            "description": "Whether there is a next page.",
-            "readOnly": true
-          },
-          "has_prev": {
-            "type": "boolean",
-            "title": "Has Prev",
-            "description": "Whether there is a previous page.",
-            "readOnly": true
-          }
-        },
-        "type": "object",
-        "required": [
-          "items",
-          "total",
-          "page",
-          "page_size",
-          "pages",
-          "has_next",
-          "has_prev"
-        ],
-        "title": "PaginatedResponse[ScreenshotRead]"
-      },
       "PasswordVerifyRequest": {
         "properties": {
           "password": {
@@ -5234,6 +5598,141 @@
         ],
         "title": "Point",
         "description": "A 2D point with x, y coordinates (pixel positions)."
+      },
+      "PreprocessRequest": {
+        "properties": {
+          "phi_pipeline_preset": {
+            "type": "string",
+            "title": "Phi Pipeline Preset",
+            "description": "PHI detection pipeline preset: fast, balanced, hipaa_compliant, thorough",
+            "default": "hipaa_compliant"
+          },
+          "phi_redaction_method": {
+            "type": "string",
+            "title": "Phi Redaction Method",
+            "description": "PHI redaction method: redbox, blackbox, pixelate",
+            "default": "redbox"
+          },
+          "phi_detection_enabled": {
+            "type": "boolean",
+            "title": "Phi Detection Enabled",
+            "description": "Whether to run PHI detection/redaction",
+            "default": true
+          },
+          "run_ocr_after": {
+            "type": "boolean",
+            "title": "Run Ocr After",
+            "description": "Whether to chain OCR processing after preprocessing",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "PreprocessRequest",
+        "description": "Request to run preprocessing on a single screenshot."
+      },
+      "PreprocessingDetailsResponse": {
+        "properties": {
+          "has_preprocessing": {
+            "type": "boolean",
+            "title": "Has Preprocessing",
+            "default": false
+          },
+          "device_detection": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Detection"
+          },
+          "cropping": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cropping"
+          },
+          "phi_detection": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phi Detection"
+          },
+          "phi_redaction": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phi Redaction"
+          },
+          "preprocessing_timestamp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preprocessing Timestamp"
+          },
+          "original_file_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original File Path"
+          },
+          "preprocessed_file_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preprocessed File Path"
+          },
+          "skip_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skip Reason"
+          }
+        },
+        "type": "object",
+        "title": "PreprocessingDetailsResponse",
+        "description": "Typed view of preprocessing results from processing_metadata."
       },
       "ProcessingIssue": {
         "properties": {
@@ -5785,6 +6284,44 @@
         ],
         "title": "ResolveDisputeResponse",
         "description": "Response after resolving a dispute."
+      },
+      "RetryStuckResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "pending_count": {
+            "type": "integer",
+            "title": "Pending Count"
+          },
+          "processing_count": {
+            "type": "integer",
+            "title": "Processing Count"
+          },
+          "requeued": {
+            "type": "integer",
+            "title": "Requeued"
+          },
+          "marked_failed": {
+            "type": "integer",
+            "title": "Marked Failed"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "pending_count",
+          "processing_count",
+          "requeued",
+          "marked_failed",
+          "message"
+        ],
+        "title": "RetryStuckResponse"
       },
       "RootResponse": {
         "properties": {
@@ -6374,6 +6911,18 @@
             ],
             "title": "Potential Duplicate Of"
           },
+          "processing_metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processing Metadata"
+          },
           "annotations_count": {
             "type": "integer",
             "title": "Annotations Count",
@@ -6427,6 +6976,48 @@
           "alignment_score_status"
         ],
         "title": "ScreenshotDetail"
+      },
+      "ScreenshotListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ScreenshotRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
+          "has_next": {
+            "type": "boolean",
+            "title": "Has Next"
+          },
+          "has_prev": {
+            "type": "boolean",
+            "title": "Has Prev"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size",
+          "has_next",
+          "has_prev"
+        ],
+        "title": "ScreenshotListResponse",
+        "description": "Response model for paginated screenshot list."
       },
       "ScreenshotRead": {
         "properties": {
@@ -6823,6 +7414,18 @@
             ],
             "title": "Potential Duplicate Of"
           },
+          "processing_metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processing Metadata"
+          },
           "processing_time_seconds": {
             "anyOf": [
               {
@@ -7124,6 +7727,12 @@
             ],
             "title": "Callback Url",
             "description": "URL to POST processing results when complete"
+          },
+          "preprocess": {
+            "type": "boolean",
+            "title": "Preprocess",
+            "description": "Run preprocessing pipeline (device detection, iPad cropping, PHI redaction) before OCR processing",
+            "default": false
           }
         },
         "type": "object",
@@ -7225,6 +7834,11 @@
           "processing_queued": {
             "type": "boolean",
             "title": "Processing Queued",
+            "default": false
+          },
+          "preprocessing_queued": {
+            "type": "boolean",
+            "title": "Preprocessing Queued",
             "default": false
           },
           "idempotency_key": {

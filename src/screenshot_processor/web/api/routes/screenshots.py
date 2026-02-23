@@ -26,12 +26,16 @@ from screenshot_processor.web.database import (
     Annotation,
     AnnotationStatus,
     BatchItemResult,
+    BatchPreprocessRequest,
+    BatchPreprocessResponse,
     BatchUploadRequest,
     BatchUploadResponse,
     ConsensusResult,
     Group,
     GroupRead,
     NextScreenshotResponse,
+    PreprocessingDetailsResponse,
+    PreprocessRequest,
     ProcessingResultResponse,
     ProcessingStatus,
     ReprocessRequest,
@@ -839,7 +843,25 @@ def sanitize_filename(name: str) -> str:
 
 
 def _detect_device_type(width: int, height: int) -> str:
-    """Detect device type from image dimensions."""
+    """Detect device type from image dimensions.
+
+    Uses ios-device-detector package if available for richer detection,
+    falls back to simple aspect ratio heuristic.
+    """
+    try:
+        from ios_device_detector import DeviceDetector
+
+        detector = DeviceDetector()
+        result = detector.detect_from_dimensions(width, height)
+        if result.detected:
+            if result.is_ipad:
+                return "ipad"
+            elif result.is_iphone:
+                return "iphone"
+    except (ImportError, AttributeError, Exception):
+        pass
+
+    # Fallback: simple aspect ratio heuristic
     aspect_ratio = height / width if width > 0 else 0
 
     if aspect_ratio > 2.0:
@@ -1007,6 +1029,7 @@ async def _process_single_upload(
     callback_url: str | None,
     idempotency_key: str | None,
     group_created: bool,
+    preprocess: bool = False,
 ) -> ScreenshotUploadResponse:
     """Process a single screenshot upload and return response with full metadata."""
     import time
@@ -1153,11 +1176,19 @@ async def _process_single_upload(
     # Queue background processing via Celery (fire and forget)
     t1 = time.perf_counter()
     processing_queued = False
+    preprocessing_queued = False
     try:
-        from screenshot_processor.web.tasks import process_screenshot_task
+        if preprocess:
+            from screenshot_processor.web.tasks import preprocess_screenshot_task
 
-        process_screenshot_task.delay(screenshot_id)  # type: ignore[attr-defined]
-        processing_queued = True
+            preprocess_screenshot_task.delay(screenshot_id)  # type: ignore[attr-defined]
+            preprocessing_queued = True
+            processing_queued = True  # preprocessing chains into OCR processing
+        else:
+            from screenshot_processor.web.tasks import process_screenshot_task
+
+            process_screenshot_task.delay(screenshot_id)  # type: ignore[attr-defined]
+            processing_queued = True
     except Exception as e:
         logger.warning(f"Failed to queue processing for screenshot {screenshot_id}: {e}")
     timings["celery_queue"] = (time.perf_counter() - t1) * 1000
@@ -1187,6 +1218,7 @@ async def _process_single_upload(
         image_dimensions=(width, height) if width > 0 else None,
         device_type_detected=detected_device_type,
         processing_queued=processing_queued,
+        preprocessing_queued=preprocessing_queued,
         idempotency_key=idempotency_key,
     )
 
@@ -1275,6 +1307,7 @@ async def upload_screenshot(
         callback_url=upload_request.callback_url,
         idempotency_key=upload_request.idempotency_key,
         group_created=group_created,
+        preprocess=upload_request.preprocess,
     )
 
 
@@ -1584,12 +1617,19 @@ async def upload_screenshots_batch(
     if screenshot_ids_to_queue:
         try:
             from celery import group
-            from screenshot_processor.web.tasks import process_screenshot_task
 
-            # Create a group of tasks and send them all at once
-            task_group = group(
-                process_screenshot_task.s(sid) for sid in screenshot_ids_to_queue  # type: ignore[attr-defined]
-            )
+            if batch_request.preprocess:
+                from screenshot_processor.web.tasks import preprocess_screenshot_task
+
+                task_group = group(
+                    preprocess_screenshot_task.s(sid) for sid in screenshot_ids_to_queue  # type: ignore[attr-defined]
+                )
+            else:
+                from screenshot_processor.web.tasks import process_screenshot_task
+
+                task_group = group(
+                    process_screenshot_task.s(sid) for sid in screenshot_ids_to_queue  # type: ignore[attr-defined]
+                )
             task_group.apply_async()
         except Exception as e:
             logger.warning(f"Failed to queue processing tasks: {e}")
@@ -1624,6 +1664,135 @@ async def upload_screenshots_batch(
         results=valid_results,  # Already filtered for None
         idempotency_key=batch_request.idempotency_key,
     )
+
+
+# ============================================================================
+# Preprocessing Endpoints
+# ============================================================================
+
+
+@router.get("/{screenshot_id}/preprocessing", response_model=PreprocessingDetailsResponse)
+async def get_preprocessing_details(screenshot_id: int, db: DatabaseSession, current_user: CurrentUser):
+    """Get preprocessing details for a screenshot from its processing_metadata."""
+    screenshot = await get_screenshot_or_404(db, screenshot_id)
+
+    metadata = screenshot.processing_metadata or {}
+    preprocessing = metadata.get("preprocessing")
+
+    if not preprocessing:
+        return PreprocessingDetailsResponse(has_preprocessing=False)
+
+    return PreprocessingDetailsResponse(
+        has_preprocessing=True,
+        device_detection=preprocessing.get("device_detection"),
+        cropping=preprocessing.get("cropping"),
+        phi_detection=preprocessing.get("phi_detection"),
+        phi_redaction=preprocessing.get("phi_redaction"),
+        preprocessing_timestamp=preprocessing.get("preprocessing_timestamp"),
+        original_file_path=preprocessing.get("original_file_path"),
+        preprocessed_file_path=preprocessing.get("preprocessed_file_path"),
+        skip_reason=preprocessing.get("skip_reason"),
+    )
+
+
+@router.post("/{screenshot_id}/preprocess", response_model=BatchPreprocessResponse)
+async def preprocess_screenshot(
+    screenshot_id: int,
+    preprocess_request: PreprocessRequest,
+    db: DatabaseSession,
+    current_user: CurrentUser,
+):
+    """Queue preprocessing task for a single screenshot."""
+    screenshot = await get_screenshot_or_404(db, screenshot_id)
+
+    try:
+        from screenshot_processor.web.tasks import preprocess_screenshot_task
+
+        preprocess_screenshot_task.delay(
+            screenshot_id,
+            phi_pipeline_preset=preprocess_request.phi_pipeline_preset,
+            phi_redaction_method=preprocess_request.phi_redaction_method,
+            phi_detection_enabled=preprocess_request.phi_detection_enabled,
+            run_ocr_after=preprocess_request.run_ocr_after,
+        )
+
+        logger.info(f"Screenshot {screenshot_id}: preprocessing queued by {current_user.username}")
+        return BatchPreprocessResponse(
+            queued_count=1,
+            screenshot_ids=[screenshot_id],
+            message=f"Preprocessing queued for screenshot {screenshot_id}",
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to queue preprocessing for screenshot {screenshot_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to queue preprocessing: {e}",
+        )
+
+
+@router.post("/preprocess-batch", response_model=BatchPreprocessResponse)
+async def preprocess_screenshots_batch(
+    batch_request: BatchPreprocessRequest,
+    db: DatabaseSession,
+    current_user: CurrentUser,
+):
+    """Queue preprocessing tasks for multiple screenshots in a group."""
+    # Get screenshot IDs to process
+    if batch_request.screenshot_ids:
+        # Verify all IDs belong to the group
+        stmt = select(Screenshot.id).where(
+            Screenshot.id.in_(batch_request.screenshot_ids),
+            Screenshot.group_id == batch_request.group_id,
+        )
+        result = await db.execute(stmt)
+        screenshot_ids = [row[0] for row in result.all()]
+    else:
+        # Get all screenshots in the group
+        stmt = select(Screenshot.id).where(
+            Screenshot.group_id == batch_request.group_id,
+        ).order_by(Screenshot.id)
+        result = await db.execute(stmt)
+        screenshot_ids = [row[0] for row in result.all()]
+
+    if not screenshot_ids:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No screenshots found in group '{batch_request.group_id}'",
+        )
+
+    try:
+        from celery import group as celery_group
+        from screenshot_processor.web.tasks import preprocess_screenshot_task
+
+        task_group = celery_group(
+            preprocess_screenshot_task.s(
+                sid,
+                phi_pipeline_preset=batch_request.phi_pipeline_preset,
+                phi_redaction_method=batch_request.phi_redaction_method,
+                phi_detection_enabled=batch_request.phi_detection_enabled,
+                run_ocr_after=batch_request.run_ocr_after,
+            )
+            for sid in screenshot_ids
+        )
+        task_group.apply_async()
+
+        logger.info(
+            f"Batch preprocessing queued: group={batch_request.group_id}, "
+            f"count={len(screenshot_ids)}, by={current_user.username}"
+        )
+        return BatchPreprocessResponse(
+            queued_count=len(screenshot_ids),
+            screenshot_ids=screenshot_ids,
+            message=f"Preprocessing queued for {len(screenshot_ids)} screenshots in group '{batch_request.group_id}'",
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to queue batch preprocessing: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to queue batch preprocessing: {e}",
+        )
 
 
 # ============================================================================

@@ -15,6 +15,7 @@ import { AdminPage } from "@/pages/AdminPage";
 import { ConsensusPage } from "@/pages/ConsensusPage";
 import { ConsensusComparisonPage } from "@/pages/ConsensusComparisonPage";
 import { SettingsPage } from "@/pages/SettingsPage";
+import { PreprocessingPage } from "@/pages/PreprocessingPage";
 
 // Auth guard
 import { useAuthStore } from "@/store/authStore";
@@ -86,6 +87,15 @@ export const AppRouter: React.FC = () => {
         element={
           <ProtectedRoute>
             <ConsensusComparisonPage />
+          </ProtectedRoute>
+        }
+      />
+      {/* Preprocessing Pipeline */}
+      <Route
+        path="/preprocessing"
+        element={
+          <ProtectedRoute>
+            <PreprocessingPage />
           </ProtectedRoute>
         }
       />

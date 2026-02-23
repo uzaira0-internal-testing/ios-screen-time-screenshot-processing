@@ -528,6 +528,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/screenshots/{screenshot_id}/preprocessing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Preprocessing Details
+         * @description Get preprocessing details for a screenshot from its processing_metadata.
+         */
+        get: operations["get_preprocessing_details_api_v1_screenshots__screenshot_id__preprocessing_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/screenshots/{screenshot_id}/preprocess": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preprocess Screenshot
+         * @description Queue preprocessing task for a single screenshot.
+         */
+        post: operations["preprocess_screenshot_api_v1_screenshots__screenshot_id__preprocess_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/screenshots/preprocess-batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preprocess Screenshots Batch
+         * @description Queue preprocessing tasks for multiple screenshots in a group.
+         */
+        post: operations["preprocess_screenshots_batch_api_v1_screenshots_preprocess_batch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/screenshots/export/csv": {
         parameters: {
             query?: never;
@@ -694,8 +754,9 @@ export interface paths {
          * Resolve Dispute
          * @description Resolve a dispute by setting the final agreed-upon values.
          *
-         *     Requires admin role. Original annotations are preserved - resolved values
-         *     are stored separately on the screenshot.
+         *     Requires admin role. Updates the screenshot's extracted_* fields directly
+         *     (like a normal GUI edit), so changes are immediately visible everywhere.
+         *     Original OCR values are preserved in resolved_* fields for audit/rollback.
          */
         post: operations["resolve_dispute_api_v1_consensus_screenshots__screenshot_id__resolve_post"];
         delete?: never;
@@ -917,6 +978,33 @@ export interface paths {
         get: operations["get_bulk_reprocess_status_api_v1_admin_bulk_reprocess_status_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/retry-stuck": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry Stuck Screenshots
+         * @description Retry screenshots stuck in PENDING or PROCESSING status.
+         *
+         *     This endpoint:
+         *     1. Optionally marks all PROCESSING screenshots as FAILED (they're stuck/orphaned)
+         *     2. Requeues all PENDING screenshots to Celery for processing
+         *
+         *     Use this when screenshots are stuck and not being processed by Celery workers.
+         *     Admin only.
+         */
+        post: operations["retry_stuck_screenshots_api_v1_admin_retry_stuck_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1196,6 +1284,51 @@ export interface components {
             error_detail?: string | null;
         };
         /**
+         * BatchPreprocessRequest
+         * @description Request to run preprocessing on multiple screenshots in a group.
+         */
+        BatchPreprocessRequest: {
+            /** Group Id */
+            group_id: string;
+            /**
+             * Screenshot Ids
+             * @description Specific screenshot IDs to preprocess. If None, all screenshots in the group are processed.
+             */
+            screenshot_ids?: number[] | null;
+            /**
+             * Phi Pipeline Preset
+             * @default hipaa_compliant
+             */
+            phi_pipeline_preset: string;
+            /**
+             * Phi Redaction Method
+             * @default redbox
+             */
+            phi_redaction_method: string;
+            /**
+             * Phi Detection Enabled
+             * @default true
+             */
+            phi_detection_enabled: boolean;
+            /**
+             * Run Ocr After
+             * @default false
+             */
+            run_ocr_after: boolean;
+        };
+        /**
+         * BatchPreprocessResponse
+         * @description Response from batch preprocessing request.
+         */
+        BatchPreprocessResponse: {
+            /** Queued Count */
+            queued_count: number;
+            /** Screenshot Ids */
+            screenshot_ids: number[];
+            /** Message */
+            message: string;
+        };
+        /**
          * BatchScreenshotItem
          * @description Single item in a batch upload request.
          */
@@ -1253,6 +1386,12 @@ export interface components {
              * @description Unique key for idempotent batch uploads
              */
             idempotency_key?: string | null;
+            /**
+             * Preprocess
+             * @description Run preprocessing pipeline before OCR processing
+             * @default false
+             */
+            preprocess: boolean;
         };
         /**
          * BatchUploadResponse
@@ -1555,32 +1694,6 @@ export interface components {
             /** Screenshots Without Group */
             screenshots_without_group: number;
         };
-        /** PaginatedResponse[ScreenshotRead] */
-        PaginatedResponse_ScreenshotRead_: {
-            /** Items */
-            items: components["schemas"]["ScreenshotRead"][];
-            /** Total */
-            total: number;
-            /** Page */
-            page: number;
-            /** Page Size */
-            page_size: number;
-            /**
-             * Pages
-             * @description Total number of pages.
-             */
-            readonly pages: number;
-            /**
-             * Has Next
-             * @description Whether there is a next page.
-             */
-            readonly has_next: boolean;
-            /**
-             * Has Prev
-             * @description Whether there is a previous page.
-             */
-            readonly has_prev: boolean;
-        };
         /**
          * PasswordVerifyRequest
          * @description Request body for password verification.
@@ -1617,6 +1730,71 @@ export interface components {
             x: number;
             /** Y */
             y: number;
+        };
+        /**
+         * PreprocessRequest
+         * @description Request to run preprocessing on a single screenshot.
+         */
+        PreprocessRequest: {
+            /**
+             * Phi Pipeline Preset
+             * @description PHI detection pipeline preset: fast, balanced, hipaa_compliant, thorough
+             * @default hipaa_compliant
+             */
+            phi_pipeline_preset: string;
+            /**
+             * Phi Redaction Method
+             * @description PHI redaction method: redbox, blackbox, pixelate
+             * @default redbox
+             */
+            phi_redaction_method: string;
+            /**
+             * Phi Detection Enabled
+             * @description Whether to run PHI detection/redaction
+             * @default true
+             */
+            phi_detection_enabled: boolean;
+            /**
+             * Run Ocr After
+             * @description Whether to chain OCR processing after preprocessing
+             * @default false
+             */
+            run_ocr_after: boolean;
+        };
+        /**
+         * PreprocessingDetailsResponse
+         * @description Typed view of preprocessing results from processing_metadata.
+         */
+        PreprocessingDetailsResponse: {
+            /**
+             * Has Preprocessing
+             * @default false
+             */
+            has_preprocessing: boolean;
+            /** Device Detection */
+            device_detection?: {
+                [key: string]: unknown;
+            } | null;
+            /** Cropping */
+            cropping?: {
+                [key: string]: unknown;
+            } | null;
+            /** Phi Detection */
+            phi_detection?: {
+                [key: string]: unknown;
+            } | null;
+            /** Phi Redaction */
+            phi_redaction?: {
+                [key: string]: unknown;
+            } | null;
+            /** Preprocessing Timestamp */
+            preprocessing_timestamp?: string | null;
+            /** Original File Path */
+            original_file_path?: string | null;
+            /** Preprocessed File Path */
+            preprocessed_file_path?: string | null;
+            /** Skip Reason */
+            skip_reason?: string | null;
         };
         /**
          * ProcessingIssue
@@ -1816,6 +1994,21 @@ export interface components {
             /** Resolved By Username */
             resolved_by_username?: string | null;
         };
+        /** RetryStuckResponse */
+        RetryStuckResponse: {
+            /** Success */
+            success: boolean;
+            /** Pending Count */
+            pending_count: number;
+            /** Processing Count */
+            processing_count: number;
+            /** Requeued */
+            requeued: number;
+            /** Marked Failed */
+            marked_failed: number;
+            /** Message */
+            message: string;
+        };
         /**
          * RootResponse
          * @description Root endpoint response.
@@ -1964,6 +2157,10 @@ export interface components {
             resolved_by_user_id?: number | null;
             /** Potential Duplicate Of */
             potential_duplicate_of?: number | null;
+            /** Processing Metadata */
+            processing_metadata?: {
+                [key: string]: unknown;
+            } | null;
             /**
              * Annotations Count
              * @default 0
@@ -1990,6 +2187,24 @@ export interface components {
             readonly alignment_score_status: {
                 [key: string]: unknown;
             } | null;
+        };
+        /**
+         * ScreenshotListResponse
+         * @description Response model for paginated screenshot list.
+         */
+        ScreenshotListResponse: {
+            /** Items */
+            items: components["schemas"]["ScreenshotRead"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Has Next */
+            has_next: boolean;
+            /** Has Prev */
+            has_prev: boolean;
         };
         /** ScreenshotRead */
         ScreenshotRead: {
@@ -2081,6 +2296,10 @@ export interface components {
             resolved_by_user_id?: number | null;
             /** Potential Duplicate Of */
             potential_duplicate_of?: number | null;
+            /** Processing Metadata */
+            processing_metadata?: {
+                [key: string]: unknown;
+            } | null;
             /**
              * Processing Time Seconds
              * @description Time in seconds related to processing:
@@ -2184,6 +2403,12 @@ export interface components {
              * @description URL to POST processing results when complete
              */
             callback_url?: string | null;
+            /**
+             * Preprocess
+             * @description Run preprocessing pipeline (device detection, iPad cropping, PHI redaction) before OCR processing
+             * @default false
+             */
+            preprocess: boolean;
         };
         /**
          * ScreenshotUploadResponse
@@ -2227,6 +2452,11 @@ export interface components {
              * @default false
              */
             processing_queued: boolean;
+            /**
+             * Preprocessing Queued
+             * @default false
+             */
+            preprocessing_queued: boolean;
             /** Idempotency Key */
             idempotency_key?: string | null;
         };
@@ -2808,7 +3038,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PaginatedResponse_ScreenshotRead_"];
+                    "application/json": components["schemas"]["ScreenshotListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3309,6 +3539,114 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BatchUploadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_preprocessing_details_api_v1_screenshots__screenshot_id__preprocessing_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
+            path: {
+                screenshot_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreprocessingDetailsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preprocess_screenshot_api_v1_screenshots__screenshot_id__preprocess_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
+            path: {
+                screenshot_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreprocessRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchPreprocessResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preprocess_screenshots_batch_api_v1_screenshots_preprocess_batch_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchPreprocessRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchPreprocessResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4014,6 +4352,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BulkReprocessStatus"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retry_stuck_screenshots_api_v1_admin_retry_stuck_post: {
+        parameters: {
+            query?: {
+                /** @description Filter by group ID */
+                group_id?: string | null;
+                /** @description Mark screenshots stuck in PROCESSING as FAILED before requeuing PENDING ones */
+                mark_processing_as_failed?: boolean;
+            };
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetryStuckResponse"];
                 };
             };
             /** @description Validation Error */

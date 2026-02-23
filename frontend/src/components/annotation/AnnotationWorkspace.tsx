@@ -18,6 +18,7 @@ import { SaveStatusIndicator } from "./SaveStatusIndicator";
 import { TotalsDisplay } from "./TotalsDisplay";
 import { AlignmentWarning } from "./AlignmentWarning";
 import type { ProcessingStatus } from "@/constants/processingStatus";
+import { PreprocessingSummary } from "./PreprocessingSummary";
 import { useScreenshotImage } from "@/hooks/useScreenshotImage";
 import toast from "react-hot-toast";
 
@@ -426,6 +427,9 @@ export const AnnotationWorkspace = ({
 
             {/* Alignment Score Warning */}
             <AlignmentWarning alignmentScore={screenshot.alignment_score} />
+
+            {/* Preprocessing Summary */}
+            <PreprocessingSummary processingMetadata={screenshot.processing_metadata} />
 
             {/* Totals Display */}
             <TotalsDisplay

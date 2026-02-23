@@ -462,6 +462,71 @@ export const api = {
     },
   },
 
+  // Preprocessing (server-only, no DI needed)
+  preprocessing: {
+    async getDetails(id: number) {
+      const { data, error } = await apiClient.GET(
+        "/api/v1/screenshots/{screenshot_id}/preprocessing",
+        {
+          params: { path: { screenshot_id: id } },
+        },
+      );
+      throwIfError(error, "Failed to get preprocessing details");
+      return data;
+    },
+
+    async preprocess(
+      id: number,
+      options: {
+        phi_pipeline_preset?: string;
+        phi_redaction_method?: string;
+        phi_detection_enabled?: boolean;
+        run_ocr_after?: boolean;
+      },
+    ) {
+      const { data, error } = await apiClient.POST(
+        "/api/v1/screenshots/{screenshot_id}/preprocess",
+        {
+          params: { path: { screenshot_id: id } },
+          body: {
+            phi_pipeline_preset: options.phi_pipeline_preset ?? "hipaa_compliant",
+            phi_redaction_method: options.phi_redaction_method ?? "redbox",
+            phi_detection_enabled: options.phi_detection_enabled ?? true,
+            run_ocr_after: options.run_ocr_after ?? false,
+          },
+        },
+      );
+      throwIfError(error, "Failed to queue preprocessing");
+      return data;
+    },
+
+    async preprocessBatch(request: {
+      group_id: string;
+      screenshot_ids?: number[];
+      phi_pipeline_preset?: string;
+      phi_redaction_method?: string;
+      phi_detection_enabled?: boolean;
+      run_ocr_after?: boolean;
+    }) {
+      const { data, error } = await apiClient.POST(
+        "/api/v1/screenshots/preprocess-batch",
+        {
+          body: {
+            group_id: request.group_id,
+            screenshot_ids: request.screenshot_ids ?? null,
+            phi_pipeline_preset:
+              request.phi_pipeline_preset ?? "hipaa_compliant",
+            phi_redaction_method: request.phi_redaction_method ?? "redbox",
+            phi_detection_enabled: request.phi_detection_enabled ?? true,
+            run_ocr_after: request.run_ocr_after ?? false,
+          },
+        },
+      );
+      throwIfError(error, "Failed to queue batch preprocessing");
+      return data;
+    },
+  },
+
   // Export
   export: {
     getCSVUrl(groupId?: string): string {

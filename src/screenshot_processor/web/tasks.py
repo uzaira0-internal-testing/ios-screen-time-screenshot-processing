@@ -157,6 +157,90 @@ def reprocess_screenshot_task(
         db.close()
 
 
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def preprocess_screenshot_task(
+    self,
+    screenshot_id: int,
+    max_shift: int = 5,
+    phi_pipeline_preset: str | None = None,
+    phi_redaction_method: str | None = None,
+    phi_detection_enabled: bool | None = None,
+    run_ocr_after: bool = True,
+) -> dict:
+    """Preprocess a screenshot (device detection, cropping, PHI redaction) then optionally chain into OCR processing.
+
+    Args:
+        screenshot_id: Screenshot ID to preprocess
+        max_shift: Max pixels to shift grid boundaries for OCR optimization
+        phi_pipeline_preset: Override PHI pipeline preset (fast/balanced/hipaa_compliant/thorough)
+        phi_redaction_method: Override PHI redaction method (redbox/blackbox/pixelate)
+        phi_detection_enabled: Override whether to run PHI detection
+        run_ocr_after: Whether to chain into OCR processing after preprocessing (default True)
+    """
+    logger.info(f"Preprocessing screenshot {screenshot_id}")
+
+    db = SessionLocal()
+    try:
+        screenshot = db.query(Screenshot).filter(Screenshot.id == screenshot_id).first()
+        if not screenshot:
+            return {"success": False, "error": "Screenshot not found"}
+
+        from screenshot_processor.web.services.preprocessing_service import preprocess_screenshot_sync
+
+        # Build override kwargs
+        overrides = {}
+        if phi_pipeline_preset is not None:
+            overrides["phi_pipeline_preset"] = phi_pipeline_preset
+        if phi_redaction_method is not None:
+            overrides["phi_redaction_method"] = phi_redaction_method
+        if phi_detection_enabled is not None:
+            overrides["phi_detection_enabled"] = phi_detection_enabled
+
+        preprocess_result = preprocess_screenshot_sync(db, screenshot, **overrides)
+
+        if not preprocess_result.get("success"):
+            logger.warning(
+                f"Preprocessing failed for screenshot {screenshot_id}: {preprocess_result.get('skip_reason')}"
+            )
+            # Still proceed to OCR with original image if run_ocr_after is True
+
+        # Determine which file path to use for OCR processing
+        # If preprocessing produced a new file, use it; otherwise use original
+        preprocessed_path = preprocess_result.get("preprocessed_file_path")
+        if preprocessed_path:
+            # Update screenshot file_path to point to preprocessed image for OCR
+            # Keep original path in processing_metadata (already stored by preprocess_screenshot_sync)
+            screenshot.file_path = preprocessed_path
+            db.commit()
+
+        if not run_ocr_after:
+            return {
+                "success": True,
+                "screenshot_id": screenshot_id,
+                "processing_status": screenshot.processing_status.value if hasattr(screenshot.processing_status, "value") else str(screenshot.processing_status),
+                "preprocessing": preprocess_result,
+            }
+
+        # Chain into OCR processing
+        result = process_screenshot_sync(db, screenshot, max_shift=max_shift)
+        return {
+            "success": True,
+            "screenshot_id": screenshot_id,
+            "processing_status": result["processing_status"],
+            "preprocessing": preprocess_result,
+        }
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error preprocessing screenshot {screenshot_id}: {e}")
+        try:
+            self.retry(exc=e)
+        except self.MaxRetriesExceededError:
+            return {"success": False, "error": str(e), "max_retries_exceeded": True}
+    finally:
+        db.close()
+
+
 @celery_app.task
 def health_check() -> dict:
     """Health check."""

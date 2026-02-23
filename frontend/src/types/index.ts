@@ -70,6 +70,15 @@ export type ProcessingResult =
   components["schemas"]["ProcessingResultResponse"];
 export type ReprocessRequest = components["schemas"]["ReprocessRequest"];
 
+// Preprocessing types
+export type PreprocessRequest = components["schemas"]["PreprocessRequest"];
+export type BatchPreprocessRequest =
+  components["schemas"]["BatchPreprocessRequest"];
+export type BatchPreprocessResponse =
+  components["schemas"]["BatchPreprocessResponse"];
+export type PreprocessingDetailsResponse =
+  components["schemas"]["PreprocessingDetailsResponse"];
+
 // Navigation types
 export type NavigationResponse = components["schemas"]["NavigationResponse"];
 export type NextScreenshotResponse =
