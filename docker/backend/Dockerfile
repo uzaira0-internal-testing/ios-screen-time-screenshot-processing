@@ -56,7 +56,7 @@ RUN uv pip install --system --no-cache-dir \
     /app/packages/fastapi-tasks
 
 # Install app dependencies (cached unless pyproject.toml changes)
-RUN uv pip install --system --no-cache-dir -e ".[web]" alembic
+RUN uv pip install --system --no-cache-dir -e ".[web,preprocessing]" alembic
 
 # Copy application source code
 COPY apps/ios-screen-time-screenshot-processing/src/ ./src/

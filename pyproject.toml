@@ -62,6 +62,12 @@ ocr = [
     "paddlepaddle>=2.6.0",
 ]
 
+preprocessing = [
+    "ios-device-detector @ file:///opt/research-pipeline/temp/packages/ios-device-detector",
+    "ipad-screenshot-cropper @ file:///opt/research-pipeline/temp/packages/ipad-screenshot-cropper",
+    "phi-detector-remover @ file:///opt/research-pipeline/temp/packages/phi-detector-remover",
+]
+
 dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.23.0",

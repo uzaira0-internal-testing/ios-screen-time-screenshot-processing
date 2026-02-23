@@ -5,6 +5,10 @@ from .auth_service import (
     get_user_by_username,
 )
 from .consensus_service import ConsensusService
+from .preprocessing_service import (
+    preprocess_screenshot_file,
+    preprocess_screenshot_sync,
+)
 from .processing_service import (
     process_screenshot_async,
     process_screenshot_file,
@@ -20,6 +24,9 @@ __all__ = [
     "get_user_by_username",
     "get_or_create_user",
     "create_user",
+    # Preprocessing
+    "preprocess_screenshot_file",
+    "preprocess_screenshot_sync",
     # Processing
     "process_screenshot_file",
     "process_screenshot_async",

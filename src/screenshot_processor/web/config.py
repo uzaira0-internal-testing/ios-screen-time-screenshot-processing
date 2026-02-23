@@ -124,6 +124,25 @@ class Settings(AuthSettingsMixin, BaseSettings):
         description="Enable Tesseract in hybrid engine fallback chain",
     )
 
+    # Preprocessing Configuration
+    PREPROCESSING_ENABLED: bool = Field(
+        default=False,
+        description="Global toggle for preprocessing pipeline (device detection, cropping, PHI redaction)",
+    )
+    PHI_DETECTION_ENABLED: bool = Field(
+        default=True,
+        description="Enable PHI detection/redaction during preprocessing",
+    )
+    PHI_PIPELINE_PRESET: str = Field(
+        default="hipaa_compliant",
+        description="PHI detection pipeline preset: fast, balanced, hipaa_compliant, thorough",
+    )
+    PHI_REDACTION_METHOD: str = Field(
+        default="redbox",
+        description="PHI redaction method: redbox, blackbox, pixelate",
+    )
+
+
     @field_validator("CORS_ORIGINS")
     @classmethod
     def parse_cors_origins(cls, v: str) -> list[str]:
