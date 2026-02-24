@@ -1,10 +1,10 @@
 # =============================================================================
-# Backend Dockerfile - ios-screen-time-screenshot-processing
+# Backend Dockerfile - Development (standalone app, no monorepo required)
 # =============================================================================
 # Python 3.12 with FastAPI, Tesseract OCR, and async PostgreSQL support
 #
-# Build context: monorepo root (../../..)
-# docker build -f apps/ios-screen-time-screenshot-processing/docker/backend/Dockerfile .
+# Build context: app root (..)
+# docker build -f docker/backend/Dockerfile.dev .
 
 FROM python:3.12-slim
 
@@ -27,23 +27,23 @@ WORKDIR /app
 # Install uv for faster package installation
 RUN pip install --no-cache-dir uv
 
-# Copy shared monorepo packages first (for layer caching)
-COPY packages/global-pass-honor-username-auth /app/packages/global-pass-honor-username-auth
-COPY packages/fastapi-errors /app/packages/fastapi-errors
-COPY packages/fastapi-logging /app/packages/fastapi-logging
-COPY packages/fastapi-ratelimit /app/packages/fastapi-ratelimit
-COPY packages/db-toolkit /app/packages/db-toolkit
-COPY packages/fastapi-pagination /app/packages/fastapi-pagination
-COPY packages/fastapi-files /app/packages/fastapi-files
-COPY packages/fastapi-tasks /app/packages/fastapi-tasks
+# Copy shared monorepo packages (vendored in docker/backend/packages/)
+COPY docker/backend/packages/global-pass-honor-username-auth /app/packages/global-pass-honor-username-auth
+COPY docker/backend/packages/fastapi-errors /app/packages/fastapi-errors
+COPY docker/backend/packages/fastapi-logging /app/packages/fastapi-logging
+COPY docker/backend/packages/fastapi-ratelimit /app/packages/fastapi-ratelimit
+COPY docker/backend/packages/db-toolkit /app/packages/db-toolkit
+COPY docker/backend/packages/fastapi-pagination /app/packages/fastapi-pagination
+COPY docker/backend/packages/fastapi-files /app/packages/fastapi-files
+COPY docker/backend/packages/fastapi-tasks /app/packages/fastapi-tasks
 
 # Copy app dependency files
-COPY apps/ios-screen-time-screenshot-processing/pyproject.toml ./
+COPY pyproject.toml ./
 
-# Copy preprocessing packages (local dependencies from app's docker/backend/packages/)
-COPY apps/ios-screen-time-screenshot-processing/docker/backend/packages/ios-device-detector /opt/packages/ios-device-detector
-COPY apps/ios-screen-time-screenshot-processing/docker/backend/packages/ipad-screenshot-cropper /opt/packages/ipad-screenshot-cropper
-COPY apps/ios-screen-time-screenshot-processing/docker/backend/packages/phi-detector-remover /opt/packages/phi-detector-remover
+# Copy preprocessing packages (local dependencies -> /opt/packages/ where pyproject.toml expects them)
+COPY docker/backend/packages/ios-device-detector /opt/packages/ios-device-detector
+COPY docker/backend/packages/ipad-screenshot-cropper /opt/packages/ipad-screenshot-cropper
+COPY docker/backend/packages/phi-detector-remover /opt/packages/phi-detector-remover
 
 # Create minimal src structure needed for editable install
 RUN mkdir -p src/screenshot_processor && \
@@ -64,9 +64,9 @@ RUN uv pip install --system --no-cache-dir \
 RUN uv pip install --system --no-cache-dir -e ".[web,preprocessing]" alembic
 
 # Copy application source code
-COPY apps/ios-screen-time-screenshot-processing/src/ ./src/
-COPY apps/ios-screen-time-screenshot-processing/alembic/ ./alembic/
-COPY apps/ios-screen-time-screenshot-processing/alembic.ini ./
+COPY src/ ./src/
+COPY alembic/ ./alembic/
+COPY alembic.ini ./
 
 # Create necessary directories
 RUN mkdir -p /app/db /app/output /app/debug /app/uploads
@@ -79,7 +79,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Copy and set up entrypoint script
-COPY apps/ios-screen-time-screenshot-processing/docker/backend/entrypoint.sh /entrypoint.sh
+COPY docker/backend/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Default command - entrypoint handles migrations automatically

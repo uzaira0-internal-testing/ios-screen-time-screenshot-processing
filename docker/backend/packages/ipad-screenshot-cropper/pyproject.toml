@@ -26,6 +26,3 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ipad_screenshot_cropper"]
-
-[tool.uv.sources]
-phi-detector-remover = { workspace = true }
