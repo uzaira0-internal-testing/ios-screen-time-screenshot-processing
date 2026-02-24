@@ -6,9 +6,11 @@ window.__CONFIG__ = {
 };
 JSEOF
 
-# Inject base href if BASE_PATH is set
+# Inject base href if BASE_PATH is set (idempotent - skip if already present)
 if [ -n "$BASE_PATH" ]; then
-    sed -i "s|<head>|<head><base href=\"${BASE_PATH}/\">|" /usr/share/nginx/html/index.html
+    if ! grep -q '<base href=' /usr/share/nginx/html/index.html; then
+        sed -i "s|<head>|<head><base href=\"${BASE_PATH}/\">|" /usr/share/nginx/html/index.html
+    fi
 fi
 
 # Start nginx

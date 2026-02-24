@@ -47,7 +47,7 @@ export type ScreenshotUploadResponse =
   components["schemas"]["ScreenshotUploadResponse"];
 // Paginated screenshot list response
 export type ScreenshotListResponse =
-  components["schemas"]["PaginatedResponse_ScreenshotRead_"];
+  components["schemas"]["ScreenshotListResponse"];
 
 // Group types
 export type Group = components["schemas"]["GroupRead"];

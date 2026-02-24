@@ -11,9 +11,9 @@ import { CroppingTab } from "@/components/preprocessing/CroppingTab";
 import { PHIDetectionTab } from "@/components/preprocessing/PHIDetectionTab";
 import { PHIRedactionTab } from "@/components/preprocessing/PHIRedactionTab";
 import toast from "react-hot-toast";
+import { config } from "@/config";
 
-const IMAGE_URL_PREFIX =
-  (import.meta.env.VITE_API_BASE_URL || "/api/v1") + "/screenshots";
+const IMAGE_URL_PREFIX = config.apiBaseUrl + "/screenshots";
 
 export const PreprocessingPage = () => {
   // State

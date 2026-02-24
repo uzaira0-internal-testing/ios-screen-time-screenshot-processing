@@ -62,7 +62,7 @@ services:
     image: ${BACKEND_IMAGE:-}
     build:
       context: ..
-      dockerfile: docker/backend/Dockerfile
+      dockerfile: docker/backend/Dockerfile.dev
     container_name: ios-screen-time-screenshot-processing-backend
     environment:
       PYTHONUNBUFFERED: "1"
@@ -88,9 +88,10 @@ services:
     restart: unless-stopped
     networks:
       - internal
-      - traefik-local
+      - traefik-apps
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=traefik-apps"
       - "traefik.http.routers.ios-screen-time-screenshot-processing-api.rule=PathPrefix(`/ios-screen-time-screenshot-processing/api`)"
       - "traefik.http.routers.ios-screen-time-screenshot-processing-api.entrypoints=web"
       - "traefik.http.services.ios-screen-time-screenshot-processing-api.loadbalancer.server.port=8000"
@@ -101,7 +102,7 @@ services:
     image: ${BACKEND_IMAGE:-}
     build:
       context: ..
-      dockerfile: docker/backend/Dockerfile
+      dockerfile: docker/backend/Dockerfile.dev
     container_name: ios-screen-time-screenshot-processing-celery
     command: celery -A src.screenshot_processor.web.celery_app worker --loglevel=info --concurrency=2
     environment:
@@ -130,15 +131,17 @@ services:
     image: ${FRONTEND_IMAGE:-}
     build:
       context: ..
-      dockerfile: docker/frontend/Dockerfile
+      dockerfile: docker/frontend/Dockerfile.prod
       args:
         APP_PATH_PREFIX: /ios-screen-time-screenshot-processing
     container_name: ios-screen-time-screenshot-processing-frontend
+    environment:
+      BASE_PATH: /ios-screen-time-screenshot-processing
     depends_on:
       - backend
     restart: unless-stopped
     networks:
-      - traefik-local
+      - traefik-apps
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.ios-screen-time-screenshot-processing-fe.rule=PathPrefix(`/ios-screen-time-screenshot-processing`)"
@@ -154,7 +157,7 @@ services:
 networks:
   internal:
     name: ios-screen-time-screenshot-processing-internal
-  traefik-local:
+  traefik-apps:
     external: true
 
 # =============================================================================
