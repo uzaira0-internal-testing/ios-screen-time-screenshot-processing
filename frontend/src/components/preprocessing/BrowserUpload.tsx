@@ -1,4 +1,6 @@
+import { useCallback } from "react";
 import { usePreprocessingStore } from "@/store/preprocessingStore";
+import type { UploadFileItem } from "@/store/preprocessingStore";
 import { UploadDropZone } from "./UploadDropZone";
 import { UploadTagTable } from "./UploadTagTable";
 import { UploadProgressBar } from "./UploadProgressBar";
@@ -16,6 +18,16 @@ export const BrowserUpload = () => {
   const startBrowserUpload = usePreprocessingStore((s) => s.startBrowserUpload);
 
   const canUpload = uploadFiles.length > 0 && uploadGroupId.trim().length > 0 && !isUploading;
+
+  // Append new files to existing list (dedup by original_filepath)
+  const appendFiles = useCallback(
+    (newFiles: UploadFileItem[]) => {
+      const existingPaths = new Set(uploadFiles.map((f) => f.original_filepath));
+      const unique = newFiles.filter((f) => !existingPaths.has(f.original_filepath));
+      setUploadFiles([...uploadFiles, ...unique]);
+    },
+    [uploadFiles, setUploadFiles],
+  );
 
   // Step 1: Drop zone (no files yet)
   if (uploadFiles.length === 0 && !isUploading) {
@@ -58,7 +70,7 @@ export const BrowserUpload = () => {
     );
   }
 
-  // Step 2: Tag table
+  // Step 2: Tag table with ability to add more folders
   return (
     <div className="space-y-4">
       <UploadTagTable
@@ -69,6 +81,8 @@ export const BrowserUpload = () => {
         onGroupIdChange={setUploadGroupId}
         onImageTypeChange={setUploadImageType}
       />
+      {/* Compact drop zone for adding more folders */}
+      <UploadDropZone onFilesSelected={appendFiles} compact />
       <div className="flex items-center justify-between">
         <button
           onClick={() => setUploadFiles([])}

@@ -20,6 +20,8 @@ export const UploadTagTable = ({
 }: UploadTagTableProps) => {
   const [thumbnails, setThumbnails] = useState<Record<number, string>>({});
   const thumbsGenerated = useRef(false);
+  const [regexInput, setRegexInput] = useState("");
+  const [regexError, setRegexError] = useState<string | null>(null);
 
   // Generate thumbnails on mount
   useEffect(() => {
@@ -47,6 +49,35 @@ export const UploadTagTable = ({
 
   const removeItem = (index: number) => {
     onFilesChange(files.filter((_, i) => i !== index));
+  };
+
+  const applyRegex = () => {
+    const trimmed = regexInput.trim();
+    if (!trimmed) {
+      setRegexError(null);
+      return;
+    }
+
+    // If the user didn't include a capture group, wrap the whole pattern in one
+    const pattern = trimmed.includes("(") ? trimmed : `(${trimmed})`;
+
+    let re: RegExp;
+    try {
+      re = new RegExp(pattern);
+    } catch (e) {
+      setRegexError(`Invalid regex: ${(e as Error).message}`);
+      return;
+    }
+
+    setRegexError(null);
+    const updated = files.map((item) => {
+      const match = item.original_filepath.match(re);
+      if (match && match[1]) {
+        return { ...item, participant_id: match[1] };
+      }
+      return item;
+    });
+    onFilesChange(updated);
   };
 
   return (
@@ -77,6 +108,38 @@ export const UploadTagTable = ({
         <span className="text-sm text-gray-500 ml-auto">
           {files.length} file{files.length !== 1 ? "s" : ""}
         </span>
+      </div>
+
+      {/* Participant ID Regex */}
+      <div className="flex flex-wrap items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Participant ID Regex:</label>
+          <input
+            type="text"
+            value={regexInput}
+            onChange={(e) => { setRegexInput(e.target.value); setRegexError(null); }}
+            onKeyDown={(e) => { if (e.key === "Enter") applyRegex(); }}
+            className={`text-sm border rounded-md px-3 py-1.5 flex-1 min-w-[200px] font-mono ${
+              regexError ? "border-red-400 bg-red-50" : "border-gray-300"
+            }`}
+            placeholder="e.g. (P\d-\d{4})"
+          />
+          <button
+            type="button"
+            onClick={applyRegex}
+            className="px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100"
+          >
+            Apply
+          </button>
+        </div>
+        {regexError && (
+          <p className="w-full text-xs text-red-600">{regexError}</p>
+        )}
+        {!regexError && regexInput.trim() && (
+          <p className="w-full text-xs text-gray-400">
+            First capture group from each file's path becomes participant_id
+          </p>
+        )}
       </div>
 
       {/* File table */}

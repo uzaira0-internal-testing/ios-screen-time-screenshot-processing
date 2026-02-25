@@ -104,20 +104,20 @@ export const PreprocessingPage = () => {
           {/* Upload/Pipeline toggle */}
           <div className="flex items-center bg-gray-100 rounded-md p-0.5">
             <button
-              onClick={() => setPageMode("pipeline")}
-              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                pageMode === "pipeline" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
-              }`}
-            >
-              Pipeline
-            </button>
-            <button
               onClick={() => setPageMode("upload")}
               className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
                 pageMode === "upload" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
               }`}
             >
               Upload
+            </button>
+            <button
+              onClick={() => setPageMode("pipeline")}
+              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                pageMode === "pipeline" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
+              }`}
+            >
+              Pipeline
             </button>
           </div>
 

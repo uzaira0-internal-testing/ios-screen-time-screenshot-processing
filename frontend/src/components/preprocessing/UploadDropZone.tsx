@@ -4,6 +4,7 @@ import type { UploadFileItem } from "@/store/preprocessingStore";
 
 interface UploadDropZoneProps {
   onFilesSelected: (files: UploadFileItem[]) => void;
+  compact?: boolean;
 }
 
 /**
@@ -21,6 +22,8 @@ interface UploadDropZoneProps {
  *   "Jan 15, 2024"         → "2024-01-15"
  *   "15 Jan 2024"          → "2024-01-15"
  *   "January 15, 2024"     → "2024-01-15"
+ *   "7.18.23"              → "2023-07-18"
+ *   "Day 1 7.18.23"        → "2023-07-18"
  * Returns "" if no date can be extracted.
  */
 function parseDateFromFolder(raw: string): string {
@@ -47,25 +50,33 @@ function parseDateFromFolder(raw: string): string {
   }
 
   // MM.DD.YYYY or MM-DD-YYYY or MM/DD/YYYY (possibly embedded in a longer string like "Day 10 10.25.2024")
-  m = s.match(/(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})/);
+  // Also handles 2-digit years: "7.18.23" → 2023-07-18
+  m = s.match(/(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{2,4})/);
   if (m) {
-    const a = +m[1]!, b = +m[2]!, year = +m[3]!;
+    const a = +m[1]!, b = +m[2]!;
+    let year = +m[3]!;
+    // Expand 2-digit year: 00-49 → 2000s, 50-99 → 1900s
+    if (year < 100) year += year < 50 ? 2000 : 1900;
     // Disambiguate: if a > 12, it's DD.MM.YYYY; otherwise assume MM.DD.YYYY (US convention)
     if (a > 12 && b <= 12) return `${year}-${pad(b)}-${pad(a)}`;
     if (a <= 12) return `${year}-${pad(a)}-${pad(b)}`;
     return `${year}-${pad(a)}-${pad(b)}`;
   }
 
-  // Mon DD, YYYY or Month DD, YYYY
-  m = s.match(/([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/);
+  // Mon DD, YYYY or Month DD, YYYY (also 2-digit year)
+  m = s.match(/([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{2,4})/);
   if (m && MONTHS[m[1]!.toLowerCase()]) {
-    return `${m[3]}-${MONTHS[m[1]!.toLowerCase()]}-${pad(+m[2]!)}`;
+    let year = +m[3]!;
+    if (year < 100) year += year < 50 ? 2000 : 1900;
+    return `${year}-${MONTHS[m[1]!.toLowerCase()]}-${pad(+m[2]!)}`;
   }
 
-  // DD Mon YYYY or DD Month YYYY
-  m = s.match(/(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/);
+  // DD Mon YYYY or DD Month YYYY (also 2-digit year)
+  m = s.match(/(\d{1,2})\s+([A-Za-z]+)\s+(\d{2,4})/);
   if (m && MONTHS[m[2]!.toLowerCase()]) {
-    return `${m[3]}-${MONTHS[m[2]!.toLowerCase()]}-${pad(+m[1]!)}`;
+    let year = +m[3]!;
+    if (year < 100) year += year < 50 ? 2000 : 1900;
+    return `${year}-${MONTHS[m[2]!.toLowerCase()]}-${pad(+m[1]!)}`;
   }
 
   return "";
@@ -110,7 +121,7 @@ function isImageFile(file: File): boolean {
   return file.type === "image/png" || file.type === "image/jpeg" || file.name.endsWith(".png") || file.name.endsWith(".jpg") || file.name.endsWith(".jpeg");
 }
 
-export const UploadDropZone = ({ onFilesSelected }: UploadDropZoneProps) => {
+export const UploadDropZone = ({ onFilesSelected, compact }: UploadDropZoneProps) => {
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
       const imageFiles = acceptedFiles.filter(isImageFile);
@@ -136,6 +147,45 @@ export const UploadDropZone = ({ onFilesSelected }: UploadDropZoneProps) => {
     noClick: true,
   });
 
+  // Compact version: inline bar for adding more folders to an existing selection
+  if (compact) {
+    return (
+      <div
+        {...getRootProps()}
+        className={`border-2 border-dashed rounded-lg p-3 text-center transition-colors ${
+          isDragActive ? "border-blue-400 bg-blue-50" : "border-gray-200 hover:border-gray-300"
+        }`}
+      >
+        <input {...getInputProps()} />
+        {/* @ts-expect-error webkitdirectory is a non-standard attribute */}
+        <input {...getInputProps()} webkitdirectory="" directory="" style={{ display: "none" }} id="folder-input-add" />
+        <div className="flex items-center justify-center gap-3">
+          <span className="text-sm text-gray-400">
+            {isDragActive ? "Drop to add..." : "Add more files or folders"}
+          </span>
+          <button
+            type="button"
+            className="px-3 py-1 text-xs bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            onClick={open}
+          >
+            + Files
+          </button>
+          <button
+            type="button"
+            className="px-3 py-1 text-xs bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            onClick={(e) => {
+              e.stopPropagation();
+              document.getElementById("folder-input-add")?.click();
+            }}
+          >
+            + Folder
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Full-size drop zone for initial selection
   return (
     <div
       {...getRootProps()}
