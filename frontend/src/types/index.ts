@@ -18,7 +18,7 @@ export type ProcessingIssueRead = components["schemas"]["ProcessingIssueRead"];
 
 // User types
 export type User = components["schemas"]["UserRead"];
-export type UserLogin = components["schemas"]["UserLogin"];
+export type UserLogin = components["schemas"]["UserLoginRequest"];
 export type UserStatsRead = components["schemas"]["UserStatsRead"];
 export type UserUpdateResponse = components["schemas"]["UserUpdateResponse"];
 
@@ -47,7 +47,7 @@ export type ScreenshotUploadResponse =
   components["schemas"]["ScreenshotUploadResponse"];
 // Paginated screenshot list response
 export type ScreenshotListResponse =
-  components["schemas"]["ScreenshotListResponse"];
+  components["schemas"]["PaginatedResponse_ScreenshotRead_"];
 
 // Group types
 export type Group = components["schemas"]["GroupRead"];
