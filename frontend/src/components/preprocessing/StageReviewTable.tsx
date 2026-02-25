@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { usePreprocessingStore } from "@/store/preprocessingStore";
 import type { Stage, StageStatus, PreprocessingEventData } from "@/store/preprocessingStore";
 import type { Screenshot } from "@/types";
@@ -39,6 +40,20 @@ export const StageReviewTable = ({
   const getScreenshotStageStatus = usePreprocessingStore((s) => s.getScreenshotStageStatus);
   const isScreenshotException = usePreprocessingStore((s) => s.isScreenshotException);
   const loadEventLog = usePreprocessingStore((s) => s.loadEventLog);
+  const highlightedScreenshotId = usePreprocessingStore((s) => s.highlightedScreenshotId);
+  const setHighlightedScreenshotId = usePreprocessingStore((s) => s.setHighlightedScreenshotId);
+
+  const highlightedRef = useRef<HTMLTableRowElement>(null);
+
+  // Auto-scroll to highlighted screenshot
+  useEffect(() => {
+    if (highlightedScreenshotId && highlightedRef.current) {
+      highlightedRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      // Clear highlight after 5 seconds
+      const timer = setTimeout(() => setHighlightedScreenshotId(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightedScreenshotId, setHighlightedScreenshotId, screenshots]);
 
   return (
     <div className="overflow-x-auto">
@@ -61,13 +76,17 @@ export const StageReviewTable = ({
             const isException = isScreenshotException(s, stage);
             const event = getCurrentEvent(s, stage);
             const badge = STATUS_BADGES[status] ?? STATUS_BADGES.pending;
+            const isHighlighted = s.id === highlightedScreenshotId;
 
             return (
               <tr
                 key={s.id}
+                ref={isHighlighted ? highlightedRef : undefined}
                 className={`border-b border-gray-100 hover:bg-gray-50 ${
-                  isException ? "bg-yellow-50" : ""
-                } ${status === "invalidated" ? "bg-orange-50/40" : ""}`}
+                  isHighlighted ? "bg-blue-50 ring-2 ring-blue-300" : ""
+                } ${isException ? "bg-yellow-50" : ""} ${
+                  status === "invalidated" ? "bg-orange-50/40" : ""
+                }`}
               >
                 <td className="px-3 py-2">
                   <img

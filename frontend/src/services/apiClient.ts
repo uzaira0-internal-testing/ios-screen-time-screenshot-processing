@@ -624,6 +624,114 @@ export const api = {
       }
       return response.json();
     },
+
+    async uploadBrowser(formData: FormData) {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/screenshots/upload/browser`,
+        {
+          method: "POST",
+          headers: {
+            "X-Username": localStorage.getItem("username") || "",
+            "X-Site-Password": localStorage.getItem("sitePassword") || "",
+          },
+          body: formData,
+        },
+      );
+      if (!response.ok) {
+        const detail = await response.text();
+        throw new Error(detail || "Failed to upload");
+      }
+      return response.json();
+    },
+
+    async getOriginalImageUrl(screenshotId: number): Promise<string> {
+      return `${LEGACY_API_PREFIX}/screenshots/${screenshotId}/original-image`;
+    },
+
+    async applyManualCrop(
+      screenshotId: number,
+      crop: { left: number; top: number; right: number; bottom: number },
+    ) {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/screenshots/${screenshotId}/manual-crop`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Username": localStorage.getItem("username") || "",
+            "X-Site-Password": localStorage.getItem("sitePassword") || "",
+          },
+          body: JSON.stringify(crop),
+        },
+      );
+      if (!response.ok) {
+        const detail = await response.text();
+        throw new Error(detail || "Failed to apply crop");
+      }
+      return response.json();
+    },
+
+    async getPHIRegions(screenshotId: number) {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/screenshots/${screenshotId}/phi-regions`,
+        {
+          headers: {
+            "X-Username": localStorage.getItem("username") || "",
+            "X-Site-Password": localStorage.getItem("sitePassword") || "",
+          },
+        },
+      );
+      if (!response.ok) {
+        throw new Error("Failed to get PHI regions");
+      }
+      return response.json();
+    },
+
+    async savePHIRegions(
+      screenshotId: number,
+      body: { regions: Array<{ x: number; y: number; w: number; h: number; label: string; source: string; confidence: number; text: string }>; preset: string },
+    ) {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/screenshots/${screenshotId}/phi-regions`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Username": localStorage.getItem("username") || "",
+            "X-Site-Password": localStorage.getItem("sitePassword") || "",
+          },
+          body: JSON.stringify(body),
+        },
+      );
+      if (!response.ok) {
+        const detail = await response.text();
+        throw new Error(detail || "Failed to save PHI regions");
+      }
+      return response.json();
+    },
+
+    async applyRedaction(
+      screenshotId: number,
+      body: { regions: Array<{ x: number; y: number; w: number; h: number; label: string; source: string; confidence: number; text: string }>; redaction_method: string },
+    ) {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/screenshots/${screenshotId}/apply-redaction`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Username": localStorage.getItem("username") || "",
+            "X-Site-Password": localStorage.getItem("sitePassword") || "",
+          },
+          body: JSON.stringify(body),
+        },
+      );
+      if (!response.ok) {
+        const detail = await response.text();
+        throw new Error(detail || "Failed to apply redaction");
+      }
+      return response.json();
+    },
   },
 
   // Export

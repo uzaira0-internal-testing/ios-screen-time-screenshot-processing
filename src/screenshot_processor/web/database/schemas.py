@@ -1102,3 +1102,135 @@ class HealthCheckResponse(BaseModel):
 
     status: str
     checks: dict[str, bool | str]  # Typed more specifically
+
+
+# =============================================================================
+# Browser Upload Schemas (Phase 2)
+# =============================================================================
+
+
+class BrowserUploadItem(BaseModel):
+    """Per-file metadata for browser upload."""
+
+    participant_id: str = Field(..., min_length=1, max_length=100)
+    filename: str = Field(..., min_length=1, max_length=255)
+    original_filepath: str | None = Field(None, max_length=1000)
+    screenshot_date: date | None = None
+
+
+class BrowserUploadRequest(BaseModel):
+    """Metadata for browser-based multi-file upload."""
+
+    group_id: str = Field(..., min_length=1, max_length=100, pattern=r"^[\w\-. ]+$")
+    image_type: ImageType
+    items: list[BrowserUploadItem] = Field(..., min_length=1, max_length=60)
+
+
+class BrowserUploadItemResult(BaseModel):
+    """Result for a single file in browser upload."""
+
+    index: int
+    success: bool
+    screenshot_id: int | None = None
+    error: str | None = None
+
+
+class BrowserUploadResponse(BaseModel):
+    """Response from browser-based upload."""
+
+    total: int
+    successful: int
+    failed: int
+    results: list[BrowserUploadItemResult]
+
+
+# =============================================================================
+# Manual Crop Schemas (Phase 3)
+# =============================================================================
+
+
+class ManualCropRequest(BaseModel):
+    """Pixel coordinates for a manual crop rectangle."""
+
+    left: int = Field(..., ge=0)
+    top: int = Field(..., ge=0)
+    right: int = Field(..., ge=0)
+    bottom: int = Field(..., ge=0)
+
+    @model_validator(mode="after")
+    def validate_crop_coords(self) -> "ManualCropRequest":
+        if self.right <= self.left:
+            raise ValueError(f"right ({self.right}) must be greater than left ({self.left})")
+        if self.bottom <= self.top:
+            raise ValueError(f"bottom ({self.bottom}) must be greater than top ({self.top})")
+        return self
+
+
+class ManualCropResponse(BaseModel):
+    """Response from manual crop operation."""
+
+    success: bool
+    event_id: int
+    output_file: str
+    width: int
+    height: int
+    message: str
+
+
+# =============================================================================
+# PHI Region Schemas (Phase 4)
+# =============================================================================
+
+
+class PHIRegionRect(BaseModel):
+    """A single PHI region rectangle."""
+
+    x: int = Field(..., ge=0)
+    y: int = Field(..., ge=0)
+    w: int = Field(..., ge=1)
+    h: int = Field(..., ge=1)
+    label: str = Field(default="OTHER", max_length=50)
+    source: str = Field(default="manual", max_length=20)
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    text: str = Field(default="", max_length=500)
+
+
+class ManualPHIRegionsRequest(BaseModel):
+    """Save manually-adjusted PHI regions."""
+
+    regions: list[PHIRegionRect] = []
+    preset: str = Field(default="manual")
+
+
+class ManualPHIRegionsResponse(BaseModel):
+    """Response from saving PHI regions."""
+
+    success: bool
+    event_id: int
+    regions_count: int
+    message: str
+
+
+class ApplyPHIRedactionRequest(BaseModel):
+    """Apply redaction to confirmed PHI regions."""
+
+    regions: list[PHIRegionRect] = []
+    redaction_method: str = Field(default="redbox")
+
+
+class ApplyPHIRedactionResponse(BaseModel):
+    """Response from applying PHI redaction."""
+
+    success: bool
+    event_id: int
+    regions_redacted: int
+    output_file: str
+    message: str
+
+
+class PHIRegionsResponse(BaseModel):
+    """Current PHI regions for a screenshot."""
+
+    regions: list[PHIRegionRect] = []
+    source: str | None = None
+    event_id: int | None = None

@@ -356,6 +356,30 @@ export const AnnotationWorkspace = ({
               </div>
             )}
           </div>
+          {/* Preprocessing status banner */}
+          {(() => {
+            const pp = (screenshot.processing_metadata as Record<string, unknown>)?.preprocessing as Record<string, unknown> | undefined;
+            const stageStatus = pp?.stage_status as Record<string, string> | undefined;
+            if (!stageStatus) return null;
+            const problemStages = Object.entries(stageStatus).filter(
+              ([, st]) => st === "invalidated" || st === "failed",
+            );
+            if (problemStages.length === 0) return null;
+            const stageNames = problemStages.map(([s]) => s.replace(/_/g, " ")).join(", ");
+            return (
+              <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-sm flex items-center gap-2">
+                <span className="text-amber-600">
+                  Preprocessing issue: {stageNames} {problemStages.length === 1 ? "is" : "are"} {problemStages[0]![1]}.
+                </span>
+                <a
+                  href={`/preprocessing?screenshot_id=${screenshot.id}&returnUrl=${encodeURIComponent(`/annotate/${screenshot.id}`)}`}
+                  className="text-blue-600 hover:text-blue-800 underline text-xs font-medium"
+                >
+                  Fix in Preprocessing &rarr;
+                </a>
+              </div>
+            );
+          })()}
           <div className="flex-1 flex items-center justify-center p-4 min-h-0">
             <div className="w-full">
               {displayMode === "overlay" ? (

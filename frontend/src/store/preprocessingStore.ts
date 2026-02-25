@@ -14,6 +14,16 @@ import toast from "react-hot-toast";
 type Stage = "device_detection" | "cropping" | "phi_detection" | "phi_redaction";
 type StageStatus = "pending" | "completed" | "running" | "failed" | "invalidated";
 type FilterMode = "all" | "needs_review" | "invalidated" | "completed" | "pending";
+type PageMode = "pipeline" | "upload";
+
+interface UploadFileItem {
+  file: File;
+  participant_id: string;
+  filename: string;
+  original_filepath: string;
+  screenshot_date: string;
+  thumbnail?: string;
+}
 
 // Re-use generated types
 type StageSummary = PreprocessingStageSummary;
@@ -37,6 +47,7 @@ interface PreprocessingState {
 
   // Navigation
   activeStage: Stage;
+  pageMode: PageMode;
 
   // Execution
   isRunningStage: boolean;
@@ -61,8 +72,21 @@ interface PreprocessingState {
   _pollCount: number;
   _queuedCount: number;
 
+  // Upload state (Phase 2)
+  uploadFiles: UploadFileItem[];
+  uploadImageType: "battery" | "screen_time";
+  uploadGroupId: string;
+  isUploading: boolean;
+  uploadProgress: { completed: number; total: number } | null;
+  uploadErrors: string[];
+
+  // Deep-link state
+  highlightedScreenshotId: number | null;
+  returnUrl: string | null;
+
   // Actions
   setActiveStage: (stage: Stage) => void;
+  setPageMode: (mode: PageMode) => void;
   setFilter: (filter: FilterMode) => void;
   setSelectedGroupId: (groupId: string) => void;
   setPhiPreset: (preset: string) => void;
@@ -75,6 +99,16 @@ interface PreprocessingState {
   invalidateFromStage: (screenshotId: number, stage: string) => Promise<void>;
   loadEventLog: (screenshotId: number) => Promise<void>;
   clearEventLog: () => void;
+
+  // Upload actions (Phase 2)
+  setUploadFiles: (files: UploadFileItem[]) => void;
+  setUploadImageType: (type: "battery" | "screen_time") => void;
+  setUploadGroupId: (groupId: string) => void;
+  startBrowserUpload: () => Promise<void>;
+
+  // Deep-link actions
+  setHighlightedScreenshotId: (id: number | null) => void;
+  setReturnUrl: (url: string | null) => void;
 
   // Polling
   startPolling: () => void;
@@ -94,6 +128,7 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
   groups: [],
   summary: null,
   activeStage: "device_detection",
+  pageMode: "pipeline",
   isRunningStage: false,
   stageProgress: null,
   filter: "all",
@@ -106,7 +141,20 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
   _pollCount: 0,
   _queuedCount: 0,
 
+  // Upload state
+  uploadFiles: [],
+  uploadImageType: "screen_time",
+  uploadGroupId: "",
+  isUploading: false,
+  uploadProgress: null,
+  uploadErrors: [],
+
+  // Deep-link state
+  highlightedScreenshotId: null,
+  returnUrl: null,
+
   setActiveStage: (stage) => set({ activeStage: stage }),
+  setPageMode: (mode) => set({ pageMode: mode }),
   setFilter: (filter) => set({ filter }),
   setSelectedGroupId: (groupId) => {
     set({ selectedGroupId: groupId, screenshots: [], summary: null });
@@ -228,6 +276,79 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
   },
 
   clearEventLog: () => set({ selectedScreenshotId: null, eventLog: null }),
+
+  // Upload actions
+  setUploadFiles: (files) => set({ uploadFiles: files }),
+  setUploadImageType: (type) => set({ uploadImageType: type }),
+  setUploadGroupId: (groupId) => set({ uploadGroupId: groupId }),
+
+  startBrowserUpload: async () => {
+    const { uploadFiles, uploadGroupId, uploadImageType } = get();
+    if (!uploadFiles.length || !uploadGroupId) return;
+
+    set({ isUploading: true, uploadProgress: { completed: 0, total: uploadFiles.length }, uploadErrors: [] });
+
+    const BATCH_SIZE = 60;
+    const errors: string[] = [];
+    let totalCompleted = 0;
+
+    for (let batchStart = 0; batchStart < uploadFiles.length; batchStart += BATCH_SIZE) {
+      const batch = uploadFiles.slice(batchStart, batchStart + BATCH_SIZE);
+      const formData = new FormData();
+
+      const metadata = {
+        group_id: uploadGroupId,
+        image_type: uploadImageType,
+        items: batch.map((item) => ({
+          participant_id: item.participant_id,
+          filename: item.filename,
+          original_filepath: item.original_filepath || null,
+          screenshot_date: item.screenshot_date || null,
+        })),
+      };
+
+      formData.append("metadata", JSON.stringify(metadata));
+      for (const item of batch) {
+        formData.append("files", item.file);
+      }
+
+      try {
+        const result = await api.preprocessing.uploadBrowser(formData);
+        totalCompleted += result.successful || 0;
+        if (result.failed > 0) {
+          for (const r of result.results || []) {
+            if (!r.success && r.error) {
+              errors.push(`File ${batchStart + r.index}: ${r.error}`);
+            }
+          }
+        }
+      } catch (err) {
+        errors.push(`Batch ${Math.floor(batchStart / BATCH_SIZE) + 1} failed: ${err}`);
+      }
+
+      set({ uploadProgress: { completed: totalCompleted, total: uploadFiles.length } });
+    }
+
+    set({ isUploading: false, uploadErrors: errors });
+
+    if (errors.length === 0) {
+      toast.success(`Uploaded ${totalCompleted} screenshot(s)`);
+      // Clear upload state and switch to pipeline mode to show uploaded screenshots
+      set({ uploadFiles: [], pageMode: "pipeline" });
+    } else {
+      toast.error(`Upload completed with ${errors.length} error(s)`);
+    }
+
+    // Refresh groups and screenshots
+    await get().loadGroups();
+    if (uploadGroupId) {
+      get().setSelectedGroupId(uploadGroupId);
+    }
+  },
+
+  // Deep-link actions
+  setHighlightedScreenshotId: (id) => set({ highlightedScreenshotId: id }),
+  setReturnUrl: (url) => set({ returnUrl: url }),
 
   startPolling: () => {
     const existing = get()._pollInterval;
@@ -356,5 +477,5 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
   },
 }));
 
-export type { Stage, StageStatus, FilterMode, StageSummary, PreprocessingSummaryData, PreprocessingEventData, EventLogData };
+export type { Stage, StageStatus, FilterMode, PageMode, StageSummary, PreprocessingSummaryData, PreprocessingEventData, EventLogData, UploadFileItem };
 export { STAGES };

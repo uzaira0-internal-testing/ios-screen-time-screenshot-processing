@@ -10,7 +10,7 @@ from pathlib import Path
 
 import aiofiles
 import cv2
-from fastapi import APIRouter, Body, Header, HTTPException, Query, Request, status
+from fastapi import APIRouter, Body, File, Form, Header, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse
 from fastapi_pagination import PaginatedResponse
 from pydantic import BaseModel
@@ -25,18 +25,29 @@ from screenshot_processor.web.rate_limiting import limiter
 from screenshot_processor.web.database import (
     Annotation,
     AnnotationStatus,
+    ApplyPHIRedactionRequest,
+    ApplyPHIRedactionResponse,
     BatchItemResult,
     BatchPreprocessRequest,
     BatchPreprocessResponse,
     BatchUploadRequest,
     BatchUploadResponse,
+    BrowserUploadRequest,
+    BrowserUploadItemResult,
+    BrowserUploadResponse,
     ConsensusResult,
     Group,
     GroupRead,
     InvalidateFromStageRequest,
+    ManualCropRequest,
+    ManualCropResponse,
+    ManualPHIRegionsRequest,
+    ManualPHIRegionsResponse,
     NextScreenshotResponse,
     PHIDetectionStageRequest,
     PHIRedactionStageRequest,
+    PHIRegionRect,
+    PHIRegionsResponse,
     PreprocessingDetailsResponse,
     PreprocessingEventLog,
     PreprocessingStageSummary,
@@ -2025,6 +2036,464 @@ async def get_preprocessing_events(
         stage_status=pp.get("stage_status", {}),
         current_events=pp.get("current_events", {}),
         events=pp.get("events", []),
+    )
+
+
+# ============================================================================
+# Browser Upload (Phase 2) — multipart/form-data, CurrentUser auth
+# ============================================================================
+
+
+@router.post("/upload/browser", response_model=BrowserUploadResponse, status_code=status.HTTP_201_CREATED)
+async def upload_browser(
+    request: Request,
+    current_user: CurrentUser,
+    db: DatabaseSession,
+    metadata: str = Form(..., description="JSON string of BrowserUploadRequest"),
+    files: list[UploadFile] = File(..., description="Image files"),
+):
+    """
+    Upload screenshots from browser with multipart/form-data.
+
+    Uses X-Username auth (CurrentUser), NOT X-API-Key.
+    Accepts metadata as a JSON string plus one or more image files.
+    Does not queue Celery tasks — user triggers stages manually.
+    """
+    import json
+
+    from screenshot_processor.web.services.preprocessing_service import init_preprocessing_metadata
+
+    # Parse metadata JSON
+    try:
+        meta = BrowserUploadRequest.model_validate(json.loads(metadata))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid metadata: {e}")
+
+    if len(files) != len(meta.items):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File count ({len(files)}) does not match items count ({len(meta.items)})",
+        )
+
+    settings = get_settings()
+    upload_dir = Path(settings.UPLOAD_DIR)
+
+    # Ensure group exists (upsert)
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    insert_stmt = (
+        pg_insert(Group)
+        .values(id=meta.group_id, name=meta.group_id, image_type=meta.image_type)
+        .on_conflict_do_nothing(index_elements=["id"])
+    )
+    await db.execute(insert_stmt)
+
+    results: list[BrowserUploadItemResult] = []
+    successful = 0
+    failed = 0
+
+    for i, (item, upload_file) in enumerate(zip(meta.items, files)):
+        try:
+            # Read file content
+            file_data = await upload_file.read()
+            if not file_data:
+                results.append(BrowserUploadItemResult(index=i, success=False, error="Empty file"))
+                failed += 1
+                continue
+
+            # Validate image format
+            if file_data[:8] == b"\x89PNG\r\n\x1a\n":
+                ext = ".png"
+            elif file_data[:2] == b"\xff\xd8":
+                ext = ".jpg"
+            else:
+                results.append(BrowserUploadItemResult(index=i, success=False, error="Unsupported format (PNG/JPEG only)"))
+                failed += 1
+                continue
+
+            # Compute hash for unique filename
+            file_hash = hashlib.blake2b(file_data, digest_size=6).hexdigest()
+            safe_name = sanitize_filename(item.filename)
+            base_name = Path(safe_name).stem
+            final_filename = f"{meta.group_id}/{item.participant_id}/{base_name}_{file_hash}{ext}"
+
+            file_path = upload_dir / final_filename
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+
+            async with aiofiles.open(file_path, "wb") as f:
+                await f.write(file_data)
+
+            # Get dimensions and detect device
+            width, height = _get_image_dimensions(file_data)
+            detected_device = _detect_device_type(width, height) if width > 0 else None
+
+            # Create screenshot record (upsert on file_path)
+            insert_stmt = (
+                pg_insert(Screenshot)
+                .values(
+                    file_path=str(file_path),
+                    image_type=meta.image_type,
+                    target_annotations=1,
+                    annotation_status="pending",
+                    processing_status="pending",
+                    current_annotation_count=0,
+                    participant_id=item.participant_id,
+                    group_id=meta.group_id,
+                    device_type=detected_device,
+                    original_filepath=item.original_filepath,
+                    screenshot_date=item.screenshot_date,
+                    uploaded_by_id=current_user.id,
+                )
+                .on_conflict_do_update(
+                    index_elements=["file_path"],
+                    set_={
+                        "processing_status": "pending",
+                        "device_type": detected_device,
+                        "original_filepath": item.original_filepath,
+                        "screenshot_date": item.screenshot_date,
+                    },
+                )
+                .returning(Screenshot.id)
+            )
+            result = await db.execute(insert_stmt)
+            screenshot_id = result.fetchone()[0]
+            await db.flush()
+
+            # Initialize preprocessing metadata (no Celery tasks)
+            screenshot = await get_screenshot_or_404(db, screenshot_id)
+            init_preprocessing_metadata(screenshot)
+            await db.flush()
+
+            results.append(BrowserUploadItemResult(index=i, success=True, screenshot_id=screenshot_id))
+            successful += 1
+
+        except Exception as e:
+            logger.error(f"Browser upload item {i} failed: {e}")
+            results.append(BrowserUploadItemResult(index=i, success=False, error=str(e)))
+            failed += 1
+
+    await db.commit()
+
+    return BrowserUploadResponse(
+        total=len(files),
+        successful=successful,
+        failed=failed,
+        results=results,
+    )
+
+
+# ============================================================================
+# Manual Crop (Phase 3) — synchronous crop with event log
+# ============================================================================
+
+
+@router.get("/{screenshot_id}/original-image")
+async def get_original_image(
+    screenshot_id: int,
+    db: DatabaseSession,
+    current_user: CurrentUser,
+):
+    """Serve the immutable original image (base_file_path) for crop editing."""
+    screenshot = await get_screenshot_or_404(db, screenshot_id)
+
+    pp = (screenshot.processing_metadata or {}).get("preprocessing", {})
+    base_path = pp.get("base_file_path", screenshot.file_path)
+
+    file_path = Path(base_path)
+    if not file_path.is_absolute():
+        settings = get_settings()
+        file_path = Path(settings.UPLOAD_DIR) / file_path
+
+    # Path traversal protection
+    try:
+        file_path = file_path.resolve()
+    except (ValueError, OSError):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file path")
+
+    if not file_path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Original image not found")
+
+    media_type = "image/png" if file_path.suffix.lower() == ".png" else "image/jpeg"
+    return FileResponse(str(file_path), media_type=media_type)
+
+
+@router.post("/{screenshot_id}/manual-crop", response_model=ManualCropResponse)
+async def manual_crop(
+    screenshot_id: int,
+    crop_request: ManualCropRequest,
+    db: DatabaseSession,
+    current_user: CurrentUser,
+):
+    """
+    Apply a manual crop to a screenshot (synchronous, no Celery).
+
+    Crops the original image and records an event in the preprocessing log.
+    Automatically invalidates phi_detection and phi_redaction downstream.
+    """
+    import numpy as np
+
+    from screenshot_processor.web.services.preprocessing_service import (
+        append_event,
+        get_next_version,
+        get_stage_output_path,
+        init_preprocessing_metadata,
+    )
+
+    screenshot = await get_screenshot_for_update(db, screenshot_id)
+    pp = init_preprocessing_metadata(screenshot)
+    base_path = pp.get("base_file_path", screenshot.file_path)
+
+    # Read original image
+    img = cv2.imread(base_path)
+    if img is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not read original image")
+
+    h_img, w_img = img.shape[:2]
+
+    # Validate crop within image bounds
+    if crop_request.right > w_img or crop_request.bottom > h_img:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Crop region ({crop_request.right}x{crop_request.bottom}) exceeds image dimensions ({w_img}x{h_img})",
+        )
+
+    # Perform crop
+    cropped = img[crop_request.top:crop_request.bottom, crop_request.left:crop_request.right]
+    crop_h, crop_w = cropped.shape[:2]
+
+    # Save cropped image
+    version = get_next_version(screenshot, "cropping")
+    output_path = get_stage_output_path(base_path, "cropping", version)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    cv2.imwrite(str(output_path), cropped)
+
+    # Record event
+    event_id = append_event(
+        screenshot,
+        "cropping",
+        "manual",
+        params={
+            "left": crop_request.left,
+            "top": crop_request.top,
+            "right": crop_request.right,
+            "bottom": crop_request.bottom,
+            "user": current_user.username,
+        },
+        result={
+            "was_cropped": True,
+            "manual": True,
+            "original_dimensions": [w_img, h_img],
+            "cropped_dimensions": [crop_w, crop_h],
+        },
+        output_file=str(output_path),
+        input_file=base_path,
+    )
+
+    await db.commit()
+
+    return ManualCropResponse(
+        success=True,
+        event_id=event_id,
+        output_file=str(output_path),
+        width=crop_w,
+        height=crop_h,
+        message=f"Manual crop applied ({crop_w}x{crop_h}). PHI stages invalidated.",
+    )
+
+
+# ============================================================================
+# PHI Region Management (Phase 4)
+# ============================================================================
+
+
+@router.get("/{screenshot_id}/phi-regions", response_model=PHIRegionsResponse)
+async def get_phi_regions(
+    screenshot_id: int,
+    db: DatabaseSession,
+    current_user: CurrentUser,
+):
+    """Get current PHI regions from the phi_detection event."""
+    screenshot = await get_screenshot_or_404(db, screenshot_id)
+
+    pp = (screenshot.processing_metadata or {}).get("preprocessing", {})
+    current_events = pp.get("current_events", {})
+    events = pp.get("events", [])
+
+    phi_eid = current_events.get("phi_detection")
+    if not phi_eid:
+        return PHIRegionsResponse(regions=[], source=None, event_id=None)
+
+    event = next((e for e in events if e["event_id"] == phi_eid), None)
+    if not event:
+        return PHIRegionsResponse(regions=[], source=None, event_id=None)
+
+    result = event.get("result", {})
+    raw_regions = result.get("regions", [])
+
+    regions = []
+    for r in raw_regions:
+        if isinstance(r, dict):
+            # Normalize from various formats (auto-detection vs manual)
+            bbox = r.get("bbox", {})
+            if isinstance(bbox, dict):
+                regions.append(PHIRegionRect(
+                    x=int(bbox.get("x", r.get("x", 0))),
+                    y=int(bbox.get("y", r.get("y", 0))),
+                    w=max(1, int(bbox.get("width", bbox.get("w", r.get("w", 1))))),
+                    h=max(1, int(bbox.get("height", bbox.get("h", r.get("h", 1))))),
+                    label=r.get("label", r.get("type", r.get("entity_type", "OTHER"))),
+                    source=r.get("source", event.get("source", "auto")),
+                    confidence=float(r.get("confidence", r.get("score", 0.0))),
+                    text=r.get("text", ""),
+                ))
+            else:
+                # Already in flat format
+                regions.append(PHIRegionRect(
+                    x=int(r.get("x", 0)),
+                    y=int(r.get("y", 0)),
+                    w=max(1, int(r.get("w", 1))),
+                    h=max(1, int(r.get("h", 1))),
+                    label=r.get("label", "OTHER"),
+                    source=r.get("source", "auto"),
+                    confidence=float(r.get("confidence", 0.0)),
+                    text=r.get("text", ""),
+                ))
+
+    return PHIRegionsResponse(
+        regions=regions,
+        source=event.get("source", "auto"),
+        event_id=phi_eid,
+    )
+
+
+@router.put("/{screenshot_id}/phi-regions", response_model=ManualPHIRegionsResponse)
+async def save_phi_regions(
+    screenshot_id: int,
+    request_body: ManualPHIRegionsRequest,
+    db: DatabaseSession,
+    current_user: CurrentUser,
+):
+    """Save manually-adjusted PHI regions. Invalidates phi_redaction downstream."""
+    from screenshot_processor.web.services.preprocessing_service import (
+        append_event,
+        get_current_input_file,
+        init_preprocessing_metadata,
+    )
+
+    screenshot = await get_screenshot_for_update(db, screenshot_id)
+    init_preprocessing_metadata(screenshot)
+
+    input_file = get_current_input_file(screenshot, "phi_detection")
+
+    regions_dicts = [r.model_dump() for r in request_body.regions]
+
+    event_id = append_event(
+        screenshot,
+        "phi_detection",
+        "manual",
+        params={
+            "preset": request_body.preset,
+            "user": current_user.username,
+        },
+        result={
+            "phi_detected": len(request_body.regions) > 0,
+            "regions_count": len(request_body.regions),
+            "regions": regions_dicts,
+            "preset": request_body.preset,
+        },
+        input_file=input_file,
+    )
+
+    await db.commit()
+
+    return ManualPHIRegionsResponse(
+        success=True,
+        event_id=event_id,
+        regions_count=len(request_body.regions),
+        message=f"Saved {len(request_body.regions)} PHI region(s). Redaction stage invalidated.",
+    )
+
+
+@router.post("/{screenshot_id}/apply-redaction", response_model=ApplyPHIRedactionResponse)
+async def apply_redaction(
+    screenshot_id: int,
+    request_body: ApplyPHIRedactionRequest,
+    db: DatabaseSession,
+    current_user: CurrentUser,
+):
+    """Apply PHI redaction to confirmed regions."""
+    from screenshot_processor.web.services.preprocessing_service import (
+        append_event,
+        get_current_input_file,
+        get_next_version,
+        get_stage_output_path,
+        init_preprocessing_metadata,
+        redact_phi,
+    )
+
+    screenshot = await get_screenshot_for_update(db, screenshot_id)
+    pp = init_preprocessing_metadata(screenshot)
+
+    input_file = get_current_input_file(screenshot, "phi_redaction")
+
+    # Read the input image
+    input_path = Path(input_file)
+    if not input_path.exists():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Input image not found")
+
+    with open(input_path, "rb") as f:
+        image_bytes = f.read()
+
+    # Convert regions to format expected by redact_phi
+    phi_regions_for_redact = [
+        {
+            "bbox": {"x": r.x, "y": r.y, "width": r.w, "height": r.h},
+            "type": r.label,
+            "text": r.text,
+            "confidence": r.confidence,
+            "source": r.source,
+        }
+        for r in request_body.regions
+    ]
+
+    redaction_result = redact_phi(image_bytes, phi_regions_for_redact, request_body.redaction_method)
+
+    # Save redacted image
+    base_path = pp.get("base_file_path", screenshot.file_path)
+    version = get_next_version(screenshot, "phi_redaction")
+    output_path = get_stage_output_path(base_path, "phi_redaction", version)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(output_path, "wb") as f:
+        f.write(redaction_result.image_bytes)
+
+    event_id = append_event(
+        screenshot,
+        "phi_redaction",
+        "manual",
+        params={
+            "method": request_body.redaction_method,
+            "user": current_user.username,
+            "regions_count": len(request_body.regions),
+        },
+        result={
+            "redacted": redaction_result.regions_redacted > 0,
+            "regions_redacted": redaction_result.regions_redacted,
+            "method": request_body.redaction_method,
+            "phi_detected": len(request_body.regions) > 0,
+        },
+        output_file=str(output_path),
+        input_file=input_file,
+    )
+
+    await db.commit()
+
+    return ApplyPHIRedactionResponse(
+        success=True,
+        event_id=event_id,
+        regions_redacted=redaction_result.regions_redacted,
+        output_file=str(output_path),
+        message=f"Redacted {redaction_result.regions_redacted} region(s) using {request_body.redaction_method}.",
     )
 
 

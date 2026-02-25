@@ -1,0 +1,89 @@
+import { usePreprocessingStore } from "@/store/preprocessingStore";
+import { UploadDropZone } from "./UploadDropZone";
+import { UploadTagTable } from "./UploadTagTable";
+import { UploadProgressBar } from "./UploadProgressBar";
+
+export const BrowserUpload = () => {
+  const uploadFiles = usePreprocessingStore((s) => s.uploadFiles);
+  const setUploadFiles = usePreprocessingStore((s) => s.setUploadFiles);
+  const uploadGroupId = usePreprocessingStore((s) => s.uploadGroupId);
+  const setUploadGroupId = usePreprocessingStore((s) => s.setUploadGroupId);
+  const uploadImageType = usePreprocessingStore((s) => s.uploadImageType);
+  const setUploadImageType = usePreprocessingStore((s) => s.setUploadImageType);
+  const isUploading = usePreprocessingStore((s) => s.isUploading);
+  const uploadProgress = usePreprocessingStore((s) => s.uploadProgress);
+  const uploadErrors = usePreprocessingStore((s) => s.uploadErrors);
+  const startBrowserUpload = usePreprocessingStore((s) => s.startBrowserUpload);
+
+  const canUpload = uploadFiles.length > 0 && uploadGroupId.trim().length > 0 && !isUploading;
+
+  // Step 1: Drop zone (no files yet)
+  if (uploadFiles.length === 0 && !isUploading) {
+    return (
+      <div className="space-y-4">
+        <UploadDropZone onFilesSelected={setUploadFiles} />
+      </div>
+    );
+  }
+
+  // Step 3: Uploading
+  if (isUploading && uploadProgress) {
+    return (
+      <div className="space-y-4">
+        <UploadProgressBar
+          completed={uploadProgress.completed}
+          total={uploadProgress.total}
+          errors={uploadErrors}
+        />
+      </div>
+    );
+  }
+
+  // Upload done with errors
+  if (!isUploading && uploadErrors.length > 0 && uploadFiles.length === 0) {
+    return (
+      <div className="space-y-4">
+        <UploadProgressBar
+          completed={uploadProgress?.completed ?? 0}
+          total={uploadProgress?.total ?? 0}
+          errors={uploadErrors}
+        />
+        <button
+          onClick={() => setUploadFiles([])}
+          className="px-4 py-2 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+        >
+          Upload More
+        </button>
+      </div>
+    );
+  }
+
+  // Step 2: Tag table
+  return (
+    <div className="space-y-4">
+      <UploadTagTable
+        files={uploadFiles}
+        groupId={uploadGroupId}
+        imageType={uploadImageType}
+        onFilesChange={setUploadFiles}
+        onGroupIdChange={setUploadGroupId}
+        onImageTypeChange={setUploadImageType}
+      />
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => setUploadFiles([])}
+          className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+        >
+          Clear
+        </button>
+        <button
+          onClick={startBrowserUpload}
+          disabled={!canUpload}
+          className="px-6 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Upload {uploadFiles.length} File{uploadFiles.length !== 1 ? "s" : ""}
+        </button>
+      </div>
+    </div>
+  );
+};
