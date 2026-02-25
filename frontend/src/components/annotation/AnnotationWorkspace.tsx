@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAnnotation } from "@/hooks/useAnnotationWithDI";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useAutoSave } from "@/hooks/useAutoSave";
@@ -371,12 +371,12 @@ export const AnnotationWorkspace = ({
                 <span className="text-amber-600">
                   Preprocessing issue: {stageNames} {problemStages.length === 1 ? "is" : "are"} {problemStages[0]![1]}.
                 </span>
-                <a
-                  href={`/preprocessing?screenshot_id=${screenshot.id}&returnUrl=${encodeURIComponent(`/annotate/${screenshot.id}`)}`}
+                <Link
+                  to={`/preprocessing?screenshot_id=${screenshot.id}&returnUrl=${encodeURIComponent(`/annotate/${screenshot.id}`)}`}
                   className="text-blue-600 hover:text-blue-800 underline text-xs font-medium"
                 >
                   Fix in Preprocessing &rarr;
-                </a>
+                </Link>
               </div>
             );
           })()}
