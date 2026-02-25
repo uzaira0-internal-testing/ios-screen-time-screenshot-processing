@@ -2136,42 +2136,45 @@ async def upload_browser(
             width, height = _get_image_dimensions(file_data)
             detected_device = _detect_device_type(width, height) if width > 0 else None
 
-            # Create screenshot record (upsert on file_path)
-            insert_stmt = (
-                pg_insert(Screenshot)
-                .values(
-                    file_path=str(file_path),
-                    image_type=meta.image_type,
-                    target_annotations=1,
-                    annotation_status="pending",
-                    processing_status="pending",
-                    current_annotation_count=0,
-                    participant_id=item.participant_id,
-                    group_id=meta.group_id,
-                    device_type=detected_device,
-                    original_filepath=item.original_filepath,
-                    screenshot_date=item.screenshot_date,
-                    uploaded_by_id=current_user.id,
+            # Use a savepoint so a single file's DB failure doesn't poison
+            # the session and cascade-fail all remaining files in the batch.
+            async with db.begin_nested():
+                # Create screenshot record (upsert on file_path)
+                insert_stmt = (
+                    pg_insert(Screenshot)
+                    .values(
+                        file_path=str(file_path),
+                        image_type=meta.image_type,
+                        target_annotations=1,
+                        annotation_status="pending",
+                        processing_status="pending",
+                        current_annotation_count=0,
+                        participant_id=item.participant_id,
+                        group_id=meta.group_id,
+                        device_type=detected_device,
+                        original_filepath=item.original_filepath,
+                        screenshot_date=item.screenshot_date,
+                        uploaded_by_id=current_user.id,
+                    )
+                    .on_conflict_do_update(
+                        index_elements=["file_path"],
+                        set_={
+                            "processing_status": "pending",
+                            "device_type": detected_device,
+                            "original_filepath": item.original_filepath,
+                            "screenshot_date": item.screenshot_date,
+                        },
+                    )
+                    .returning(Screenshot.id)
                 )
-                .on_conflict_do_update(
-                    index_elements=["file_path"],
-                    set_={
-                        "processing_status": "pending",
-                        "device_type": detected_device,
-                        "original_filepath": item.original_filepath,
-                        "screenshot_date": item.screenshot_date,
-                    },
-                )
-                .returning(Screenshot.id)
-            )
-            result = await db.execute(insert_stmt)
-            screenshot_id = result.fetchone()[0]
-            await db.flush()
+                result = await db.execute(insert_stmt)
+                screenshot_id = result.fetchone()[0]
+                await db.flush()
 
-            # Initialize preprocessing metadata (no Celery tasks)
-            screenshot = await get_screenshot_or_404(db, screenshot_id)
-            init_preprocessing_metadata(screenshot)
-            await db.flush()
+                # Initialize preprocessing metadata (no Celery tasks)
+                screenshot = await get_screenshot_or_404(db, screenshot_id)
+                init_preprocessing_metadata(screenshot)
+                await db.flush()
 
             results.append(BrowserUploadItemResult(index=i, success=True, screenshot_id=screenshot_id))
             successful += 1

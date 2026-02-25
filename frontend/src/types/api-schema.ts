@@ -728,6 +728,118 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/screenshots/upload/browser": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Browser
+         * @description Upload screenshots from browser with multipart/form-data.
+         *
+         *     Uses X-Username auth (CurrentUser), NOT X-API-Key.
+         *     Accepts metadata as a JSON string plus one or more image files.
+         *     Does not queue Celery tasks — user triggers stages manually.
+         */
+        post: operations["upload_browser_api_v1_screenshots_upload_browser_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/screenshots/{screenshot_id}/original-image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Original Image
+         * @description Serve the immutable original image (base_file_path) for crop editing.
+         */
+        get: operations["get_original_image_api_v1_screenshots__screenshot_id__original_image_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/screenshots/{screenshot_id}/manual-crop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Manual Crop
+         * @description Apply a manual crop to a screenshot.
+         *
+         *     Crops the original image and records an event in the preprocessing log.
+         *     Automatically invalidates phi_detection and phi_redaction downstream.
+         *     CPU-bound OpenCV work runs in a thread to avoid blocking the event loop.
+         */
+        post: operations["manual_crop_api_v1_screenshots__screenshot_id__manual_crop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/screenshots/{screenshot_id}/phi-regions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Phi Regions
+         * @description Get current PHI regions from the phi_detection event.
+         */
+        get: operations["get_phi_regions_api_v1_screenshots__screenshot_id__phi_regions_get"];
+        /**
+         * Save Phi Regions
+         * @description Save manually-adjusted PHI regions. Invalidates phi_redaction downstream.
+         */
+        put: operations["save_phi_regions_api_v1_screenshots__screenshot_id__phi_regions_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/screenshots/{screenshot_id}/apply-redaction": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply Redaction
+         * @description Apply PHI redaction to confirmed regions.
+         */
+        post: operations["apply_redaction_api_v1_screenshots__screenshot_id__apply_redaction_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/screenshots/export/csv": {
         parameters: {
             query?: never;
@@ -1393,6 +1505,38 @@ export interface components {
             issues: components["schemas"]["ProcessingIssueRead"][];
         };
         /**
+         * ApplyPHIRedactionRequest
+         * @description Apply redaction to confirmed PHI regions.
+         */
+        ApplyPHIRedactionRequest: {
+            /**
+             * Regions
+             * @default []
+             */
+            regions: components["schemas"]["PHIRegionRect"][];
+            /**
+             * Redaction Method
+             * @default redbox
+             */
+            redaction_method: string;
+        };
+        /**
+         * ApplyPHIRedactionResponse
+         * @description Response from applying PHI redaction.
+         */
+        ApplyPHIRedactionResponse: {
+            /** Success */
+            success: boolean;
+            /** Event Id */
+            event_id: number;
+            /** Regions Redacted */
+            regions_redacted: number;
+            /** Output File */
+            output_file: string;
+            /** Message */
+            message: string;
+        };
+        /**
          * AuthStatusResponse
          * @description Response for auth status check.
          */
@@ -1557,6 +1701,47 @@ export interface components {
             results: components["schemas"]["BatchItemResult"][];
             /** Idempotency Key */
             idempotency_key?: string | null;
+        };
+        /** Body_upload_browser_api_v1_screenshots_upload_browser_post */
+        Body_upload_browser_api_v1_screenshots_upload_browser_post: {
+            /**
+             * Metadata
+             * @description JSON string of BrowserUploadRequest
+             */
+            metadata: string;
+            /**
+             * Files
+             * @description Image files
+             */
+            files: string[];
+        };
+        /**
+         * BrowserUploadItemResult
+         * @description Result for a single file in browser upload.
+         */
+        BrowserUploadItemResult: {
+            /** Index */
+            index: number;
+            /** Success */
+            success: boolean;
+            /** Screenshot Id */
+            screenshot_id?: number | null;
+            /** Error */
+            error?: string | null;
+        };
+        /**
+         * BrowserUploadResponse
+         * @description Response from browser-based upload.
+         */
+        BrowserUploadResponse: {
+            /** Total */
+            total: number;
+            /** Successful */
+            successful: number;
+            /** Failed */
+            failed: number;
+            /** Results */
+            results: components["schemas"]["BrowserUploadItemResult"][];
         };
         /** BulkReprocessResponse */
         BulkReprocessResponse: {
@@ -1818,6 +2003,68 @@ export interface components {
          */
         IssueSeverity: "blocking" | "non_blocking";
         /**
+         * ManualCropRequest
+         * @description Pixel coordinates for a manual crop rectangle.
+         */
+        ManualCropRequest: {
+            /** Left */
+            left: number;
+            /** Top */
+            top: number;
+            /** Right */
+            right: number;
+            /** Bottom */
+            bottom: number;
+        };
+        /**
+         * ManualCropResponse
+         * @description Response from manual crop operation.
+         */
+        ManualCropResponse: {
+            /** Success */
+            success: boolean;
+            /** Event Id */
+            event_id: number;
+            /** Output File */
+            output_file: string;
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
+            /** Message */
+            message: string;
+        };
+        /**
+         * ManualPHIRegionsRequest
+         * @description Save manually-adjusted PHI regions.
+         */
+        ManualPHIRegionsRequest: {
+            /**
+             * Regions
+             * @default []
+             */
+            regions: components["schemas"]["PHIRegionRect"][];
+            /**
+             * Preset
+             * @default manual
+             */
+            preset: string;
+        };
+        /**
+         * ManualPHIRegionsResponse
+         * @description Response from saving PHI regions.
+         */
+        ManualPHIRegionsResponse: {
+            /** Success */
+            success: boolean;
+            /** Event Id */
+            event_id: number;
+            /** Regions Count */
+            regions_count: number;
+            /** Message */
+            message: string;
+        };
+        /**
          * NavigationResponse
          * @description Response for navigation endpoints.
          */
@@ -1894,6 +2141,55 @@ export interface components {
              * @default redbox
              */
             phi_redaction_method: string;
+        };
+        /**
+         * PHIRegionRect
+         * @description A single PHI region rectangle.
+         */
+        PHIRegionRect: {
+            /** X */
+            x: number;
+            /** Y */
+            y: number;
+            /** W */
+            w: number;
+            /** H */
+            h: number;
+            /**
+             * Label
+             * @default OTHER
+             */
+            label: string;
+            /**
+             * Source
+             * @default manual
+             */
+            source: string;
+            /**
+             * Confidence
+             * @default 1
+             */
+            confidence: number;
+            /**
+             * Text
+             * @default
+             */
+            text: string;
+        };
+        /**
+         * PHIRegionsResponse
+         * @description Current PHI regions for a screenshot.
+         */
+        PHIRegionsResponse: {
+            /**
+             * Regions
+             * @default []
+             */
+            regions: components["schemas"]["PHIRegionRect"][];
+            /** Source */
+            source?: string | null;
+            /** Event Id */
+            event_id?: number | null;
         };
         /** PaginatedResponse[ScreenshotRead] */
         PaginatedResponse_ScreenshotRead_: {
@@ -4237,6 +4533,224 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PreprocessingEventLog"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_browser_api_v1_screenshots_upload_browser_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_browser_api_v1_screenshots_upload_browser_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserUploadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_original_image_api_v1_screenshots__screenshot_id__original_image_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
+            path: {
+                screenshot_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    manual_crop_api_v1_screenshots__screenshot_id__manual_crop_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
+            path: {
+                screenshot_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualCropRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualCropResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_phi_regions_api_v1_screenshots__screenshot_id__phi_regions_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
+            path: {
+                screenshot_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PHIRegionsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_phi_regions_api_v1_screenshots__screenshot_id__phi_regions_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
+            path: {
+                screenshot_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualPHIRegionsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualPHIRegionsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_redaction_api_v1_screenshots__screenshot_id__apply_redaction_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
+            path: {
+                screenshot_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyPHIRedactionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplyPHIRedactionResponse"];
                 };
             };
             /** @description Validation Error */
