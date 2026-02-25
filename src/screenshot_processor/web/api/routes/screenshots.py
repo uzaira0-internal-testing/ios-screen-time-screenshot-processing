@@ -875,6 +875,15 @@ async def reprocess_screenshot_endpoint(
 # ============================================================================
 
 
+def _resolve_image_path(path_str: str) -> Path:
+    """Resolve an image path to an absolute path, prepending UPLOAD_DIR if relative."""
+    file_path = Path(path_str)
+    if not file_path.is_absolute():
+        settings = get_settings()
+        file_path = Path(settings.UPLOAD_DIR) / file_path
+    return file_path.resolve()
+
+
 def sanitize_filename(name: str) -> str:
     """Remove path components and dangerous characters from filename."""
     # Extract just the filename, removing any path components
@@ -2199,14 +2208,8 @@ async def get_original_image(
     pp = (screenshot.processing_metadata or {}).get("preprocessing", {})
     base_path = pp.get("base_file_path", screenshot.file_path)
 
-    file_path = Path(base_path)
-    if not file_path.is_absolute():
-        settings = get_settings()
-        file_path = Path(settings.UPLOAD_DIR) / file_path
-
-    # Path traversal protection
     try:
-        file_path = file_path.resolve()
+        file_path = _resolve_image_path(base_path)
     except (ValueError, OSError):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file path")
 
@@ -2225,13 +2228,12 @@ async def manual_crop(
     current_user: CurrentUser,
 ):
     """
-    Apply a manual crop to a screenshot (synchronous, no Celery).
+    Apply a manual crop to a screenshot.
 
     Crops the original image and records an event in the preprocessing log.
     Automatically invalidates phi_detection and phi_redaction downstream.
+    CPU-bound OpenCV work runs in a thread to avoid blocking the event loop.
     """
-    import numpy as np
-
     from screenshot_processor.web.services.preprocessing_service import (
         append_event,
         get_next_version,
@@ -2243,8 +2245,11 @@ async def manual_crop(
     pp = init_preprocessing_metadata(screenshot)
     base_path = pp.get("base_file_path", screenshot.file_path)
 
-    # Read original image
-    img = cv2.imread(base_path)
+    # Resolve relative paths
+    resolved_base = str(_resolve_image_path(base_path))
+
+    # Read image in a thread to avoid blocking the event loop
+    img = await asyncio.to_thread(cv2.imread, resolved_base)
     if img is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not read original image")
 
@@ -2257,15 +2262,17 @@ async def manual_crop(
             detail=f"Crop region ({crop_request.right}x{crop_request.bottom}) exceeds image dimensions ({w_img}x{h_img})",
         )
 
-    # Perform crop
-    cropped = img[crop_request.top:crop_request.bottom, crop_request.left:crop_request.right]
-    crop_h, crop_w = cropped.shape[:2]
-
-    # Save cropped image
+    # Crop and save in a thread
     version = get_next_version(screenshot, "cropping")
     output_path = get_stage_output_path(base_path, "cropping", version)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    cv2.imwrite(str(output_path), cropped)
+
+    def _crop_and_save() -> tuple[int, int]:
+        cropped = img[crop_request.top:crop_request.bottom, crop_request.left:crop_request.right]
+        cv2.imwrite(str(output_path), cropped)
+        return cropped.shape[1], cropped.shape[0]  # w, h
+
+    crop_w, crop_h = await asyncio.to_thread(_crop_and_save)
 
     # Record event
     event_id = append_event(
@@ -2436,13 +2443,14 @@ async def apply_redaction(
 
     input_file = get_current_input_file(screenshot, "phi_redaction")
 
-    # Read the input image
-    input_path = Path(input_file)
+    # Resolve relative paths
+    input_path = _resolve_image_path(input_file)
     if not input_path.exists():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Input image not found")
 
-    with open(input_path, "rb") as f:
-        image_bytes = f.read()
+    # Read input image without blocking the event loop
+    async with aiofiles.open(input_path, "rb") as f:
+        image_bytes = await f.read()
 
     # Convert regions to format expected by redact_phi
     phi_regions_for_redact = [
@@ -2456,7 +2464,10 @@ async def apply_redaction(
         for r in request_body.regions
     ]
 
-    redaction_result = redact_phi(image_bytes, phi_regions_for_redact, request_body.redaction_method)
+    # Run CPU-bound redaction in a thread
+    redaction_result = await asyncio.to_thread(
+        redact_phi, image_bytes, phi_regions_for_redact, request_body.redaction_method
+    )
 
     # Save redacted image
     base_path = pp.get("base_file_path", screenshot.file_path)
@@ -2464,8 +2475,8 @@ async def apply_redaction(
     output_path = get_stage_output_path(base_path, "phi_redaction", version)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with open(output_path, "wb") as f:
-        f.write(redaction_result.image_bytes)
+    async with aiofiles.open(output_path, "wb") as f:
+        await f.write(redaction_result.image_bytes)
 
     event_id = append_event(
         screenshot,
