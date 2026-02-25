@@ -200,6 +200,9 @@ __pycache__/*
 .claude/
 .playwright-mcp/
 
+# npm lock file (project uses bun)
+frontend/package-lock.json
+
 # Database files
 *.db
 *.sqlite3
