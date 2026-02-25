@@ -527,6 +527,105 @@ export const api = {
       throwIfError(error, "Failed to queue batch preprocessing");
       return data;
     },
+
+    // --- Composable pipeline endpoints ---
+
+    async runStage(
+      stage: string,
+      options: {
+        group_id?: string;
+        screenshot_ids?: number[];
+        phi_pipeline_preset?: string;
+        phi_redaction_method?: string;
+      },
+    ) {
+      const stageUrlMap: Record<string, string> = {
+        device_detection: "/api/v1/screenshots/preprocess-stage/device-detection",
+        cropping: "/api/v1/screenshots/preprocess-stage/cropping",
+        phi_detection: "/api/v1/screenshots/preprocess-stage/phi-detection",
+        phi_redaction: "/api/v1/screenshots/preprocess-stage/phi-redaction",
+      };
+      const url = stageUrlMap[stage];
+      if (!url) throw new Error(`Unknown stage: ${stage}`);
+
+      // Build request body based on stage
+      const body: Record<string, unknown> = {
+        screenshot_ids: options.screenshot_ids ?? null,
+        group_id: options.group_id ?? null,
+      };
+      if (stage === "phi_detection") {
+        body.phi_pipeline_preset = options.phi_pipeline_preset ?? "hipaa_compliant";
+      }
+      if (stage === "phi_redaction") {
+        body.phi_redaction_method = options.phi_redaction_method ?? "redbox";
+      }
+
+      const response = await fetch(`${API_BASE_URL}${url}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Username": localStorage.getItem("username") || "",
+          "X-Site-Password": localStorage.getItem("sitePassword") || "",
+        },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) {
+        const detail = await response.text();
+        throw new Error(detail || "Failed to queue stage");
+      }
+      return response.json();
+    },
+
+    async invalidateFromStage(screenshotId: number, stage: string) {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/screenshots/${screenshotId}/invalidate-from-stage`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Username": localStorage.getItem("username") || "",
+            "X-Site-Password": localStorage.getItem("sitePassword") || "",
+          },
+          body: JSON.stringify({ stage }),
+        },
+      );
+      if (!response.ok) {
+        throw new Error("Failed to invalidate stages");
+      }
+      return response.json();
+    },
+
+    async getSummary(groupId: string) {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/screenshots/preprocessing-summary?group_id=${encodeURIComponent(groupId)}`,
+        {
+          headers: {
+            "X-Username": localStorage.getItem("username") || "",
+            "X-Site-Password": localStorage.getItem("sitePassword") || "",
+          },
+        },
+      );
+      if (!response.ok) {
+        throw new Error("Failed to get preprocessing summary");
+      }
+      return response.json();
+    },
+
+    async getEventLog(screenshotId: number) {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/screenshots/${screenshotId}/preprocessing-events`,
+        {
+          headers: {
+            "X-Username": localStorage.getItem("username") || "",
+            "X-Site-Password": localStorage.getItem("sitePassword") || "",
+          },
+        },
+      );
+      if (!response.ok) {
+        throw new Error("Failed to get event log");
+      }
+      return response.json();
+    },
   },
 
   // Export

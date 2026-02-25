@@ -33,8 +33,14 @@ from screenshot_processor.web.database import (
     ConsensusResult,
     Group,
     GroupRead,
+    InvalidateFromStageRequest,
     NextScreenshotResponse,
+    PHIDetectionStageRequest,
+    PHIRedactionStageRequest,
     PreprocessingDetailsResponse,
+    PreprocessingEventLog,
+    PreprocessingStageSummary,
+    PreprocessingSummary,
     PreprocessRequest,
     ProcessingResultResponse,
     ProcessingStatus,
@@ -45,6 +51,8 @@ from screenshot_processor.web.database import (
     ScreenshotUpdate,
     ScreenshotUploadRequest,
     ScreenshotUploadResponse,
+    StagePreprocessRequest,
+    StagePreprocessResponse,
     StatsResponse,
     UploadErrorCode,
     UserQueueState,
@@ -262,6 +270,30 @@ async def list_screenshots_paginated(
         page=page,
         page_size=page_size,
     )
+
+
+@router.get("/preprocessing-summary", response_model=PreprocessingSummary)
+async def get_preprocessing_summary(
+    db: DatabaseSession,
+    current_user: CurrentUser,
+    group_id: str = Query(..., description="Group ID"),
+):
+    """Get per-stage counts for a group's preprocessing pipeline."""
+    from screenshot_processor.web.services.preprocessing_service import (
+        STAGE_ORDER,
+        get_stage_counts,
+    )
+
+    stmt = select(Screenshot).where(Screenshot.group_id == group_id)
+    result = await db.execute(stmt)
+    screenshots = list(result.scalars().all())
+
+    stage_summaries = {}
+    for stage in STAGE_ORDER:
+        counts = get_stage_counts(screenshots, stage)
+        stage_summaries[stage] = PreprocessingStageSummary(**counts)
+
+    return PreprocessingSummary(total=len(screenshots), **stage_summaries)
 
 
 @router.get("/{screenshot_id}", response_model=ScreenshotDetail)
@@ -1793,6 +1825,207 @@ async def preprocess_screenshots_batch(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to queue batch preprocessing: {e}",
         )
+
+
+# ============================================================================
+# Composable Pipeline Endpoints (per-stage execution)
+# ============================================================================
+
+
+async def _get_eligible_screenshot_ids(
+    db: AsyncSession,
+    stage: str,
+    group_id: str | None,
+    screenshot_ids: list[int] | None,
+) -> list[int]:
+    """Get screenshot IDs eligible for a stage (pending or invalidated)."""
+    if screenshot_ids:
+        stmt = select(Screenshot).where(Screenshot.id.in_(screenshot_ids))
+    elif group_id:
+        stmt = select(Screenshot).where(Screenshot.group_id == group_id)
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Either screenshot_ids or group_id is required",
+        )
+    result = await db.execute(stmt)
+    screenshots = result.scalars().all()
+
+    eligible = []
+    for s in screenshots:
+        pp = (s.processing_metadata or {}).get("preprocessing", {})
+        stage_status = pp.get("stage_status", {}).get(stage, "pending")
+        if stage_status in ("pending", "invalidated", "failed"):
+            eligible.append(s.id)
+    return eligible
+
+
+@router.post("/preprocess-stage/device-detection", response_model=StagePreprocessResponse)
+async def run_device_detection_stage(
+    request: StagePreprocessRequest,
+    db: DatabaseSession,
+    current_user: CurrentUser,
+):
+    """Queue device detection for a batch of screenshots."""
+    ids = await _get_eligible_screenshot_ids(db, "device_detection", request.group_id, request.screenshot_ids)
+    if not ids:
+        return StagePreprocessResponse(
+            queued_count=0, screenshot_ids=[], stage="device_detection",
+            message="No eligible screenshots for device detection",
+        )
+
+    from celery import group as celery_group
+    from screenshot_processor.web.tasks import device_detection_task
+
+    task_group = celery_group(device_detection_task.s(sid) for sid in ids)
+    task_group.apply_async()
+
+    logger.info(f"Device detection queued: {len(ids)} screenshots by {current_user.username}")
+    return StagePreprocessResponse(
+        queued_count=len(ids), screenshot_ids=ids, stage="device_detection",
+        message=f"Device detection queued for {len(ids)} screenshots",
+    )
+
+
+@router.post("/preprocess-stage/cropping", response_model=StagePreprocessResponse)
+async def run_cropping_stage(
+    request: StagePreprocessRequest,
+    db: DatabaseSession,
+    current_user: CurrentUser,
+):
+    """Queue cropping for a batch of screenshots."""
+    ids = await _get_eligible_screenshot_ids(db, "cropping", request.group_id, request.screenshot_ids)
+    if not ids:
+        return StagePreprocessResponse(
+            queued_count=0, screenshot_ids=[], stage="cropping",
+            message="No eligible screenshots for cropping",
+        )
+
+    from celery import group as celery_group
+    from screenshot_processor.web.tasks import cropping_task
+
+    task_group = celery_group(cropping_task.s(sid) for sid in ids)
+    task_group.apply_async()
+
+    logger.info(f"Cropping queued: {len(ids)} screenshots by {current_user.username}")
+    return StagePreprocessResponse(
+        queued_count=len(ids), screenshot_ids=ids, stage="cropping",
+        message=f"Cropping queued for {len(ids)} screenshots",
+    )
+
+
+@router.post("/preprocess-stage/phi-detection", response_model=StagePreprocessResponse)
+async def run_phi_detection_stage(
+    request: PHIDetectionStageRequest,
+    db: DatabaseSession,
+    current_user: CurrentUser,
+):
+    """Queue PHI detection for a batch of screenshots."""
+    ids = await _get_eligible_screenshot_ids(db, "phi_detection", request.group_id, request.screenshot_ids)
+    if not ids:
+        return StagePreprocessResponse(
+            queued_count=0, screenshot_ids=[], stage="phi_detection",
+            message="No eligible screenshots for PHI detection",
+        )
+
+    from celery import group as celery_group
+    from screenshot_processor.web.tasks import phi_detection_task
+
+    task_group = celery_group(phi_detection_task.s(sid, preset=request.phi_pipeline_preset) for sid in ids)
+    task_group.apply_async()
+
+    logger.info(f"PHI detection queued: {len(ids)} screenshots by {current_user.username}")
+    return StagePreprocessResponse(
+        queued_count=len(ids), screenshot_ids=ids, stage="phi_detection",
+        message=f"PHI detection queued for {len(ids)} screenshots",
+    )
+
+
+@router.post("/preprocess-stage/phi-redaction", response_model=StagePreprocessResponse)
+async def run_phi_redaction_stage(
+    request: PHIRedactionStageRequest,
+    db: DatabaseSession,
+    current_user: CurrentUser,
+):
+    """Queue PHI redaction for a batch of screenshots."""
+    ids = await _get_eligible_screenshot_ids(db, "phi_redaction", request.group_id, request.screenshot_ids)
+    if not ids:
+        return StagePreprocessResponse(
+            queued_count=0, screenshot_ids=[], stage="phi_redaction",
+            message="No eligible screenshots for PHI redaction",
+        )
+
+    from celery import group as celery_group
+    from screenshot_processor.web.tasks import phi_redaction_task
+
+    task_group = celery_group(phi_redaction_task.s(sid, method=request.phi_redaction_method) for sid in ids)
+    task_group.apply_async()
+
+    logger.info(f"PHI redaction queued: {len(ids)} screenshots by {current_user.username}")
+    return StagePreprocessResponse(
+        queued_count=len(ids), screenshot_ids=ids, stage="phi_redaction",
+        message=f"PHI redaction queued for {len(ids)} screenshots",
+    )
+
+
+@router.post("/{screenshot_id}/invalidate-from-stage", response_model=StagePreprocessResponse)
+async def invalidate_from_stage(
+    screenshot_id: int,
+    request: InvalidateFromStageRequest,
+    db: DatabaseSession,
+    current_user: CurrentUser,
+):
+    """Manually invalidate downstream stages for a screenshot."""
+    from sqlalchemy.orm.attributes import flag_modified
+
+    from screenshot_processor.web.services.preprocessing_service import (
+        STAGE_ORDER,
+        init_preprocessing_metadata,
+        invalidate_downstream,
+        update_file_path,
+    )
+
+    screenshot = await get_screenshot_or_404(db, screenshot_id)
+
+    if request.stage not in STAGE_ORDER:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid stage: {request.stage}. Must be one of: {STAGE_ORDER}",
+        )
+
+    pp = init_preprocessing_metadata(screenshot)
+    # Invalidate the named stage itself
+    pp["stage_status"][request.stage] = "invalidated"
+    pp["current_events"][request.stage] = None
+    # Invalidate all downstream stages
+    invalidate_downstream(screenshot, request.stage)
+    update_file_path(screenshot)
+    flag_modified(screenshot, "processing_metadata")
+    await db.commit()
+
+    return StagePreprocessResponse(
+        queued_count=0, screenshot_ids=[screenshot_id], stage=request.stage,
+        message=f"Downstream stages invalidated from {request.stage}",
+    )
+
+
+@router.get("/{screenshot_id}/preprocessing-events", response_model=PreprocessingEventLog)
+async def get_preprocessing_events(
+    screenshot_id: int,
+    db: DatabaseSession,
+    current_user: CurrentUser,
+):
+    """Get the full preprocessing event log for a screenshot."""
+    screenshot = await get_screenshot_or_404(db, screenshot_id)
+
+    pp = (screenshot.processing_metadata or {}).get("preprocessing", {})
+    return PreprocessingEventLog(
+        screenshot_id=screenshot_id,
+        base_file_path=pp.get("base_file_path", screenshot.file_path),
+        stage_status=pp.get("stage_status", {}),
+        current_events=pp.get("current_events", {}),
+        events=pp.get("events", []),
+    )
 
 
 # ============================================================================

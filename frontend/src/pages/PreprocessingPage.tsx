@@ -1,150 +1,33 @@
-import { useState, useEffect, useCallback } from "react";
-import { api } from "@/services/apiClient";
-import type { Screenshot, Group } from "@/types";
-import {
-  PreprocessingTabBar,
-  type PreprocessingTab,
-} from "@/components/preprocessing/PreprocessingTabBar";
-import { PreprocessingOptions } from "@/components/preprocessing/PreprocessingOptions";
+import { useEffect } from "react";
+import { usePreprocessingStore } from "@/store/preprocessingStore";
+import { PreprocessingWizard } from "@/components/preprocessing/PreprocessingWizard";
+import { StageSummaryBar } from "@/components/preprocessing/StageSummaryBar";
 import { DeviceDetectionTab } from "@/components/preprocessing/DeviceDetectionTab";
 import { CroppingTab } from "@/components/preprocessing/CroppingTab";
 import { PHIDetectionTab } from "@/components/preprocessing/PHIDetectionTab";
 import { PHIRedactionTab } from "@/components/preprocessing/PHIRedactionTab";
-import toast from "react-hot-toast";
-import { config } from "@/config";
-
-const IMAGE_URL_PREFIX = config.apiBaseUrl + "/screenshots";
+import { EventLogPanel } from "@/components/preprocessing/EventLogPanel";
 
 export const PreprocessingPage = () => {
-  // State
-  const [activeTab, setActiveTab] = useState<PreprocessingTab>("device_detection");
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [selectedGroupId, setSelectedGroupId] = useState<string>("");
-  const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isRunningAll, setIsRunningAll] = useState(false);
-  const [runningIds, setRunningIds] = useState<Set<number>>(new Set());
+  const groups = usePreprocessingStore((s) => s.groups);
+  const selectedGroupId = usePreprocessingStore((s) => s.selectedGroupId);
+  const setSelectedGroupId = usePreprocessingStore((s) => s.setSelectedGroupId);
+  const loadGroups = usePreprocessingStore((s) => s.loadGroups);
+  const screenshots = usePreprocessingStore((s) => s.screenshots);
+  const isLoading = usePreprocessingStore((s) => s.isLoading);
+  const activeStage = usePreprocessingStore((s) => s.activeStage);
+  const eventLog = usePreprocessingStore((s) => s.eventLog);
+  const phiPreset = usePreprocessingStore((s) => s.phiPreset);
+  const setPhiPreset = usePreprocessingStore((s) => s.setPhiPreset);
+  const redactionMethod = usePreprocessingStore((s) => s.redactionMethod);
+  const setRedactionMethod = usePreprocessingStore((s) => s.setRedactionMethod);
+  const stopPolling = usePreprocessingStore((s) => s.stopPolling);
 
-  // Preprocessing options
-  const [preset, setPreset] = useState("hipaa_compliant");
-  const [method, setMethod] = useState("redbox");
-  const [phiEnabled, setPhiEnabled] = useState(true);
-  const [runOcrAfter, setRunOcrAfter] = useState(false);
-
-  // Load groups on mount
+  // Load groups on mount, cleanup polling on unmount
   useEffect(() => {
-    const loadGroups = async () => {
-      try {
-        const data = await api.groups.list();
-        if (data && data.length > 0) {
-          setGroups(data);
-          setSelectedGroupId((prev) => prev || data[0]!.id);
-        }
-      } catch (err) {
-        console.error("Failed to load groups:", err);
-      }
-    };
     loadGroups();
-  }, []);
-
-  // Load screenshots when group changes
-  const loadScreenshots = useCallback(async () => {
-    if (!selectedGroupId) {
-      setScreenshots([]);
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const data = await api.screenshots.list({
-        group_id: selectedGroupId,
-        page_size: 500,
-        sort_by: "id",
-        sort_order: "asc",
-      });
-      if (data) {
-        setScreenshots(data.items);
-      }
-    } catch (err) {
-      console.error("Failed to load screenshots:", err);
-      toast.error("Failed to load screenshots");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [selectedGroupId]);
-
-  useEffect(() => {
-    loadScreenshots();
-  }, [loadScreenshots]);
-
-  // Run preprocessing on a single screenshot
-  const handleRunOne = async (screenshotId: number) => {
-    setRunningIds((prev) => new Set(prev).add(screenshotId));
-    try {
-      await api.preprocessing.preprocess(screenshotId, {
-        phi_pipeline_preset: preset,
-        phi_redaction_method: method,
-        phi_detection_enabled: phiEnabled,
-        run_ocr_after: runOcrAfter,
-      });
-      toast.success(`Preprocessing queued for screenshot ${screenshotId}`);
-      // Refresh after a short delay to allow task to start
-      setTimeout(() => loadScreenshots(), 2000);
-    } catch (err) {
-      console.error("Failed to queue preprocessing:", err);
-      toast.error("Failed to queue preprocessing");
-    } finally {
-      setRunningIds((prev) => {
-        const next = new Set(prev);
-        next.delete(screenshotId);
-        return next;
-      });
-    }
-  };
-
-  // Run preprocessing on all screenshots in group
-  const handleRunAll = async () => {
-    if (!selectedGroupId) return;
-
-    setIsRunningAll(true);
-    try {
-      const result = await api.preprocessing.preprocessBatch({
-        group_id: selectedGroupId,
-        phi_pipeline_preset: preset,
-        phi_redaction_method: method,
-        phi_detection_enabled: phiEnabled,
-        run_ocr_after: runOcrAfter,
-      });
-      if (result) {
-        toast.success(result.message);
-      }
-      // Refresh after a delay
-      setTimeout(() => loadScreenshots(), 3000);
-    } catch (err) {
-      console.error("Failed to queue batch preprocessing:", err);
-      toast.error("Failed to queue batch preprocessing");
-    } finally {
-      setIsRunningAll(false);
-    }
-  };
-
-  // Compute tab counts based on preprocessing data
-  const tabCounts: Partial<Record<PreprocessingTab, number>> = {};
-  let withDevice = 0;
-  let withCrop = 0;
-  let withPhi = 0;
-  let withRedact = 0;
-  for (const s of screenshots) {
-    const pp = (s.processing_metadata as any)?.preprocessing;
-    if (pp?.device_detection) withDevice++;
-    if (pp?.cropping) withCrop++;
-    if (pp?.phi_detection) withPhi++;
-    if (pp?.phi_redaction) withRedact++;
-  }
-  tabCounts.device_detection = withDevice;
-  tabCounts.cropping = withCrop;
-  tabCounts.phi_detection = withPhi;
-  tabCounts.phi_redaction = withRedact;
+    return () => stopPolling();
+  }, [loadGroups, stopPolling]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
@@ -169,31 +52,54 @@ export const PreprocessingPage = () => {
         </div>
       </div>
 
-      {/* Tab Bar */}
-      <PreprocessingTabBar
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        counts={tabCounts}
-      />
+      {/* Pipeline wizard steps */}
+      <PreprocessingWizard />
 
-      {/* Options Bar */}
-      <div className="mt-4">
-        <PreprocessingOptions
-          preset={preset}
-          onPresetChange={setPreset}
-          method={method}
-          onMethodChange={setMethod}
-          phiEnabled={phiEnabled}
-          onPhiEnabledChange={setPhiEnabled}
-          runOcrAfter={runOcrAfter}
-          onRunOcrAfterChange={setRunOcrAfter}
-          onRunAll={handleRunAll}
-          isRunningAll={isRunningAll}
-          disabled={!selectedGroupId || screenshots.length === 0}
-        />
+      {/* Options - show preset/method controls for PHI stages */}
+      {(activeStage === "phi_detection" || activeStage === "phi_redaction") && (
+        <div className="mt-3 flex flex-wrap items-center gap-4 p-3 bg-white rounded-lg border border-gray-200">
+          {activeStage === "phi_detection" && (
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">
+                Preset:
+              </label>
+              <select
+                value={phiPreset}
+                onChange={(e) => setPhiPreset(e.target.value)}
+                className="text-sm border border-gray-300 rounded-md px-2 py-1"
+              >
+                <option value="fast">Fast</option>
+                <option value="balanced">Balanced</option>
+                <option value="hipaa_compliant">HIPAA Compliant</option>
+                <option value="thorough">Thorough</option>
+              </select>
+            </div>
+          )}
+          {activeStage === "phi_redaction" && (
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">
+                Method:
+              </label>
+              <select
+                value={redactionMethod}
+                onChange={(e) => setRedactionMethod(e.target.value)}
+                className="text-sm border border-gray-300 rounded-md px-2 py-1"
+              >
+                <option value="redbox">Red Box</option>
+                <option value="blackbox">Black Box</option>
+                <option value="pixelate">Pixelate</option>
+              </select>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Filter bar and run button */}
+      <div className="mt-3">
+        <StageSummaryBar />
       </div>
 
-      {/* Tab Content */}
+      {/* Stage content */}
       <div className="mt-4 bg-white rounded-lg border border-gray-200">
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
@@ -202,38 +108,10 @@ export const PreprocessingPage = () => {
           </div>
         ) : (
           <>
-            {activeTab === "device_detection" && (
-              <DeviceDetectionTab
-                screenshots={screenshots}
-                imageUrlPrefix={IMAGE_URL_PREFIX}
-                onRunOne={handleRunOne}
-                runningIds={runningIds}
-              />
-            )}
-            {activeTab === "cropping" && (
-              <CroppingTab
-                screenshots={screenshots}
-                imageUrlPrefix={IMAGE_URL_PREFIX}
-                onRunOne={handleRunOne}
-                runningIds={runningIds}
-              />
-            )}
-            {activeTab === "phi_detection" && (
-              <PHIDetectionTab
-                screenshots={screenshots}
-                imageUrlPrefix={IMAGE_URL_PREFIX}
-                onRunOne={handleRunOne}
-                runningIds={runningIds}
-              />
-            )}
-            {activeTab === "phi_redaction" && (
-              <PHIRedactionTab
-                screenshots={screenshots}
-                imageUrlPrefix={IMAGE_URL_PREFIX}
-                onRunOne={handleRunOne}
-                runningIds={runningIds}
-              />
-            )}
+            {activeStage === "device_detection" && <DeviceDetectionTab />}
+            {activeStage === "cropping" && <CroppingTab />}
+            {activeStage === "phi_detection" && <PHIDetectionTab />}
+            {activeStage === "phi_redaction" && <PHIRedactionTab />}
           </>
         )}
       </div>
@@ -244,6 +122,9 @@ export const PreprocessingPage = () => {
         group
         {selectedGroupId && ` "${selectedGroupId}"`}
       </div>
+
+      {/* Event log side panel */}
+      {eventLog && <EventLogPanel />}
     </div>
   );
 };

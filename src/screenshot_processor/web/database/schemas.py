@@ -593,6 +593,97 @@ class PreprocessingDetailsResponse(BaseModel):
     skip_reason: str | None = None
 
 
+# --- Composable pipeline schemas (event log architecture) ---
+
+
+class StagePreprocessRequest(BaseModel):
+    """Request to run a single preprocessing stage on a batch."""
+
+    screenshot_ids: list[int] | None = Field(
+        default=None,
+        description="Specific screenshot IDs. If None, all eligible in group.",
+    )
+    group_id: str | None = Field(
+        default=None,
+        description="Required if screenshot_ids is None.",
+    )
+
+
+class PHIDetectionStageRequest(StagePreprocessRequest):
+    """PHI detection stage with preset."""
+
+    phi_pipeline_preset: str = Field(default="hipaa_compliant")
+
+
+class PHIRedactionStageRequest(StagePreprocessRequest):
+    """PHI redaction stage with method."""
+
+    phi_redaction_method: str = Field(default="redbox")
+
+
+class StagePreprocessResponse(BaseModel):
+    """Response from a stage preprocessing request."""
+
+    queued_count: int
+    screenshot_ids: list[int]
+    stage: str
+    message: str
+
+
+class InvalidateFromStageRequest(BaseModel):
+    """Request to manually invalidate downstream stages."""
+
+    stage: str = Field(
+        ...,
+        description="Stage to invalidate from (device_detection, cropping, phi_detection)",
+    )
+
+
+class PreprocessingEvent(BaseModel):
+    """A single event in the preprocessing event log."""
+
+    event_id: int
+    stage: str
+    timestamp: str
+    source: str
+    params: dict
+    result: dict
+    output_file: str | None = None
+    input_file: str | None = None
+    supersedes: int | None = None
+
+
+class PreprocessingEventLog(BaseModel):
+    """Full event log for a screenshot."""
+
+    screenshot_id: int
+    base_file_path: str
+    stage_status: dict[str, str]
+    current_events: dict[str, int | None]
+    events: list[PreprocessingEvent]
+
+
+class PreprocessingStageSummary(BaseModel):
+    """Per-stage counts."""
+
+    completed: int = 0
+    pending: int = 0
+    invalidated: int = 0
+    running: int = 0
+    failed: int = 0
+    exceptions: int = 0
+
+
+class PreprocessingSummary(BaseModel):
+    """Full summary across all stages."""
+
+    total: int
+    device_detection: PreprocessingStageSummary
+    cropping: PreprocessingStageSummary
+    phi_detection: PreprocessingStageSummary
+    phi_redaction: PreprocessingStageSummary
+
+
 # =============================================================================
 # Navigation Schemas
 # =============================================================================

@@ -79,6 +79,26 @@ export type BatchPreprocessResponse =
 export type PreprocessingDetailsResponse =
   components["schemas"]["PreprocessingDetailsResponse"];
 
+// Composable pipeline types
+export type StagePreprocessRequest =
+  components["schemas"]["StagePreprocessRequest"];
+export type StagePreprocessResponse =
+  components["schemas"]["StagePreprocessResponse"];
+export type PHIDetectionStageRequest =
+  components["schemas"]["PHIDetectionStageRequest"];
+export type PHIRedactionStageRequest =
+  components["schemas"]["PHIRedactionStageRequest"];
+export type InvalidateFromStageRequest =
+  components["schemas"]["InvalidateFromStageRequest"];
+export type PreprocessingEvent =
+  components["schemas"]["PreprocessingEvent"];
+export type PreprocessingEventLog =
+  components["schemas"]["PreprocessingEventLog"];
+export type PreprocessingStageSummary =
+  components["schemas"]["PreprocessingStageSummary"];
+export type PreprocessingSummary =
+  components["schemas"]["PreprocessingSummary"];
+
 // Navigation types
 export type NavigationResponse = components["schemas"]["NavigationResponse"];
 export type NextScreenshotResponse =

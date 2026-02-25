@@ -47,7 +47,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/auth/password-required": {
+    "/api/v1/auth/status": {
         parameters: {
             query?: never;
             header?: never;
@@ -55,12 +55,37 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Password Required
-         * @description Check if password is required for login.
+         * Auth Status
+         * @description Check if authentication is required.
+         *
+         *     Public endpoint - frontend uses this to determine if login is needed.
          */
-        get: operations["password_required_api_v1_auth_password_required_get"];
+        get: operations["auth_status_api_v1_auth_status_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify Password
+         * @description Verify site password (stateless check).
+         *
+         *     Does not create a session - frontend should store password
+         *     and send via X-Site-Password header on subsequent requests.
+         */
+        post: operations["verify_password_api_v1_auth_verify_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -78,10 +103,9 @@ export interface paths {
         put?: never;
         /**
          * Login
-         * @description Simple session-based login. Returns user info.
-         *     Frontend stores username and sends it via x-username header on subsequent requests.
+         * @description Login with username and optional password.
          *
-         *     If ACCESS_PASSWORD is configured, the password must match.
+         *     Auto-creates user on first login. Returns user info.
          */
         post: operations["login_api_v1_auth_login_post"];
         delete?: never;
@@ -97,8 +121,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Current User Info */
-        get: operations["get_current_user_info_api_v1_auth_me_get"];
+        /**
+         * Get Me
+         * @description Get current user info.
+         *
+         *     Requires X-Username header (and X-Site-Password if configured).
+         */
+        get: operations["get_me_api_v1_auth_me_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -213,6 +242,26 @@ export interface paths {
          * @description List screenshots with comprehensive filtering and pagination.
          */
         get: operations["list_screenshots_paginated_api_v1_screenshots_list_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/screenshots/preprocessing-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Preprocessing Summary
+         * @description Get per-stage counts for a group's preprocessing pipeline.
+         */
+        get: operations["get_preprocessing_summary_api_v1_screenshots_preprocessing_summary_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -559,6 +608,126 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/screenshots/preprocess-stage/device-detection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Device Detection Stage
+         * @description Queue device detection for a batch of screenshots.
+         */
+        post: operations["run_device_detection_stage_api_v1_screenshots_preprocess_stage_device_detection_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/screenshots/preprocess-stage/cropping": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Cropping Stage
+         * @description Queue cropping for a batch of screenshots.
+         */
+        post: operations["run_cropping_stage_api_v1_screenshots_preprocess_stage_cropping_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/screenshots/preprocess-stage/phi-detection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Phi Detection Stage
+         * @description Queue PHI detection for a batch of screenshots.
+         */
+        post: operations["run_phi_detection_stage_api_v1_screenshots_preprocess_stage_phi_detection_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/screenshots/preprocess-stage/phi-redaction": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Phi Redaction Stage
+         * @description Queue PHI redaction for a batch of screenshots.
+         */
+        post: operations["run_phi_redaction_stage_api_v1_screenshots_preprocess_stage_phi_redaction_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/screenshots/{screenshot_id}/invalidate-from-stage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Invalidate From Stage
+         * @description Manually invalidate downstream stages for a screenshot.
+         */
+        post: operations["invalidate_from_stage_api_v1_screenshots__screenshot_id__invalidate_from_stage_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/screenshots/{screenshot_id}/preprocessing-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Preprocessing Events
+         * @description Get the full preprocessing event log for a screenshot.
+         */
+        get: operations["get_preprocessing_events_api_v1_screenshots__screenshot_id__preprocessing_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/screenshots/export/csv": {
         parameters: {
             query?: never;
@@ -725,8 +894,9 @@ export interface paths {
          * Resolve Dispute
          * @description Resolve a dispute by setting the final agreed-upon values.
          *
-         *     Requires admin role. Original annotations are preserved - resolved values
-         *     are stored separately on the screenshot.
+         *     Requires admin role. Updates the screenshot's extracted_* fields directly
+         *     (like a normal GUI edit), so changes are immediately visible everywhere.
+         *     Original OCR values are preserved in resolved_* fields for audit/rollback.
          */
         post: operations["resolve_dispute_api_v1_consensus_screenshots__screenshot_id__resolve_post"];
         delete?: never;
@@ -764,7 +934,7 @@ export interface paths {
         };
         /**
          * Get Consensus Analysis
-         * @description Get consensus analysis for a specific screenshot (legacy endpoint).
+         * @description Get consensus analysis for a specific screenshot.
          */
         get: operations["get_consensus_analysis_api_v1_consensus__screenshot_id__get"];
         put?: never;
@@ -786,7 +956,7 @@ export interface paths {
         put?: never;
         /**
          * Recalculate Consensus
-         * @description Recalculate consensus for a specific screenshot (legacy endpoint).
+         * @description Recalculate consensus for a specific screenshot.
          */
         post: operations["recalculate_consensus_api_v1_consensus__screenshot_id__recalculate_post"];
         delete?: never;
@@ -954,6 +1124,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/retry-stuck": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry Stuck Screenshots
+         * @description Retry screenshots stuck in PENDING or PROCESSING status.
+         *
+         *     This endpoint:
+         *     1. Optionally marks all PROCESSING screenshots as FAILED (they're stuck/orphaned)
+         *     2. Requeues all PENDING screenshots to Celery for processing
+         *
+         *     Use this when screenshots are stuck and not being processed by Celery workers.
+         *     Admin only.
+         */
+        post: operations["retry_stuck_screenshots_api_v1_admin_retry_stuck_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/orphaned-entries": {
         parameters: {
             query?: never;
@@ -990,6 +1187,74 @@ export interface paths {
          *     Admin only.
          */
         post: operations["cleanup_orphaned_entries_api_v1_admin_cleanup_orphaned_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/session/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Session Login
+         * @description Login with username and optional password, get session cookie.
+         *
+         *     Creates a session and sets an HTTP-only secure cookie.
+         *     Frontend should redirect here if no valid session exists.
+         */
+        post: operations["session_login_api_v1_auth_session_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/session/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Session Logout
+         * @description Logout and clear session cookie.
+         *
+         *     Deletes the session from storage and clears the cookie.
+         */
+        post: operations["session_logout_api_v1_auth_session_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/session/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Session Me
+         * @description Get current session info.
+         *
+         *     Returns the username from the current session.
+         *     Requires valid session (enforced by middleware).
+         */
+        get: operations["session_me_api_v1_auth_session_me_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1126,6 +1391,17 @@ export interface components {
              * @default []
              */
             issues: components["schemas"]["ProcessingIssueRead"][];
+        };
+        /**
+         * AuthStatusResponse
+         * @description Response for auth status check.
+         */
+        AuthStatusResponse: {
+            /**
+             * Password Required
+             * @description Whether password is required
+             */
+            password_required: boolean;
         };
         /**
          * BatchItemResult
@@ -1458,6 +1734,14 @@ export interface components {
              * @default 0
              */
             processing_deleted: number;
+            /** Total Processing Time Seconds */
+            total_processing_time_seconds?: number | null;
+            /** Avg Processing Time Seconds */
+            avg_processing_time_seconds?: number | null;
+            /** Min Processing Time Seconds */
+            min_processing_time_seconds?: number | null;
+            /** Max Processing Time Seconds */
+            max_processing_time_seconds?: number | null;
         };
         /**
          * GroupVerificationSummary
@@ -1517,6 +1801,17 @@ export interface components {
             };
         };
         /**
+         * InvalidateFromStageRequest
+         * @description Request to manually invalidate downstream stages.
+         */
+        InvalidateFromStageRequest: {
+            /**
+             * Stage
+             * @description Stage to invalidate from (device_detection, cropping, phi_detection)
+             */
+            stage: string;
+        };
+        /**
          * IssueSeverity
          * @description Issue severity levels
          * @enum {string}
@@ -1558,11 +1853,98 @@ export interface components {
             /** Screenshots Without Group */
             screenshots_without_group: number;
         };
-        /** PasswordRequiredResponse */
-        PasswordRequiredResponse: {
+        /**
+         * PHIDetectionStageRequest
+         * @description PHI detection stage with preset.
+         */
+        PHIDetectionStageRequest: {
+            /**
+             * Screenshot Ids
+             * @description Specific screenshot IDs. If None, all eligible in group.
+             */
+            screenshot_ids?: number[] | null;
+            /**
+             * Group Id
+             * @description Required if screenshot_ids is None.
+             */
+            group_id?: string | null;
+            /**
+             * Phi Pipeline Preset
+             * @default hipaa_compliant
+             */
+            phi_pipeline_preset: string;
+        };
+        /**
+         * PHIRedactionStageRequest
+         * @description PHI redaction stage with method.
+         */
+        PHIRedactionStageRequest: {
+            /**
+             * Screenshot Ids
+             * @description Specific screenshot IDs. If None, all eligible in group.
+             */
+            screenshot_ids?: number[] | null;
+            /**
+             * Group Id
+             * @description Required if screenshot_ids is None.
+             */
+            group_id?: string | null;
+            /**
+             * Phi Redaction Method
+             * @default redbox
+             */
+            phi_redaction_method: string;
+        };
+        /** PaginatedResponse[ScreenshotRead] */
+        PaginatedResponse_ScreenshotRead_: {
+            /** Items */
+            items: components["schemas"]["ScreenshotRead"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /**
+             * Pages
+             * @description Total number of pages.
+             */
+            readonly pages: number;
+            /**
+             * Has Next
+             * @description Whether there is a next page.
+             */
+            readonly has_next: boolean;
+            /**
+             * Has Prev
+             * @description Whether there is a previous page.
+             */
+            readonly has_prev: boolean;
+        };
+        /**
+         * PasswordVerifyRequest
+         * @description Request body for password verification.
+         */
+        PasswordVerifyRequest: {
+            /**
+             * Password
+             * @description Site password to verify
+             */
+            password: string;
+        };
+        /**
+         * PasswordVerifyResponse
+         * @description Response from password verification.
+         */
+        PasswordVerifyResponse: {
+            /**
+             * Valid
+             * @description Whether the password is valid
+             */
+            valid: boolean;
             /**
              * Password Required
-             * @description Whether password is required for login
+             * @description Whether password is required
              */
             password_required: boolean;
         };
@@ -1640,6 +2022,102 @@ export interface components {
             preprocessed_file_path?: string | null;
             /** Skip Reason */
             skip_reason?: string | null;
+        };
+        /**
+         * PreprocessingEvent
+         * @description A single event in the preprocessing event log.
+         */
+        PreprocessingEvent: {
+            /** Event Id */
+            event_id: number;
+            /** Stage */
+            stage: string;
+            /** Timestamp */
+            timestamp: string;
+            /** Source */
+            source: string;
+            /** Params */
+            params: {
+                [key: string]: unknown;
+            };
+            /** Result */
+            result: {
+                [key: string]: unknown;
+            };
+            /** Output File */
+            output_file?: string | null;
+            /** Input File */
+            input_file?: string | null;
+            /** Supersedes */
+            supersedes?: number | null;
+        };
+        /**
+         * PreprocessingEventLog
+         * @description Full event log for a screenshot.
+         */
+        PreprocessingEventLog: {
+            /** Screenshot Id */
+            screenshot_id: number;
+            /** Base File Path */
+            base_file_path: string;
+            /** Stage Status */
+            stage_status: {
+                [key: string]: string;
+            };
+            /** Current Events */
+            current_events: {
+                [key: string]: number | null;
+            };
+            /** Events */
+            events: components["schemas"]["PreprocessingEvent"][];
+        };
+        /**
+         * PreprocessingStageSummary
+         * @description Per-stage counts.
+         */
+        PreprocessingStageSummary: {
+            /**
+             * Completed
+             * @default 0
+             */
+            completed: number;
+            /**
+             * Pending
+             * @default 0
+             */
+            pending: number;
+            /**
+             * Invalidated
+             * @default 0
+             */
+            invalidated: number;
+            /**
+             * Running
+             * @default 0
+             */
+            running: number;
+            /**
+             * Failed
+             * @default 0
+             */
+            failed: number;
+            /**
+             * Exceptions
+             * @default 0
+             */
+            exceptions: number;
+        };
+        /**
+         * PreprocessingSummary
+         * @description Full summary across all stages.
+         */
+        PreprocessingSummary: {
+            /** Total */
+            total: number;
+            device_detection: components["schemas"]["PreprocessingStageSummary"];
+            cropping: components["schemas"]["PreprocessingStageSummary"];
+            phi_detection: components["schemas"]["PreprocessingStageSummary"];
+            phi_redaction: components["schemas"]["PreprocessingStageSummary"];
         };
         /**
          * ProcessingIssue
@@ -1839,6 +2317,21 @@ export interface components {
             /** Resolved By Username */
             resolved_by_username?: string | null;
         };
+        /** RetryStuckResponse */
+        RetryStuckResponse: {
+            /** Success */
+            success: boolean;
+            /** Pending Count */
+            pending_count: number;
+            /** Processing Count */
+            processing_count: number;
+            /** Requeued */
+            requeued: number;
+            /** Marked Failed */
+            marked_failed: number;
+            /** Message */
+            message: string;
+        };
         /**
          * RootResponse
          * @description Root endpoint response.
@@ -2017,24 +2510,6 @@ export interface components {
             readonly alignment_score_status: {
                 [key: string]: unknown;
             } | null;
-        };
-        /**
-         * ScreenshotListResponse
-         * @description Response model for paginated screenshot list.
-         */
-        ScreenshotListResponse: {
-            /** Items */
-            items: components["schemas"]["ScreenshotRead"][];
-            /** Total */
-            total: number;
-            /** Page */
-            page: number;
-            /** Page Size */
-            page_size: number;
-            /** Has Next */
-            has_next: boolean;
-            /** Has Prev */
-            has_prev: boolean;
         };
         /** ScreenshotRead */
         ScreenshotRead: {
@@ -2290,6 +2765,70 @@ export interface components {
             /** Idempotency Key */
             idempotency_key?: string | null;
         };
+        /**
+         * SessionLoginRequest
+         * @description Request body for session-based login.
+         */
+        SessionLoginRequest: {
+            /** Username */
+            username: string;
+            /**
+             * Password
+             * @description Site password. Required if SITE_PASSWORD is configured.
+             */
+            password?: string | null;
+        };
+        /**
+         * SessionLoginResponse
+         * @description Response from session login.
+         */
+        SessionLoginResponse: {
+            /**
+             * Success
+             * @description Whether login was successful
+             */
+            success: boolean;
+            /**
+             * Username
+             * @description The logged-in username
+             */
+            username: string;
+            /**
+             * Expires In Seconds
+             * @description Session lifetime in seconds
+             */
+            expires_in_seconds: number;
+        };
+        /**
+         * StagePreprocessRequest
+         * @description Request to run a single preprocessing stage on a batch.
+         */
+        StagePreprocessRequest: {
+            /**
+             * Screenshot Ids
+             * @description Specific screenshot IDs. If None, all eligible in group.
+             */
+            screenshot_ids?: number[] | null;
+            /**
+             * Group Id
+             * @description Required if screenshot_ids is None.
+             */
+            group_id?: string | null;
+        };
+        /**
+         * StagePreprocessResponse
+         * @description Response from a stage preprocessing request.
+         */
+        StagePreprocessResponse: {
+            /** Queued Count */
+            queued_count: number;
+            /** Screenshot Ids */
+            screenshot_ids: number[];
+            /** Stage */
+            stage: string;
+            /** Message */
+            message: string;
+        };
         /** StatsResponse */
         StatsResponse: {
             /** Total Screenshots */
@@ -2350,13 +2889,16 @@ export interface components {
          * @enum {string}
          */
         UploadErrorCode: "invalid_api_key" | "invalid_base64" | "unsupported_format" | "image_too_large" | "checksum_mismatch" | "invalid_callback_url" | "batch_too_large" | "rate_limited" | "storage_error" | "database_error";
-        /** UserLogin */
-        UserLogin: {
+        /**
+         * UserLoginRequest
+         * @description Request body for user login (Variant B).
+         */
+        UserLoginRequest: {
             /** Username */
             username: string;
             /**
              * Password
-             * @description Shared access password. Required if ACCESS_PASSWORD is set in server config.
+             * @description Site password. Required if SITE_PASSWORD is configured.
              */
             password?: string | null;
         };
@@ -2526,7 +3068,7 @@ export interface operations {
             };
         };
     };
-    password_required_api_v1_auth_password_required_get: {
+    auth_status_api_v1_auth_status_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2541,7 +3083,40 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PasswordRequiredResponse"];
+                    "application/json": components["schemas"]["AuthStatusResponse"];
+                };
+            };
+        };
+    };
+    verify_password_api_v1_auth_verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordVerifyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordVerifyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -2555,7 +3130,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["UserLogin"];
+                "application/json": components["schemas"]["UserLoginRequest"];
             };
         };
         responses: {
@@ -2579,11 +3154,12 @@ export interface operations {
             };
         };
     };
-    get_current_user_info_api_v1_auth_me_get: {
+    get_me_api_v1_auth_me_get: {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -2672,7 +3248,8 @@ export interface operations {
                 browse?: boolean;
             };
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -2703,7 +3280,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -2734,7 +3312,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -2784,7 +3363,8 @@ export interface operations {
                 sort_order?: string;
             };
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -2797,7 +3377,42 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ScreenshotListResponse"];
+                    "application/json": components["schemas"]["PaginatedResponse_ScreenshotRead_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_preprocessing_summary_api_v1_screenshots_preprocessing_summary_get: {
+        parameters: {
+            query: {
+                /** @description Group ID */
+                group_id: string;
+            };
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreprocessingSummary"];
                 };
             };
             /** @description Validation Error */
@@ -2815,7 +3430,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -2848,7 +3464,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -2889,7 +3506,8 @@ export interface operations {
                 status?: string | null;
             };
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -2920,7 +3538,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -2951,7 +3570,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -2984,7 +3604,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -3021,7 +3642,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -3065,7 +3687,8 @@ export interface operations {
                 direction?: string;
             };
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -3129,7 +3752,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -3162,7 +3786,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -3195,7 +3820,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -3304,7 +3930,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -3337,7 +3964,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -3374,7 +4002,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -3405,6 +4034,222 @@ export interface operations {
             };
         };
     };
+    run_device_detection_stage_api_v1_screenshots_preprocess_stage_device_detection_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StagePreprocessRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StagePreprocessResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_cropping_stage_api_v1_screenshots_preprocess_stage_cropping_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StagePreprocessRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StagePreprocessResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_phi_detection_stage_api_v1_screenshots_preprocess_stage_phi_detection_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PHIDetectionStageRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StagePreprocessResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_phi_redaction_stage_api_v1_screenshots_preprocess_stage_phi_redaction_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PHIRedactionStageRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StagePreprocessResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    invalidate_from_stage_api_v1_screenshots__screenshot_id__invalidate_from_stage_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
+            path: {
+                screenshot_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvalidateFromStageRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StagePreprocessResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_preprocessing_events_api_v1_screenshots__screenshot_id__preprocessing_events_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
+            path: {
+                screenshot_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreprocessingEventLog"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     export_consensus_csv_api_v1_screenshots_export_csv_get: {
         parameters: {
             query?: {
@@ -3418,7 +4263,8 @@ export interface operations {
                 processing_status?: string | null;
             };
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -3449,7 +4295,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -3487,7 +4334,8 @@ export interface operations {
                 limit?: number;
             };
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -3518,7 +4366,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path: {
                 annotation_id: number;
@@ -3551,7 +4400,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path: {
                 annotation_id: number;
@@ -3588,7 +4438,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path: {
                 annotation_id: number;
@@ -3619,7 +4470,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -3653,7 +4505,8 @@ export interface operations {
                 tier: "single_verified" | "agreed" | "disputed";
             };
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path: {
                 group_id: string;
@@ -3686,7 +4539,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -3719,7 +4573,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -3756,7 +4611,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -3787,7 +4643,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -3820,7 +4677,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path: {
                 screenshot_id: number;
@@ -3853,7 +4711,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -3887,7 +4746,8 @@ export interface operations {
                 role?: string | null;
             };
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path: {
                 user_id: number;
@@ -3920,7 +4780,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -3951,7 +4812,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path: {
                 group_id: string;
@@ -3989,7 +4851,8 @@ export interface operations {
                 group_id?: string | null;
             };
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -4029,7 +4892,8 @@ export interface operations {
                 limit?: number;
             };
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -4063,7 +4927,8 @@ export interface operations {
                 group_id?: string | null;
             };
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -4090,11 +4955,49 @@ export interface operations {
             };
         };
     };
+    retry_stuck_screenshots_api_v1_admin_retry_stuck_post: {
+        parameters: {
+            query?: {
+                /** @description Filter by group ID */
+                group_id?: string | null;
+                /** @description Mark screenshots stuck in PROCESSING as FAILED before requeuing PENDING ones */
+                mark_processing_as_failed?: boolean;
+            };
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetryStuckResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     find_orphaned_entries_api_v1_admin_orphaned_entries_get: {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -4125,7 +5028,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-username"?: string | null;
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -4148,6 +5052,83 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    session_login_api_v1_auth_session_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionLoginResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    session_logout_api_v1_auth_session_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: boolean;
+                    };
+                };
+            };
+        };
+    };
+    session_me_api_v1_auth_session_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string | null;
+                    };
                 };
             };
         };

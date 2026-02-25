@@ -12,6 +12,8 @@ degrades gracefully when packages aren't installed.
 Architecture:
 1. preprocess_screenshot_file() - Core sync function, no DB
 2. preprocess_screenshot_sync() - Sync wrapper for Celery (commits to DB)
+3. Event log functions - append_event(), invalidate_downstream(), etc.
+   Manage an append-only event log per screenshot for composable pipeline.
 """
 
 from __future__ import annotations
@@ -503,3 +505,255 @@ def preprocess_screenshot_sync(
         "phi_redacted": result.phi_redacted,
         "skip_reason": result.skip_reason,
     }
+
+
+# =============================================================================
+# Event log management — composable per-stage pipeline
+# =============================================================================
+
+STAGE_ORDER = ["device_detection", "cropping", "phi_detection", "phi_redaction"]
+
+# Stages that produce an output file (others are metadata-only)
+STAGE_FILE_SUFFIX = {
+    "cropping": "crop",
+    "phi_redaction": "redact",
+}
+
+
+def init_preprocessing_metadata(screenshot: Any) -> dict:
+    """Initialize preprocessing metadata on a screenshot if not already present.
+
+    Sets base_file_path and initializes empty events/status structures.
+    Returns the preprocessing sub-dict.
+    """
+    metadata = screenshot.processing_metadata or {}
+    pp = metadata.setdefault("preprocessing", {})
+    if "base_file_path" not in pp:
+        pp["base_file_path"] = screenshot.file_path
+        pp["events"] = []
+        pp["current_events"] = {}
+        pp["stage_status"] = {s: "pending" for s in STAGE_ORDER}
+    # Ensure all keys exist (for screenshots initialized before event log)
+    pp.setdefault("events", [])
+    pp.setdefault("current_events", {})
+    pp.setdefault("stage_status", {s: "pending" for s in STAGE_ORDER})
+    screenshot.processing_metadata = metadata
+    return pp
+
+
+def append_event(
+    screenshot: Any,
+    stage: str,
+    source: str,
+    params: dict,
+    result: dict,
+    output_file: str | None = None,
+    input_file: str | None = None,
+) -> int:
+    """Append an event to the preprocessing log. Returns the new event_id.
+
+    After appending, updates current_events and stage_status, then
+    invalidates any downstream stages whose input is now stale.
+    """
+    pp = init_preprocessing_metadata(screenshot)
+    events = pp["events"]
+    current = pp["current_events"]
+    stage_status = pp["stage_status"]
+
+    # Determine what this event supersedes
+    prev_event_id = current.get(stage)
+
+    event_id = len(events) + 1
+    events.append({
+        "event_id": event_id,
+        "stage": stage,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "source": source,
+        "params": params,
+        "result": result,
+        "output_file": output_file,
+        "input_file": input_file,
+        "supersedes": prev_event_id,
+    })
+
+    # Update current state
+    current[stage] = event_id
+    stage_status[stage] = "completed"
+
+    # Invalidate downstream stages
+    invalidate_downstream(screenshot, stage)
+
+    # Update file_path to latest valid output
+    update_file_path(screenshot)
+
+    return event_id
+
+
+def set_stage_running(screenshot: Any, stage: str) -> None:
+    """Mark a stage as running before execution starts."""
+    pp = init_preprocessing_metadata(screenshot)
+    pp["stage_status"][stage] = "running"
+
+
+def append_error_event(
+    screenshot: Any,
+    stage: str,
+    source: str,
+    params: dict,
+    error_message: str,
+    input_file: str | None = None,
+) -> int:
+    """Append a failed event. Sets stage_status to 'failed'."""
+    pp = init_preprocessing_metadata(screenshot)
+    events = pp["events"]
+    stage_status = pp["stage_status"]
+
+    event_id = len(events) + 1
+    events.append({
+        "event_id": event_id,
+        "stage": stage,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "source": source,
+        "params": params,
+        "result": {"error": error_message},
+        "output_file": None,
+        "input_file": input_file,
+        "supersedes": None,
+    })
+
+    stage_status[stage] = "failed"
+    return event_id
+
+
+def invalidate_downstream(screenshot: Any, from_stage: str) -> None:
+    """Mark all stages after from_stage as invalidated."""
+    pp = screenshot.processing_metadata["preprocessing"]
+    stage_status = pp["stage_status"]
+    current = pp["current_events"]
+
+    idx = STAGE_ORDER.index(from_stage)
+    for downstream in STAGE_ORDER[idx + 1:]:
+        if current.get(downstream) is not None:
+            stage_status[downstream] = "invalidated"
+            current[downstream] = None
+
+
+def update_file_path(screenshot: Any) -> None:
+    """Set screenshot.file_path to the output of the latest completed stage."""
+    pp = screenshot.processing_metadata["preprocessing"]
+    events = pp.get("events", [])
+    current = pp.get("current_events", {})
+
+    # Walk stages in reverse, find latest with an output file
+    for stage in reversed(STAGE_ORDER):
+        eid = current.get(stage)
+        if eid is not None:
+            event = next((e for e in events if e["event_id"] == eid), None)
+            if event and event.get("output_file"):
+                screenshot.file_path = event["output_file"]
+                return
+    # Fallback to base
+    screenshot.file_path = pp.get("base_file_path", screenshot.file_path)
+
+
+def get_current_input_file(screenshot: Any, stage: str) -> str:
+    """Get the input file for a stage based on current events."""
+    pp = screenshot.processing_metadata.get("preprocessing", {})
+    base = pp.get("base_file_path", screenshot.file_path)
+
+    if stage in ("device_detection", "cropping"):
+        return base
+    if stage in ("phi_detection", "phi_redaction"):
+        # Use latest crop output, or base if no crop
+        crop_eid = pp.get("current_events", {}).get("cropping")
+        if crop_eid:
+            event = next(
+                (e for e in pp.get("events", []) if e["event_id"] == crop_eid),
+                None,
+            )
+            if event and event.get("output_file"):
+                return event["output_file"]
+        return base
+    return base
+
+
+def get_stage_output_path(base_path: str, stage: str, version: int) -> Path:
+    """Build versioned output path for a stage. E.g. IMG_crop_v2.png."""
+    tag = STAGE_FILE_SUFFIX.get(stage)
+    if not tag:
+        raise ValueError(f"Stage {stage} does not produce output files")
+    p = Path(base_path)
+    return p.parent / f"{p.stem}_{tag}_v{version}{p.suffix}"
+
+
+def get_next_version(screenshot: Any, stage: str) -> int:
+    """Get the next version number for a stage's output file."""
+    pp = screenshot.processing_metadata.get("preprocessing", {})
+    events = pp.get("events", [])
+    count = sum(1 for e in events if e["stage"] == stage and e.get("output_file"))
+    return count + 1
+
+
+def get_stage_counts(screenshots: list, stage: str) -> dict:
+    """Compute per-status counts for a stage across a list of screenshots."""
+    counts = {"completed": 0, "pending": 0, "invalidated": 0, "running": 0, "failed": 0, "exceptions": 0}
+    for s in screenshots:
+        pp = (s.processing_metadata or {}).get("preprocessing", {})
+        status = pp.get("stage_status", {}).get(stage, "pending")
+        if status in counts:
+            counts[status] += 1
+        else:
+            counts["pending"] += 1
+
+        # Exception detection
+        if status == "completed":
+            current_events = pp.get("current_events", {})
+            eid = current_events.get(stage)
+            if eid:
+                event = next((e for e in pp.get("events", []) if e["event_id"] == eid), None)
+                if event and is_exception(stage, event.get("result", {})):
+                    counts["exceptions"] += 1
+    return counts
+
+
+def is_exception(stage: str, result: dict) -> bool:
+    """Check if a stage result should be flagged for review."""
+    if stage == "device_detection":
+        if result.get("device_category") == "unknown":
+            return True
+        if result.get("confidence", 1.0) < 0.7:
+            return True
+    elif stage == "cropping":
+        if result.get("is_ipad") and not result.get("was_cropped"):
+            return True
+    elif stage == "phi_detection":
+        if result.get("phi_detected"):
+            return True
+        if result.get("regions_count", 0) > 10:
+            return True
+    elif stage == "phi_redaction":
+        if result.get("phi_detected") and not result.get("redacted"):
+            return True
+    return False
+
+
+def serialize_phi_regions(regions: list) -> list[dict]:
+    """Convert PHI regions (which may be PHIRegion objects) to serializable dicts."""
+    serialized = []
+    for region in regions:
+        if isinstance(region, dict):
+            serialized.append(region)
+        else:
+            # PHIRegion object
+            bbox = getattr(region, "bbox", (0, 0, 0, 0))
+            serialized.append({
+                "x": bbox[0] if len(bbox) > 0 else 0,
+                "y": bbox[1] if len(bbox) > 1 else 0,
+                "w": bbox[2] if len(bbox) > 2 else 0,
+                "h": bbox[3] if len(bbox) > 3 else 0,
+                "label": getattr(region, "entity_type", "UNKNOWN"),
+                "source": getattr(region, "source", "auto"),
+                "confidence": getattr(region, "score", 0.0),
+                "text": getattr(region, "text", ""),
+            })
+    return serialized
