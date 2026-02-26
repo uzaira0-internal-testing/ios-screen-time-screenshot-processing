@@ -26,7 +26,7 @@ if "sqlite" in DATABASE_URL:
     # SQLite configuration (for testing or legacy development)
     # Uses StaticPool to work around SQLite's single-writer limitation
     # Note: db-toolkit doesn't handle SQLite's special needs, so we create manually
-    logger.info(f"Using SQLite database: {DATABASE_URL}")
+    logger.info("Using SQLite database", extra={"db_type": "sqlite"})
     engine = sa_create_async_engine(
         DATABASE_URL,
         echo=False,
@@ -37,7 +37,7 @@ if "sqlite" in DATABASE_URL:
 else:
     # PostgreSQL configuration (recommended for development and production)
     # Use db-toolkit for standardized connection pooling
-    logger.info(f"Using PostgreSQL database: {DATABASE_URL.split('@')[1] if '@' in DATABASE_URL else DATABASE_URL}")
+    logger.info("Using PostgreSQL database", extra={"db_type": "postgresql"})
     engine = create_engine(
         DATABASE_URL,
         pool_size=10,

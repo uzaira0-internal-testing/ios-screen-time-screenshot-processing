@@ -236,13 +236,13 @@ class AdminService:
             try:
                 file_path = screenshot.file_path
                 if not Path(file_path).exists():
-                    logger.warning(f"Screenshot {screenshot.id}: File not found at {file_path}")
+                    logger.warning("Screenshot file not found", extra={"screenshot_id": screenshot.id, "file_path": file_path})
                     failed += 1
                     continue
 
                 img = cv2.imread(file_path)
                 if img is None:
-                    logger.warning(f"Screenshot {screenshot.id}: Could not read image at {file_path}")
+                    logger.warning("Could not read screenshot image", extra={"screenshot_id": screenshot.id, "file_path": file_path})
                     failed += 1
                     continue
 
@@ -252,12 +252,12 @@ class AdminService:
                 if total and total.strip():
                     screenshot.extracted_total = total.strip()
                     updated += 1
-                    logger.info(f"Screenshot {screenshot.id}: Extracted total = '{total.strip()}'")
+                    logger.info("Extracted OCR total", extra={"screenshot_id": screenshot.id, "extracted_total": total.strip()})
                 else:
-                    logger.info(f"Screenshot {screenshot.id}: No total found")
+                    logger.info("No OCR total found", extra={"screenshot_id": screenshot.id})
 
             except Exception as e:
-                logger.error(f"Screenshot {screenshot.id}: Error extracting total - {e}")
+                logger.error("Error extracting OCR total", extra={"screenshot_id": screenshot.id, "error": str(e)})
                 failed += 1
 
         await self.db.commit()

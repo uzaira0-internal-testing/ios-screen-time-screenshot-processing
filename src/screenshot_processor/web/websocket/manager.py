@@ -36,7 +36,7 @@ class ConnectionManager:
             "username": username,
             "connected_at": datetime.now(UTC).isoformat(),
         }
-        logger.info(f"User {user_id} ({username}) connected. Total connections: {len(self.active_connections)}")
+        logger.info("User connected", extra={"user_id": user_id, "username": username, "total_connections": len(self.active_connections)})
 
         await self.broadcast_except(
             WebSocketEvent.create(
@@ -59,7 +59,7 @@ class ConnectionManager:
             username = self.user_metadata[user_id].get("username")
             del self.user_metadata[user_id]
 
-        logger.info(f"User {user_id} ({username}) disconnected. Total connections: {len(self.active_connections)}")
+        logger.info("User disconnected", extra={"user_id": user_id, "username": username, "total_connections": len(self.active_connections)})
 
         return username
 
@@ -69,7 +69,7 @@ class ConnectionManager:
                 websocket = self.active_connections[user_id]
                 await websocket.send_json(event.model_dump())
             except Exception as e:
-                logger.error(f"Error sending to user {user_id}: {e}")
+                logger.error("Error sending to user", extra={"user_id": user_id, "error": str(e)})
                 self.disconnect(user_id)
 
     async def broadcast(self, event: WebSocketEvent):
@@ -79,7 +79,7 @@ class ConnectionManager:
             try:
                 await websocket.send_json(event.model_dump())
             except Exception as e:
-                logger.error(f"Error broadcasting to user {user_id}: {e}")
+                logger.error("Error broadcasting to user", extra={"user_id": user_id, "error": str(e)})
                 disconnected_users.append(user_id)
 
         for user_id in disconnected_users:
@@ -95,7 +95,7 @@ class ConnectionManager:
             try:
                 await websocket.send_json(event.model_dump())
             except Exception as e:
-                logger.error(f"Error broadcasting to user {user_id}: {e}")
+                logger.error("Error broadcasting to user", extra={"user_id": user_id, "error": str(e)})
                 disconnected_users.append(user_id)
 
         for user_id in disconnected_users:

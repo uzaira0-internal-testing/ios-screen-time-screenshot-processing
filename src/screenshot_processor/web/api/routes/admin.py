@@ -114,10 +114,10 @@ async def update_user(
 
         # Audit logging
         if role is not None and role != old_role:
-            logger.info(f"AUDIT: Admin {admin.username} changed user {user.username} role from {old_role} to {role}")
+            logger.info("Admin changed user role", extra={"audit": True, "admin_username": admin.username, "username": user.username, "old_role": str(old_role), "new_role": role})
         if is_active is not None and is_active != old_active:
             status_str = "activated" if is_active else "deactivated"
-            logger.info(f"AUDIT: Admin {admin.username} {status_str} user {user.username}")
+            logger.info("Admin changed user status", extra={"audit": True, "admin_username": admin.username, "username": user.username, "action": status_str})
 
         return UserUpdateResponse(
             id=user.id,
@@ -131,7 +131,7 @@ async def update_user(
         raise
     except Exception as e:
         await db.rollback()
-        logger.error(f"Failed to update user {user_id}: {e}")
+        logger.error("Failed to update user", extra={"user_id": user_id, "error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update user",
@@ -174,13 +174,13 @@ async def reset_test_data(request: Request, db: DatabaseSession, admin: User = A
 
         await db.commit()
 
-        logger.info(f"AUDIT: Admin {admin.username} reset test data")
+        logger.info("Admin reset test data", extra={"audit": True, "admin_username": admin.username})
 
         return ResetTestDataResponse(success=True, message="Test data reset successfully")
 
     except Exception as e:
         await db.rollback()
-        logger.error(f"Failed to reset test data: {e}")
+        logger.error("Failed to reset test data", extra={"error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to reset test data: {str(e)}",
@@ -249,10 +249,7 @@ async def delete_group(
             )
             queue_count = queue_result.rowcount
 
-            logger.info(
-                f"Cleaning up group '{group_id}': {annotations_count} annotations, "
-                f"{consensus_count} consensus results, {queue_count} queue states"
-            )
+            logger.info("Cleaning up group", extra={"group_id": group_id, "annotations_count": annotations_count, "consensus_count": consensus_count, "queue_states_count": queue_count})
 
             # 4. Delete all screenshots in this group
             await db.execute(delete(Screenshot).where(Screenshot.group_id == group_id))
@@ -262,10 +259,7 @@ async def delete_group(
 
         await db.commit()
 
-        logger.info(
-            f"AUDIT: Admin {admin.username} deleted group '{group_id}' "
-            f"({screenshots_count} screenshots, {annotations_count} annotations)"
-        )
+        logger.info("Admin deleted group", extra={"audit": True, "admin_username": admin.username, "group_id": group_id, "screenshots_deleted": screenshots_count, "annotations_deleted": annotations_count})
 
         return DeleteGroupResponse(
             success=True,
@@ -279,7 +273,7 @@ async def delete_group(
         raise
     except Exception as e:
         await db.rollback()
-        logger.error(f"Failed to delete group '{group_id}': {e}")
+        logger.error("Failed to delete group", extra={"group_id": group_id, "error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete group: {str(e)}",
@@ -342,14 +336,14 @@ async def recalculate_ocr_totals(
                 # Load the image
                 file_path = screenshot.file_path
                 if not Path(file_path).exists():
-                    logger.warning(f"Screenshot {screenshot.id}: File not found at {file_path}")
+                    logger.warning("Screenshot file not found", extra={"screenshot_id": screenshot.id, "file_path": file_path})
                     failed += 1
                     continue
 
                 # Read and process the image
                 img = cv2.imread(file_path)
                 if img is None:
-                    logger.warning(f"Screenshot {screenshot.id}: Could not read image at {file_path}")
+                    logger.warning("Could not read screenshot image", extra={"screenshot_id": screenshot.id, "file_path": file_path})
                     failed += 1
                     continue
 
@@ -362,20 +356,17 @@ async def recalculate_ocr_totals(
                 if total and total.strip():
                     screenshot.extracted_total = total.strip()
                     updated += 1
-                    logger.info(f"Screenshot {screenshot.id}: Extracted total = '{total.strip()}'")
+                    logger.info("Extracted OCR total", extra={"screenshot_id": screenshot.id, "extracted_total": total.strip()})
                 else:
-                    logger.info(f"Screenshot {screenshot.id}: No total found")
+                    logger.info("No OCR total found", extra={"screenshot_id": screenshot.id})
 
             except Exception as e:
-                logger.error(f"Screenshot {screenshot.id}: Error extracting total - {e}")
+                logger.error("Error extracting OCR total", extra={"screenshot_id": screenshot.id, "error": str(e)})
                 failed += 1
 
         await db.commit()
 
-        logger.info(
-            f"AUDIT: Admin {admin.username} recalculated OCR totals: "
-            f"{processed} processed, {updated} updated, {failed} failed"
-        )
+        logger.info("Admin recalculated OCR totals", extra={"audit": True, "admin_username": admin.username, "processed": processed, "updated": updated, "failed": failed})
 
         return RecalculateOcrTotalResponse(
             success=True,
@@ -388,7 +379,7 @@ async def recalculate_ocr_totals(
 
     except Exception as e:
         await db.rollback()
-        logger.error(f"Failed to recalculate OCR totals: {e}")
+        logger.error("Failed to recalculate OCR totals", extra={"error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to recalculate OCR totals: {str(e)}",
@@ -432,7 +423,7 @@ def _cleanup_old_reprocess_status() -> None:
     ]
     for key in keys_to_remove:
         del _bulk_reprocess_status[key]
-        logger.debug(f"Cleaned up old reprocess status: {key}")
+        logger.debug("Cleaned up old reprocess status", extra={"status_key": key})
 
 
 async def _bulk_reprocess_task(
@@ -461,7 +452,7 @@ async def _bulk_reprocess_task(
                 result = await db.execute(select(Screenshot).where(Screenshot.id == screenshot_id))
                 screenshot = result.scalar_one_or_none()
                 if screenshot is None:
-                    logger.warning(f"Screenshot {screenshot_id} not found")
+                    logger.warning("Screenshot not found for reprocessing", extra={"screenshot_id": screenshot_id})
                     _bulk_reprocess_status[status_key].failed += 1
                     continue
 
@@ -472,7 +463,7 @@ async def _bulk_reprocess_task(
                 )
                 _bulk_reprocess_status[status_key].succeeded += 1
         except Exception as e:
-            logger.error(f"Failed to reprocess screenshot {screenshot_id}: {e}")
+            logger.error("Failed to reprocess screenshot", extra={"screenshot_id": screenshot_id, "error": str(e)})
             _bulk_reprocess_status[status_key].failed += 1
         finally:
             _bulk_reprocess_status[status_key].processed += 1
@@ -483,11 +474,7 @@ async def _bulk_reprocess_task(
 
     _bulk_reprocess_status[status_key].in_progress = False
     _bulk_reprocess_status[status_key].completed_at = time.time()
-    logger.info(
-        f"Bulk reprocess complete for {group_id}: "
-        f"{_bulk_reprocess_status[status_key].succeeded} succeeded, "
-        f"{_bulk_reprocess_status[status_key].failed} failed"
-    )
+    logger.info("Bulk reprocess complete", extra={"group_id": group_id, "succeeded": _bulk_reprocess_status[status_key].succeeded, "failed": _bulk_reprocess_status[status_key].failed})
 
 
 @router.post("/bulk-reprocess", response_model=BulkReprocessResponse)
@@ -541,10 +528,7 @@ async def bulk_reprocess_screenshots(
         )
         task_group.apply_async()
 
-        logger.info(
-            f"AUDIT: Admin {admin.username} queued bulk reprocess via Celery: "
-            f"{len(screenshot_ids)} screenshots, group={group_id}, method={processing_method}, max_shift={max_shift}"
-        )
+        logger.info("Admin queued bulk reprocess via Celery", extra={"audit": True, "admin_username": admin.username, "count": len(screenshot_ids), "group_id": group_id, "processing_method": processing_method, "max_shift": max_shift})
 
         return BulkReprocessResponse(
             success=True,
@@ -553,7 +537,7 @@ async def bulk_reprocess_screenshots(
         )
 
     except Exception as e:
-        logger.error(f"Failed to queue bulk reprocess: {e}")
+        logger.error("Failed to queue bulk reprocess", extra={"error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to queue bulk reprocess: {str(e)}",
@@ -652,7 +636,7 @@ async def retry_stuck_screenshots(
             marked_failed = result.rowcount
             await db.commit()
 
-            logger.info(f"Marked {marked_failed} stuck PROCESSING screenshots as FAILED")
+            logger.info("Marked stuck PROCESSING screenshots as FAILED", extra={"count": marked_failed})
 
         # Step 2: Get all PENDING screenshot IDs and requeue them
         ids_query = select(Screenshot.id).where(
@@ -675,13 +659,9 @@ async def retry_stuck_screenshots(
             task_group.apply_async()
             requeued = len(screenshot_ids)
 
-            logger.info(f"Requeued {requeued} PENDING screenshots to Celery")
+            logger.info("Requeued PENDING screenshots to Celery", extra={"count": requeued})
 
-        logger.info(
-            f"AUDIT: Admin {admin.username} retried stuck screenshots: "
-            f"group={group_id}, pending={pending_count}, processing={processing_count}, "
-            f"marked_failed={marked_failed}, requeued={requeued}"
-        )
+        logger.info("Admin retried stuck screenshots", extra={"audit": True, "admin_username": admin.username, "group_id": group_id, "pending_count": pending_count, "processing_count": processing_count, "marked_failed": marked_failed, "requeued": requeued})
 
         return RetryStuckResponse(
             success=True,
@@ -694,7 +674,7 @@ async def retry_stuck_screenshots(
 
     except Exception as e:
         await db.rollback()
-        logger.error(f"Failed to retry stuck screenshots: {e}")
+        logger.error("Failed to retry stuck screenshots", extra={"error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retry stuck screenshots: {str(e)}",
@@ -803,11 +783,7 @@ async def cleanup_orphaned_entries(request: Request, db: DatabaseSession, admin:
 
         await db.commit()
 
-        logger.info(
-            f"AUDIT: Admin {admin.username} cleaned up orphaned entries: "
-            f"{deleted_annotations} annotations, {deleted_consensus} consensus, "
-            f"{deleted_queue_states} queue states"
-        )
+        logger.info("Admin cleaned up orphaned entries", extra={"audit": True, "admin_username": admin.username, "deleted_annotations": deleted_annotations, "deleted_consensus": deleted_consensus, "deleted_queue_states": deleted_queue_states})
 
         return CleanupResponse(
             success=True,
@@ -819,7 +795,7 @@ async def cleanup_orphaned_entries(request: Request, db: DatabaseSession, admin:
 
     except Exception as e:
         await db.rollback()
-        logger.error(f"Failed to cleanup orphaned entries: {e}")
+        logger.error("Failed to cleanup orphaned entries", extra={"error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to cleanup: {str(e)}",

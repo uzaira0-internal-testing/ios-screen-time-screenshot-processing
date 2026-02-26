@@ -112,7 +112,7 @@ async def upload_zip_for_preprocessing(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to save ZIP file: {e}")
+        logger.error("Failed to save ZIP file", extra={"error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to save uploaded file",
@@ -162,9 +162,9 @@ async def upload_zip_for_preprocessing(
         from screenshot_processor.web.tasks import preprocess_zip_task
 
         preprocess_zip_task.delay(job_id)
-        logger.info(f"Queued preprocessing job {job_id} with {total_images} images")
+        logger.info("Queued preprocessing job", extra={"job_id": job_id, "total_images": total_images})
     except Exception as e:
-        logger.error(f"Failed to queue preprocessing task: {e}")
+        logger.error("Failed to queue preprocessing task", extra={"job_id": job_id, "error": str(e)})
         # Update job status to failed
         job.status = PreprocessingJobStatus.FAILED
         job.errors = [{"type": "queue_error", "message": str(e)}]

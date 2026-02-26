@@ -117,13 +117,13 @@ async def ensure_ocr_total(screenshot: Screenshot, db: AsyncSession) -> None:
     try:
         file_path = screenshot.file_path
         if not Path(file_path).exists():
-            logger.warning(f"Screenshot {screenshot.id}: File not found at {file_path}")
+            logger.warning("Screenshot file not found", extra={"screenshot_id": screenshot.id, "file_path": file_path})
             return
 
         # Read and process the image
         img = cv2.imread(file_path)
         if img is None:
-            logger.warning(f"Screenshot {screenshot.id}: Could not read image at {file_path}")
+            logger.warning("Could not read screenshot image", extra={"screenshot_id": screenshot.id, "file_path": file_path})
             return
 
         # Convert dark mode if needed
@@ -135,10 +135,10 @@ async def ensure_ocr_total(screenshot: Screenshot, db: AsyncSession) -> None:
         if total and total.strip():
             screenshot.extracted_total = total.strip()
             await db.commit()
-            logger.info(f"Screenshot {screenshot.id}: Auto-extracted OCR total = '{total.strip()}'")
+            logger.info("Auto-extracted OCR total", extra={"screenshot_id": screenshot.id, "extracted_total": total.strip()})
 
     except Exception as e:
-        logger.error(f"Screenshot {screenshot.id}: Error auto-extracting OCR total - {e}")
+        logger.error("Error auto-extracting OCR total", extra={"screenshot_id": screenshot.id, "error": str(e)})
 
 
 async def enrich_screenshot_with_usernames(screenshot: Screenshot, db: AsyncSession) -> ScreenshotRead:
@@ -349,12 +349,12 @@ async def update_screenshot(
         await db.commit()
         await db.refresh(screenshot)
 
-        logger.info(f"Screenshot {screenshot_id} updated by {current_user.username}")
+        logger.info("Screenshot updated", extra={"screenshot_id": screenshot_id, "username": current_user.username})
         return await enrich_screenshot_with_usernames(screenshot, db)
 
     except Exception as e:
         await db.rollback()
-        logger.error(f"Failed to update screenshot {screenshot_id}: {e}")
+        logger.error("Failed to update screenshot", extra={"screenshot_id": screenshot_id, "error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update screenshot",
@@ -394,14 +394,14 @@ async def skip_screenshot(screenshot_id: int, db: DatabaseSession, current_user:
     screenshot = await get_screenshot_or_404(db, screenshot_id)
 
     old_status = screenshot.processing_status
-    logger.info(f"Screenshot {screenshot_id}: skip requested by {current_user.username}, current status={old_status}")
+    logger.info("Screenshot skip requested", extra={"screenshot_id": screenshot_id, "username": current_user.username, "status": str(old_status)})
 
     # Update the global processing status to skipped
     screenshot.processing_status = ProcessingStatus.SKIPPED
     await db.commit()
     await db.refresh(screenshot)
 
-    logger.info(f"Screenshot {screenshot_id}: skipped by {current_user.username}, old={old_status} -> new={screenshot.processing_status}")
+    logger.info("Screenshot skipped", extra={"screenshot_id": screenshot_id, "username": current_user.username, "old_status": str(old_status), "new_status": str(screenshot.processing_status)})
 
 
 class UnskipResponse(BaseModel):
@@ -419,17 +419,17 @@ async def unskip_screenshot(screenshot_id: int, db: DatabaseSession, current_use
     screenshot = await get_screenshot_or_404(db, screenshot_id)
 
     old_status = screenshot.processing_status
-    logger.info(f"Screenshot {screenshot_id}: unskip requested by {current_user.username}, current status={old_status}")
+    logger.info("Screenshot unskip requested", extra={"screenshot_id": screenshot_id, "username": current_user.username, "status": str(old_status)})
 
     if screenshot.processing_status != ProcessingStatus.SKIPPED:
-        logger.warning(f"Screenshot {screenshot_id}: cannot unskip, status is {old_status} not SKIPPED")
+        logger.warning("Cannot unskip screenshot", extra={"screenshot_id": screenshot_id, "status": str(old_status)})
         return UnskipResponse(success=False, message="Screenshot is not in skipped status")
 
     # Restore to completed status
     screenshot.processing_status = ProcessingStatus.COMPLETED
     await db.commit()
     await db.refresh(screenshot)
-    logger.info(f"Screenshot {screenshot_id}: unskipped by {current_user.username}, old={old_status} -> new={screenshot.processing_status}")
+    logger.info("Screenshot unskipped", extra={"screenshot_id": screenshot_id, "username": current_user.username, "old_status": str(old_status), "new_status": str(screenshot.processing_status)})
 
     return UnskipResponse(success=True, message="Screenshot has been restored to completed status")
 
@@ -457,7 +457,7 @@ async def verify_screenshot(
     """
     from sqlalchemy.orm.attributes import flag_modified
 
-    logger.info(f"Screenshot {screenshot_id}: verify requested by user_id={current_user.id} ({current_user.username})")
+    logger.info("Screenshot verify requested", extra={"screenshot_id": screenshot_id, "user_id": current_user.id, "username": current_user.username})
 
     # Use row lock to prevent race condition when multiple users verify simultaneously
     screenshot = await get_screenshot_for_update(db, screenshot_id)
@@ -465,7 +465,7 @@ async def verify_screenshot(
     try:
         # Initialize list if null - make a copy to avoid mutation issues
         old_verified_ids = list(screenshot.verified_by_user_ids or [])
-        logger.info(f"Screenshot {screenshot_id}: current verified_by_user_ids = {old_verified_ids}")
+        logger.info("Screenshot current verified_by_user_ids", extra={"screenshot_id": screenshot_id, "verified_by_user_ids": old_verified_ids})
 
         # Add user if not already verified
         if current_user.id not in old_verified_ids:
@@ -487,13 +487,13 @@ async def verify_screenshot(
 
         await db.commit()
         await db.refresh(screenshot)
-        logger.info(f"Screenshot {screenshot_id}: verified by {current_user.username}, old={old_verified_ids} -> new={screenshot.verified_by_user_ids}")
+        logger.info("Screenshot verified", extra={"screenshot_id": screenshot_id, "username": current_user.username, "old_verified_ids": old_verified_ids, "new_verified_ids": screenshot.verified_by_user_ids})
 
         return await enrich_screenshot_with_usernames(screenshot, db)
 
     except Exception as e:
         await db.rollback()
-        logger.error(f"Failed to verify screenshot {screenshot_id}: {e}")
+        logger.error("Failed to verify screenshot", extra={"screenshot_id": screenshot_id, "error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to verify screenshot",
@@ -507,7 +507,7 @@ async def unverify_screenshot(screenshot_id: int, db: DatabaseSession, current_u
     """
     from sqlalchemy.orm.attributes import flag_modified
 
-    logger.info(f"Screenshot {screenshot_id}: unverify requested by user_id={current_user.id} ({current_user.username})")
+    logger.info("Screenshot unverify requested", extra={"screenshot_id": screenshot_id, "user_id": current_user.id, "username": current_user.username})
 
     # Use row lock to prevent race condition when multiple users unverify simultaneously
     screenshot = await get_screenshot_for_update(db, screenshot_id)
@@ -515,7 +515,7 @@ async def unverify_screenshot(screenshot_id: int, db: DatabaseSession, current_u
     try:
         # Remove user from verified list
         old_verified_ids = list(screenshot.verified_by_user_ids or [])
-        logger.info(f"Screenshot {screenshot_id}: current verified_by_user_ids = {old_verified_ids}")
+        logger.info("Screenshot current verified_by_user_ids", extra={"screenshot_id": screenshot_id, "verified_by_user_ids": old_verified_ids})
 
         if current_user.id in old_verified_ids:
             new_verified_ids = [uid for uid in old_verified_ids if uid != current_user.id]
@@ -523,15 +523,15 @@ async def unverify_screenshot(screenshot_id: int, db: DatabaseSession, current_u
             flag_modified(screenshot, "verified_by_user_ids")  # Tell SQLAlchemy the field changed
             await db.commit()
             await db.refresh(screenshot)
-            logger.info(f"Screenshot {screenshot_id}: unverified by {current_user.username}, old={old_verified_ids} -> new={screenshot.verified_by_user_ids}")
+            logger.info("Screenshot unverified", extra={"screenshot_id": screenshot_id, "username": current_user.username, "old_verified_ids": old_verified_ids, "new_verified_ids": screenshot.verified_by_user_ids})
         else:
-            logger.warning(f"Screenshot {screenshot_id}: user_id={current_user.id} not in verified list {old_verified_ids}")
+            logger.warning("User not in verified list", extra={"screenshot_id": screenshot_id, "user_id": current_user.id, "verified_by_user_ids": old_verified_ids})
 
         return await enrich_screenshot_with_usernames(screenshot, db)
 
     except Exception as e:
         await db.rollback()
-        logger.error(f"Failed to unverify screenshot {screenshot_id}: {e}")
+        logger.error("Failed to unverify screenshot", extra={"screenshot_id": screenshot_id, "error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to unverify screenshot",
@@ -693,7 +693,7 @@ async def get_screenshot_image(screenshot_id: int, db: DatabaseSession):
         file_path.relative_to(upload_dir)
     except ValueError:
         # file_path is not relative to upload_dir - path traversal attempt
-        logger.warning(f"Path traversal attempt detected: {screenshot.file_path} is outside {upload_dir}")
+        logger.warning("Path traversal attempt detected", extra={"screenshot_id": screenshot_id, "file_path": screenshot.file_path, "upload_dir": str(upload_dir)})
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
     if not file_path.exists():
@@ -758,7 +758,7 @@ async def recalculate_ocr_total(screenshot_id: int, db: DatabaseSession, current
             screenshot.extracted_total = total.strip()
             await db.commit()
             await db.refresh(screenshot)
-            logger.info(f"Screenshot {screenshot_id}: Recalculated OCR total = '{total.strip()}'")
+            logger.info("Recalculated OCR total", extra={"screenshot_id": screenshot_id, "extracted_total": total.strip()})
             return RecalculateOcrResponse(
                 success=True,
                 extracted_total=total.strip(),
@@ -773,7 +773,7 @@ async def recalculate_ocr_total(screenshot_id: int, db: DatabaseSession, current
 
     except Exception as e:
         await db.rollback()
-        logger.error(f"Screenshot {screenshot_id}: Error recalculating OCR total - {e}")
+        logger.error("Error recalculating OCR total", extra={"screenshot_id": screenshot_id, "error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to recalculate OCR total: {str(e)}",
@@ -1212,7 +1212,7 @@ async def _process_single_upload(
                     verified_by_user_ids=None,
                 )
             )
-            logger.info(f"Duplicate upload: cleared all data for screenshot {screenshot_id}, reprocessing")
+            logger.info("Duplicate upload: cleared all data, reprocessing", extra={"screenshot_id": screenshot_id})
 
         await db.commit()
     except Exception as e:
@@ -1242,7 +1242,7 @@ async def _process_single_upload(
             process_screenshot_task.delay(screenshot_id)  # type: ignore[attr-defined]
             processing_queued = True
     except Exception as e:
-        logger.warning(f"Failed to queue processing for screenshot {screenshot_id}: {e}")
+        logger.warning("Failed to queue processing", extra={"screenshot_id": screenshot_id, "error": str(e)})
     timings["celery_queue"] = (time.perf_counter() - t1) * 1000
 
     total_ms = (time.perf_counter() - t0) * 1000
@@ -1627,7 +1627,7 @@ async def upload_screenshots_batch(
                         verified_by_user_ids=None,
                     )
                 )
-                logger.info(f"Batch upload: cleared all data for {len(dup_ids)} duplicates, reprocessing")
+                logger.info("Batch upload: cleared all data for duplicates, reprocessing", extra={"duplicate_count": len(dup_ids)})
 
             await db.commit()
 
@@ -1684,7 +1684,7 @@ async def upload_screenshots_batch(
                 )
             task_group.apply_async()
         except Exception as e:
-            logger.warning(f"Failed to queue processing tasks: {e}")
+            logger.warning("Failed to queue processing tasks", extra={"error": str(e)})
 
     timings["celery_queue"] = (time.perf_counter() - t1) * 1000
 
@@ -1768,7 +1768,7 @@ async def preprocess_screenshot(
             run_ocr_after=preprocess_request.run_ocr_after,
         )
 
-        logger.info(f"Screenshot {screenshot_id}: preprocessing queued by {current_user.username}")
+        logger.info("Preprocessing queued", extra={"screenshot_id": screenshot_id, "username": current_user.username})
         return BatchPreprocessResponse(
             queued_count=1,
             screenshot_ids=[screenshot_id],
@@ -1776,7 +1776,7 @@ async def preprocess_screenshot(
         )
 
     except Exception as e:
-        logger.error(f"Failed to queue preprocessing for screenshot {screenshot_id}: {e}")
+        logger.error("Failed to queue preprocessing", extra={"screenshot_id": screenshot_id, "error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to queue preprocessing: {e}",
@@ -1840,7 +1840,7 @@ async def preprocess_screenshots_batch(
         )
 
     except Exception as e:
-        logger.error(f"Failed to queue batch preprocessing: {e}")
+        logger.error("Failed to queue batch preprocessing", extra={"error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to queue batch preprocessing: {e}",
@@ -1948,7 +1948,7 @@ async def reset_stage(
     if reset_ids:
         await db.commit()
 
-    logger.info(f"Stage {stage} reset for {len(reset_ids)} screenshots by {current_user.username}")
+    logger.info("Stage reset for screenshots", extra={"stage": stage, "count": len(reset_ids), "username": current_user.username})
     return StagePreprocessResponse(
         queued_count=0,
         screenshot_ids=reset_ids,
@@ -1977,7 +1977,7 @@ async def run_device_detection_stage(
     task_group = celery_group(device_detection_task.s(sid) for sid in ids)
     task_group.apply_async()
 
-    logger.info(f"Device detection queued: {len(ids)} screenshots by {current_user.username}")
+    logger.info("Device detection queued", extra={"count": len(ids), "username": current_user.username})
     return StagePreprocessResponse(
         queued_count=len(ids), screenshot_ids=ids, stage="device_detection",
         message=f"Device detection queued for {len(ids)} screenshots",
@@ -2004,7 +2004,7 @@ async def run_cropping_stage(
     task_group = celery_group(cropping_task.s(sid) for sid in ids)
     task_group.apply_async()
 
-    logger.info(f"Cropping queued: {len(ids)} screenshots by {current_user.username}")
+    logger.info("Cropping queued", extra={"count": len(ids), "username": current_user.username})
     return StagePreprocessResponse(
         queued_count=len(ids), screenshot_ids=ids, stage="cropping",
         message=f"Cropping queued for {len(ids)} screenshots",
@@ -2031,7 +2031,7 @@ async def run_phi_detection_stage(
     task_group = celery_group(phi_detection_task.s(sid, preset=request.phi_pipeline_preset) for sid in ids)
     task_group.apply_async()
 
-    logger.info(f"PHI detection queued: {len(ids)} screenshots by {current_user.username}")
+    logger.info("PHI detection queued", extra={"count": len(ids), "username": current_user.username})
     return StagePreprocessResponse(
         queued_count=len(ids), screenshot_ids=ids, stage="phi_detection",
         message=f"PHI detection queued for {len(ids)} screenshots",
@@ -2058,7 +2058,7 @@ async def run_phi_redaction_stage(
     task_group = celery_group(phi_redaction_task.s(sid, method=request.phi_redaction_method) for sid in ids)
     task_group.apply_async()
 
-    logger.info(f"PHI redaction queued: {len(ids)} screenshots by {current_user.username}")
+    logger.info("PHI redaction queued", extra={"count": len(ids), "username": current_user.username})
     return StagePreprocessResponse(
         queued_count=len(ids), screenshot_ids=ids, stage="phi_redaction",
         message=f"PHI redaction queued for {len(ids)} screenshots",
@@ -2257,7 +2257,7 @@ async def upload_browser(
             successful += 1
 
         except Exception as e:
-            logger.error(f"Browser upload item {i} failed: {e}")
+            logger.error("Browser upload item failed", extra={"item_index": i, "error": str(e)})
             results.append(BrowserUploadItemResult(index=i, success=False, error=str(e)))
             failed += 1
 

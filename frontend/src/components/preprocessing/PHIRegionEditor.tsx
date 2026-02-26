@@ -317,6 +317,8 @@ export const PHIRegionEditor = ({
             ) : image ? (
               <canvas
                 ref={canvasRef}
+                role="img"
+                aria-label={`PHI region editor for screenshot ${screenshotId}. ${regions.length} regions marked. Use the toolbar to select Draw, Select, or Delete tools.`}
                 style={{ cursor: getCursor() }}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
@@ -421,14 +423,14 @@ export const PHIRegionEditor = ({
                 <button
                   onClick={handleSave}
                   disabled={isSaving}
-                  className="flex-1 px-3 py-2 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 disabled:opacity-50"
+                  className="flex-1 px-3 py-2 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200"
                 >
                   {isSaving ? "Saving..." : "Save Regions"}
                 </button>
                 <button
                   onClick={handleRedact}
                   disabled={isRedacting || regions.length === 0}
-                  className="flex-1 px-3 py-2 text-xs font-medium text-white bg-orange-600 rounded hover:bg-orange-700 disabled:opacity-50"
+                  className="flex-1 px-3 py-2 text-xs font-medium text-white bg-orange-600 rounded hover:bg-orange-700 disabled:bg-gray-400 disabled:text-gray-200"
                 >
                   {isRedacting ? "Redacting..." : "Apply Redaction"}
                 </button>

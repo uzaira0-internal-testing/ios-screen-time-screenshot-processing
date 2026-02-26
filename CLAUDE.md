@@ -369,21 +369,22 @@ Zustand stores in `frontend/src/store/` with React context for DI container acce
 
 The following items were identified during code reviews (see `docs/reviews/` folder) and should be addressed as time permits:
 
-### Priority: Soon
+### Completed
 
-| Item | Effort | Description |
-|------|--------|-------------|
-| Structured Logging | 2h | Add JSON-formatted logging for production log aggregation |
-| Remove duplicate hook | 30m | Remove legacy `hooks/useAnnotation.ts` (replaced by `useAnnotationWithDI.ts`) |
+| Item | Description |
+|------|-------------|
+| ~~Structured Logging~~ | Converted ~100 f-string log calls to structured `extra={}` format across 13 backend files |
+| ~~Remove duplicate hook~~ | Legacy `hooks/useAnnotation.ts` already removed (replaced by `useAnnotationWithDI.ts`) |
+| ~~Split large store~~ | `createAnnotationStore.ts` already split into 5 Zustand slices |
+| ~~Accessibility~~ | ARIA labels on grid canvas/PHI editor, improved disabled button contrast (WCAG AA) |
+| ~~Extract repository~~ | `ScreenshotRepository` already exists (568 lines) |
+| ~~Split processing service~~ | `preprocessing_service.py` split into `preprocessing/` package (device_and_crop, phi, pipeline) |
 
 ### Priority: Medium
 
 | Item | Effort | Description |
 |------|--------|-------------|
-| Split large store | 4h | Split `createAnnotationStore.ts` (1131 lines) into Zustand slices |
-| Accessibility | 4h | Add ARIA labels to grid canvas, improve contrast on disabled states |
-| Extract repository | 4h | Move database queries from routes to a dedicated `ScreenshotRepository` class |
-| Split processing service | 4h | Split `processing_service.py` (673 lines) into focused services |
+| Extract more DB queries to repository | 8h | Routes still have ~58 direct DB queries — migrate to `ScreenshotRepository` |
 
 ### Notes
 

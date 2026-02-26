@@ -138,7 +138,8 @@ async def create_or_update_annotation(
         if existing:
             # UPDATE existing annotation
             logger.info(
-                f"User {current_user.username} updating annotation {existing.id} for screenshot {screenshot.id}"
+                "User updating annotation",
+                extra={"username": current_user.username, "annotation_id": existing.id, "screenshot_id": screenshot.id},
             )
             # Capture old values for audit log
             old_values = annotation_to_dict(existing)
@@ -177,7 +178,7 @@ async def create_or_update_annotation(
             return AnnotationRead.model_validate(existing)
         else:
             # CREATE new annotation
-            logger.info(f"User {current_user.username} creating annotation for screenshot {screenshot.id}")
+            logger.info("User creating annotation", extra={"username": current_user.username, "screenshot_id": screenshot.id})
             grid_upper_left_dict, grid_lower_right_dict = convert_grid_coords_to_dicts(annotation_data)
 
             new_annotation = Annotation(
@@ -218,8 +219,8 @@ async def create_or_update_annotation(
             await db.refresh(new_annotation)
 
             logger.info(
-                f"Annotation {new_annotation.id} created by {current_user.username} "
-                f"for screenshot {screenshot.id} (count: {screenshot.current_annotation_count})"
+                "Annotation created",
+                extra={"annotation_id": new_annotation.id, "username": current_user.username, "screenshot_id": screenshot.id, "annotation_count": screenshot.current_annotation_count},
             )
 
             if screenshot.current_annotation_count >= 2:
@@ -232,7 +233,7 @@ async def create_or_update_annotation(
         raise
     except Exception as e:
         await db.rollback()
-        logger.error(f"Failed to save annotation for screenshot {annotation_data.screenshot_id}: {e}")
+        logger.error("Failed to save annotation", extra={"screenshot_id": annotation_data.screenshot_id, "error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to save annotation",
@@ -323,7 +324,7 @@ async def update_annotation(
         await db.commit()
         await db.refresh(annotation)
 
-        logger.info(f"User {current_user.username} updated annotation {annotation_id}")
+        logger.info("User updated annotation", extra={"username": current_user.username, "annotation_id": annotation_id})
 
         if annotation.screenshot_id:
             # Lock the screenshot before consensus analysis to prevent race conditions
@@ -337,7 +338,7 @@ async def update_annotation(
         raise
     except Exception as e:
         await db.rollback()
-        logger.error(f"Failed to update annotation {annotation_id}: {e}")
+        logger.error("Failed to update annotation", extra={"annotation_id": annotation_id, "error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update annotation",
@@ -387,13 +388,13 @@ async def delete_annotation(annotation_id: int, db: DatabaseSession, current_use
 
         await db.commit()
 
-        logger.info(f"User {current_user.username} deleted annotation {annotation_id} for screenshot {screenshot_id}")
+        logger.info("User deleted annotation", extra={"username": current_user.username, "annotation_id": annotation_id, "screenshot_id": screenshot_id})
 
     except HTTPException:
         raise
     except Exception as e:
         await db.rollback()
-        logger.error(f"Failed to delete annotation {annotation_id}: {e}")
+        logger.error("Failed to delete annotation", extra={"annotation_id": annotation_id, "error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete annotation",

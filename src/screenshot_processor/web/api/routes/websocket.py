@@ -61,11 +61,11 @@ async def websocket_endpoint(websocket: WebSocket, token: str | None = None):
             if data == "ping":
                 await websocket.send_json({"type": "pong", "timestamp": ""})
             else:
-                logger.debug(f"Received message from user {user_id}: {data}")
+                logger.debug("Received message from user", extra={"user_id": user_id})
 
     except WebSocketDisconnect:
         username = manager.disconnect(user_id)
-        logger.info(f"User {user_id} ({username}) disconnected normally")
+        logger.info("User disconnected normally", extra={"user_id": user_id, "username": username})
 
         from screenshot_processor.web.websocket import WebSocketEvent
 
@@ -81,7 +81,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str | None = None):
         )
 
     except Exception as e:
-        logger.error(f"Error in WebSocket connection for user {user_id}: {e}")
+        logger.error("Error in WebSocket connection", extra={"user_id": user_id, "error": str(e)})
         manager.disconnect(user_id)
 
 

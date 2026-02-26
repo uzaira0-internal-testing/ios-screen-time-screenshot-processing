@@ -74,12 +74,12 @@ class ScreenshotService:
         try:
             file_path = screenshot.file_path
             if not Path(file_path).exists():
-                logger.warning(f"Screenshot {screenshot.id}: File not found at {file_path}")
+                logger.warning("Screenshot file not found", extra={"screenshot_id": screenshot.id, "file_path": file_path})
                 return False
 
             img = cv2.imread(file_path)
             if img is None:
-                logger.warning(f"Screenshot {screenshot.id}: Could not read image at {file_path}")
+                logger.warning("Could not read screenshot image", extra={"screenshot_id": screenshot.id, "file_path": file_path})
                 return False
 
             img = convert_dark_mode(img)
@@ -88,11 +88,11 @@ class ScreenshotService:
             if total and total.strip():
                 screenshot.extracted_total = total.strip()
                 await self.db.commit()
-                logger.info(f"Screenshot {screenshot.id}: Auto-extracted OCR total = '{total.strip()}'")
+                logger.info("Auto-extracted OCR total", extra={"screenshot_id": screenshot.id, "extracted_total": total.strip()})
                 return True
 
         except Exception as e:
-            logger.error(f"Screenshot {screenshot.id}: Error auto-extracting OCR total - {e}")
+            logger.error("Error auto-extracting OCR total", extra={"screenshot_id": screenshot.id, "error": str(e)})
 
         return False
 
@@ -120,14 +120,14 @@ class ScreenshotService:
                 screenshot.extracted_total = total.strip()
                 await self.db.commit()
                 await self.db.refresh(screenshot)
-                logger.info(f"Screenshot {screenshot.id}: Recalculated OCR total = '{total.strip()}'")
+                logger.info("Recalculated OCR total", extra={"screenshot_id": screenshot.id, "extracted_total": total.strip()})
                 return True, total.strip(), "OCR total recalculated successfully"
             else:
                 return False, None, "No total found in image"
 
         except Exception as e:
             await self.db.rollback()
-            logger.error(f"Screenshot {screenshot.id}: Error recalculating OCR total - {e}")
+            logger.error("Error recalculating OCR total", extra={"screenshot_id": screenshot.id, "error": str(e)})
             raise
 
     # =========================================================================

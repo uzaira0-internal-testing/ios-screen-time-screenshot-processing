@@ -121,7 +121,7 @@ class QueueService:
                     await db.rollback()
                 except Exception as e:
                     # Unexpected error - log and rollback
-                    logger.warning(f"Failed to create queue state: {e}")
+                    logger.warning("Failed to create queue state", extra={"error": str(e)})
                     await db.rollback()
 
         return screenshot

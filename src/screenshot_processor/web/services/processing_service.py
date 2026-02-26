@@ -83,7 +83,7 @@ def process_screenshot_file(
             detection_method = GridDetectionMethod.LINE_BASED
 
     # Process
-    logger.info(f"Processing {file_path}: method={detection_method.value}, fallback={use_fallback}, max_shift={max_shift}")
+    logger.info("Processing screenshot file", extra={"file_path": file_path, "method": detection_method.value, "fallback": use_fallback, "max_shift": max_shift})
     result = service.process(
         image_path=file_path,
         image_type=image_type,
@@ -97,7 +97,7 @@ def process_screenshot_file(
     # Fallback to OCR-anchored only if line-based found no grid coords
     has_grid_coords = result.grid_bounds is not None
     if use_fallback and not has_grid_coords and result.processing_status != "skipped":
-        logger.info(f"Line-based found no grid coords for {file_path}, falling back to OCR-anchored")
+        logger.info("Line-based found no grid coords, falling back to OCR-anchored", extra={"file_path": file_path})
         result = service.process(
             image_path=file_path,
             image_type=image_type,
@@ -175,7 +175,7 @@ async def process_screenshot_async(
     # Block if current user already verified
     if current_user_id and screenshot.verified_by_user_ids:
         if current_user_id in screenshot.verified_by_user_ids:
-            logger.info(f"Screenshot {screenshot.id} verified by user {current_user_id}, skipping")
+            logger.info("Screenshot verified by user, skipping reprocess", extra={"screenshot_id": screenshot.id, "user_id": current_user_id})
             return {
                 "success": False,
                 "skipped": True,

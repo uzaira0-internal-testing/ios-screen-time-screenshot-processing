@@ -117,7 +117,7 @@ async def health_check(db: AsyncSession = Depends(get_db), include_celery: bool 
         await db.execute(text("SELECT 1"))
         checks_dict["database"] = "ok"
     except Exception as e:
-        logger.error(f"Health check - database error: {e}")
+        logger.error("Health check - database error", extra={"error": str(e)})
         health_status = "unhealthy"
         checks_dict["database"] = f"error: {str(e)}"
 
@@ -135,7 +135,7 @@ async def health_check(db: AsyncSession = Depends(get_db), include_celery: bool 
                 checks_dict["celery"] = "no workers available"
                 # Don't mark unhealthy - Celery may be optional
         except Exception as e:
-            logger.warning(f"Health check - celery error: {e}")
+            logger.warning("Health check - celery error", extra={"error": str(e)})
             checks_dict["celery"] = f"error: {str(e)}"
 
     # Return appropriate status code

@@ -68,7 +68,7 @@ export const StageSummaryBar = () => {
   const prevStageLabel = stageIdx > 0 ? STAGE_LABELS[STAGE_ORDER[stageIdx - 1]!] : null;
 
   return (
-    <div className="flex flex-wrap items-center gap-2 p-3 bg-gray-50 rounded-lg">
+    <div className="flex flex-wrap items-center gap-2 p-3 bg-gray-50 rounded-lg" role="toolbar" aria-label="Preprocessing stage controls">
       {/* Filter toggles */}
       <div className="flex items-center gap-1">
         {FILTER_DEFS.map((f) => {
@@ -127,7 +127,7 @@ export const StageSummaryBar = () => {
       <button
         onClick={() => runStage(activeStage)}
         disabled={isRunningStage || eligible === 0}
-        className={`${eligible === 0 && counts.completed > 0 ? "" : "ml-auto "}px-4 py-1.5 bg-primary-600 text-white text-sm font-medium rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
+        className={`${eligible === 0 && counts.completed > 0 ? "" : "ml-auto "}px-4 py-1.5 bg-primary-600 text-white text-sm font-medium rounded-md hover:bg-primary-700 disabled:bg-gray-400 disabled:text-gray-200 disabled:cursor-not-allowed transition-colors`}
       >
         {isRunningStage
           ? "Running..."

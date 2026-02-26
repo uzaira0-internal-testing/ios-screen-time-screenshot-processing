@@ -42,7 +42,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 )
 def process_screenshot_task(self, screenshot_id: int, max_shift: int = 5) -> dict:
     """Process a screenshot with grid optimization."""
-    logger.info(f"Processing screenshot {screenshot_id} with max_shift={max_shift}")
+    logger.info("Processing screenshot", extra={"screenshot_id": screenshot_id, "max_shift": max_shift})
 
     db = SessionLocal()
     try:
@@ -59,7 +59,7 @@ def process_screenshot_task(self, screenshot_id: int, max_shift: int = 5) -> dic
 
     except SoftTimeLimitExceeded:
         # Task timed out - mark as FAILED so it doesn't stay stuck in PROCESSING
-        logger.error(f"Screenshot {screenshot_id} timed out after {SOFT_TIME_LIMIT}s")
+        logger.error("Screenshot timed out", extra={"screenshot_id": screenshot_id, "timeout_seconds": SOFT_TIME_LIMIT})
         try:
             screenshot = db.query(Screenshot).filter(Screenshot.id == screenshot_id).first()
             if screenshot:
@@ -67,14 +67,14 @@ def process_screenshot_task(self, screenshot_id: int, max_shift: int = 5) -> dic
                 screenshot.processing_issues = [f"Processing timed out after {SOFT_TIME_LIMIT} seconds"]
                 screenshot.processed_at = datetime.now(timezone.utc)
                 db.commit()
-                logger.info(f"Marked screenshot {screenshot_id} as FAILED due to timeout")
+                logger.info("Marked screenshot as FAILED due to timeout", extra={"screenshot_id": screenshot_id})
         except Exception as db_err:
-            logger.error(f"Failed to mark screenshot {screenshot_id} as FAILED: {db_err}")
+            logger.error("Failed to mark screenshot as FAILED", extra={"screenshot_id": screenshot_id, "error": str(db_err)})
         return {"success": False, "error": "timeout", "screenshot_id": screenshot_id}
 
     except Exception as e:
         db.rollback()
-        logger.error(f"Error processing screenshot {screenshot_id}: {e}")
+        logger.error("Error processing screenshot", extra={"screenshot_id": screenshot_id, "error": str(e)})
         try:
             self.retry(exc=e)
         except self.MaxRetriesExceededError:
@@ -85,9 +85,9 @@ def process_screenshot_task(self, screenshot_id: int, max_shift: int = 5) -> dic
                     screenshot.processing_status = ProcessingStatus.FAILED
                     screenshot.processing_issues = [f"Max retries exceeded: {str(e)}"]
                     db.commit()
-                    logger.info(f"Marked screenshot {screenshot_id} as FAILED after max retries")
+                    logger.info("Marked screenshot as FAILED after max retries", extra={"screenshot_id": screenshot_id})
             except Exception as db_err:
-                logger.error(f"Failed to mark screenshot {screenshot_id} as FAILED: {db_err}")
+                logger.error("Failed to mark screenshot as FAILED", extra={"screenshot_id": screenshot_id, "error": str(db_err)})
             return {"success": False, "error": str(e), "max_retries_exceeded": True}
     finally:
         db.close()
@@ -104,7 +104,7 @@ def reprocess_screenshot_task(
     self, screenshot_id: int, processing_method: str | None = None, max_shift: int = 5
 ) -> dict:
     """Reprocess a screenshot with optional specific method and grid optimization."""
-    logger.info(f"Reprocessing screenshot {screenshot_id} with method={processing_method}, max_shift={max_shift}")
+    logger.info("Reprocessing screenshot", extra={"screenshot_id": screenshot_id, "processing_method": processing_method, "max_shift": max_shift})
 
     db = SessionLocal()
     try:
@@ -123,7 +123,7 @@ def reprocess_screenshot_task(
 
     except SoftTimeLimitExceeded:
         # Task timed out - mark as FAILED so it doesn't stay stuck in PROCESSING
-        logger.error(f"Screenshot {screenshot_id} timed out after {SOFT_TIME_LIMIT}s")
+        logger.error("Screenshot timed out during reprocessing", extra={"screenshot_id": screenshot_id, "timeout_seconds": SOFT_TIME_LIMIT})
         try:
             screenshot = db.query(Screenshot).filter(Screenshot.id == screenshot_id).first()
             if screenshot:
@@ -131,14 +131,14 @@ def reprocess_screenshot_task(
                 screenshot.processing_issues = [f"Processing timed out after {SOFT_TIME_LIMIT} seconds"]
                 screenshot.processed_at = datetime.now(timezone.utc)
                 db.commit()
-                logger.info(f"Marked screenshot {screenshot_id} as FAILED due to timeout")
+                logger.info("Marked screenshot as FAILED due to timeout", extra={"screenshot_id": screenshot_id})
         except Exception as db_err:
-            logger.error(f"Failed to mark screenshot {screenshot_id} as FAILED: {db_err}")
+            logger.error("Failed to mark screenshot as FAILED", extra={"screenshot_id": screenshot_id, "error": str(db_err)})
         return {"success": False, "error": "timeout", "screenshot_id": screenshot_id}
 
     except Exception as e:
         db.rollback()
-        logger.error(f"Error reprocessing screenshot {screenshot_id}: {e}")
+        logger.error("Error reprocessing screenshot", extra={"screenshot_id": screenshot_id, "error": str(e)})
         try:
             self.retry(exc=e)
         except self.MaxRetriesExceededError:
@@ -149,9 +149,9 @@ def reprocess_screenshot_task(
                     screenshot.processing_status = ProcessingStatus.FAILED
                     screenshot.processing_issues = [f"Max retries exceeded: {str(e)}"]
                     db.commit()
-                    logger.info(f"Marked screenshot {screenshot_id} as FAILED after max retries")
+                    logger.info("Marked screenshot as FAILED after max retries", extra={"screenshot_id": screenshot_id})
             except Exception as db_err:
-                logger.error(f"Failed to mark screenshot {screenshot_id} as FAILED: {db_err}")
+                logger.error("Failed to mark screenshot as FAILED", extra={"screenshot_id": screenshot_id, "error": str(db_err)})
             return {"success": False, "error": str(e), "max_retries_exceeded": True}
     finally:
         db.close()
@@ -177,7 +177,7 @@ def preprocess_screenshot_task(
         phi_detection_enabled: Override whether to run PHI detection
         run_ocr_after: Whether to chain into OCR processing after preprocessing (default True)
     """
-    logger.info(f"Preprocessing screenshot {screenshot_id}")
+    logger.info("Preprocessing screenshot", extra={"screenshot_id": screenshot_id})
 
     db = SessionLocal()
     try:
@@ -200,7 +200,8 @@ def preprocess_screenshot_task(
 
         if not preprocess_result.get("success"):
             logger.warning(
-                f"Preprocessing failed for screenshot {screenshot_id}: {preprocess_result.get('skip_reason')}"
+                "Preprocessing failed for screenshot",
+                extra={"screenshot_id": screenshot_id, "skip_reason": preprocess_result.get("skip_reason")},
             )
             # Still proceed to OCR with original image if run_ocr_after is True
 
@@ -232,7 +233,7 @@ def preprocess_screenshot_task(
 
     except Exception as e:
         db.rollback()
-        logger.error(f"Error preprocessing screenshot {screenshot_id}: {e}")
+        logger.error("Error preprocessing screenshot", extra={"screenshot_id": screenshot_id, "error": str(e)})
         try:
             self.retry(exc=e)
         except self.MaxRetriesExceededError:
@@ -269,7 +270,7 @@ def device_detection_task(self, screenshot_id: int) -> dict:
         set_stage_running,
     )
 
-    logger.info(f"Device detection for screenshot {screenshot_id}")
+    logger.info("Device detection for screenshot", extra={"screenshot_id": screenshot_id, "stage": "device_detection"})
     db = SessionLocal()
     try:
         screenshot = db.query(Screenshot).filter(Screenshot.id == screenshot_id).first()
@@ -311,7 +312,7 @@ def device_detection_task(self, screenshot_id: int) -> dict:
 
     except Exception as e:
         db.rollback()
-        logger.error(f"Device detection failed for screenshot {screenshot_id}: {e}")
+        logger.error("Device detection failed", extra={"screenshot_id": screenshot_id, "stage": "device_detection", "error": str(e)})
         try:
             screenshot = db.query(Screenshot).filter(Screenshot.id == screenshot_id).first()
             if screenshot:
@@ -351,7 +352,7 @@ def cropping_task(self, screenshot_id: int) -> dict:
         set_stage_running,
     )
 
-    logger.info(f"Cropping for screenshot {screenshot_id}")
+    logger.info("Cropping for screenshot", extra={"screenshot_id": screenshot_id, "stage": "cropping"})
     db = SessionLocal()
     try:
         screenshot = db.query(Screenshot).filter(Screenshot.id == screenshot_id).first()
@@ -437,7 +438,7 @@ def cropping_task(self, screenshot_id: int) -> dict:
 
     except Exception as e:
         db.rollback()
-        logger.error(f"Cropping failed for screenshot {screenshot_id}: {e}")
+        logger.error("Cropping failed", extra={"screenshot_id": screenshot_id, "stage": "cropping", "error": str(e)})
         try:
             screenshot = db.query(Screenshot).filter(Screenshot.id == screenshot_id).first()
             if screenshot:
@@ -475,7 +476,7 @@ def phi_detection_task(self, screenshot_id: int, preset: str = "screen_time") ->
         set_stage_running,
     )
 
-    logger.info(f"PHI detection for screenshot {screenshot_id} with preset={preset}")
+    logger.info("PHI detection for screenshot", extra={"screenshot_id": screenshot_id, "stage": "phi_detection", "preset": preset})
     db = SessionLocal()
     try:
         screenshot = db.query(Screenshot).filter(Screenshot.id == screenshot_id).first()
@@ -510,7 +511,7 @@ def phi_detection_task(self, screenshot_id: int, preset: str = "screen_time") ->
 
     except Exception as e:
         db.rollback()
-        logger.error(f"PHI detection failed for screenshot {screenshot_id}: {e}")
+        logger.error("PHI detection failed", extra={"screenshot_id": screenshot_id, "stage": "phi_detection", "error": str(e)})
         try:
             screenshot = db.query(Screenshot).filter(Screenshot.id == screenshot_id).first()
             if screenshot:
@@ -549,7 +550,7 @@ def phi_redaction_task(self, screenshot_id: int, method: str = "redbox") -> dict
         set_stage_running,
     )
 
-    logger.info(f"PHI redaction for screenshot {screenshot_id} with method={method}")
+    logger.info("PHI redaction for screenshot", extra={"screenshot_id": screenshot_id, "stage": "phi_redaction", "method": method})
     db = SessionLocal()
     try:
         screenshot = db.query(Screenshot).filter(Screenshot.id == screenshot_id).first()
@@ -610,7 +611,7 @@ def phi_redaction_task(self, screenshot_id: int, method: str = "redbox") -> dict
 
     except Exception as e:
         db.rollback()
-        logger.error(f"PHI redaction failed for screenshot {screenshot_id}: {e}")
+        logger.error("PHI redaction failed", extra={"screenshot_id": screenshot_id, "stage": "phi_redaction", "error": str(e)})
         try:
             screenshot = db.query(Screenshot).filter(Screenshot.id == screenshot_id).first()
             if screenshot:
