@@ -2148,6 +2148,16 @@ export interface components {
              * @default screen_time
              */
             phi_pipeline_preset: string;
+            /**
+             * Llm Endpoint
+             * @description LLM API endpoint for assisted detection
+             */
+            llm_endpoint?: string | null;
+            /**
+             * Llm Model
+             * @description LLM model name (e.g. gpt-oss-20b)
+             */
+            llm_model?: string | null;
         };
         /**
          * PHIRedactionStageRequest
