@@ -1,6 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { usePreprocessingStore } from "@/store/preprocessingStore";
+import type { Stage, PageMode } from "@/store/preprocessingStore";
 import { PreprocessingWizard } from "@/components/preprocessing/PreprocessingWizard";
 import { StageSummaryBar } from "@/components/preprocessing/StageSummaryBar";
 import { DeviceDetectionTab } from "@/components/preprocessing/DeviceDetectionTab";
@@ -12,7 +13,7 @@ import { BrowserUpload } from "@/components/preprocessing/BrowserUpload";
 import { api } from "@/services/apiClient";
 
 export const PreprocessingPage = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const groups = usePreprocessingStore((s) => s.groups);
   const selectedGroupId = usePreprocessingStore((s) => s.selectedGroupId);
   const setSelectedGroupId = usePreprocessingStore((s) => s.setSelectedGroupId);
@@ -39,14 +40,28 @@ export const PreprocessingPage = () => {
     return () => stopPolling();
   }, [loadGroups, stopPolling]);
 
-  // Handle deep-link query params
+  const VALID_STAGES = ["device_detection", "cropping", "phi_detection", "phi_redaction"];
+  const VALID_MODES = ["upload", "pipeline"];
+
+  // Restore state from URL params on mount
   useEffect(() => {
+    const stageParam = searchParams.get("stage");
+    const modeParam = searchParams.get("mode");
+    const groupParam = searchParams.get("group");
     const screenshotId = searchParams.get("screenshot_id");
-    const stage = searchParams.get("stage");
     const returnUrlParam = searchParams.get("returnUrl");
 
     if (returnUrlParam) {
       setReturnUrl(returnUrlParam);
+    }
+    if (modeParam && VALID_MODES.includes(modeParam)) {
+      setPageMode(modeParam as PageMode);
+    }
+    if (stageParam && VALID_STAGES.includes(stageParam)) {
+      setActiveStage(stageParam as Stage);
+    }
+    if (groupParam) {
+      setSelectedGroupId(groupParam);
     }
 
     if (screenshotId) {
@@ -60,8 +75,8 @@ export const PreprocessingPage = () => {
           setHighlightedScreenshotId(id);
 
           // Navigate to specified stage or first incomplete/invalidated stage
-          if (stage && ["device_detection", "cropping", "phi_detection", "phi_redaction"].includes(stage)) {
-            setActiveStage(stage as typeof activeStage);
+          if (stageParam && VALID_STAGES.includes(stageParam)) {
+            setActiveStage(stageParam as Stage);
           } else {
             // Find first problematic stage from preprocessing metadata
             const pp = (screenshot?.processing_metadata as Record<string, unknown>)?.preprocessing as Record<string, unknown> | undefined;
@@ -81,7 +96,26 @@ export const PreprocessingPage = () => {
         });
       }
     }
-  }, [searchParams, setSelectedGroupId, setHighlightedScreenshotId, setActiveStage, setReturnUrl]);
+    // Only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Sync active stage, page mode, and group to URL (without triggering full re-render)
+  const syncToUrl = useCallback(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("stage", activeStage);
+      next.set("mode", pageMode);
+      if (selectedGroupId) {
+        next.set("group", selectedGroupId);
+      }
+      return next;
+    }, { replace: true });
+  }, [activeStage, pageMode, selectedGroupId, setSearchParams]);
+
+  useEffect(() => {
+    syncToUrl();
+  }, [syncToUrl]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
@@ -166,6 +200,7 @@ export const PreprocessingPage = () => {
                     onChange={(e) => setPhiPreset(e.target.value)}
                     className="text-sm border border-gray-300 rounded-md px-2 py-1"
                   >
+                    <option value="screen_time">Screen Time</option>
                     <option value="fast">Fast</option>
                     <option value="balanced">Balanced</option>
                     <option value="hipaa_compliant">HIPAA Compliant</option>

@@ -190,10 +190,11 @@ export const UploadTagTable = ({
                 <td className="px-3 py-1.5">
                   <button
                     onClick={() => removeItem(i)}
-                    className="text-gray-400 hover:text-red-500 text-xs"
-                    title="Remove"
+                    className="text-gray-400 hover:text-red-500 text-sm leading-none"
+                    title="Remove file"
+                    aria-label={`Remove ${item.filename}`}
                   >
-                    x
+                    &times;
                   </button>
                 </td>
               </tr>

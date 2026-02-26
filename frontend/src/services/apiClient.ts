@@ -574,6 +574,26 @@ export const api = {
       return response.json();
     },
 
+    async resetStage(stage: string, groupId: string) {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/screenshots/preprocess-stage/reset`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Username": localStorage.getItem("username") || "",
+            "X-Site-Password": localStorage.getItem("sitePassword") || "",
+          },
+          body: JSON.stringify({ stage, group_id: groupId }),
+        },
+      );
+      if (!response.ok) {
+        const detail = await response.text();
+        throw new Error(detail || "Failed to reset stage");
+      }
+      return response.json();
+    },
+
     async invalidateFromStage(screenshotId: number, stage: string) {
       const response = await fetch(
         `${API_BASE_URL}/api/v1/screenshots/${screenshotId}/invalidate-from-stage`,

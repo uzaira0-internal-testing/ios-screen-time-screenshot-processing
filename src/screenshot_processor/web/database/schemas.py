@@ -540,7 +540,7 @@ class PreprocessRequest(BaseModel):
     """Request to run preprocessing on a single screenshot."""
 
     phi_pipeline_preset: str = Field(
-        default="hipaa_compliant",
+        default="screen_time",
         description="PHI detection pipeline preset: fast, balanced, hipaa_compliant, thorough",
     )
     phi_redaction_method: str = Field(
@@ -565,7 +565,7 @@ class BatchPreprocessRequest(BaseModel):
         default=None,
         description="Specific screenshot IDs to preprocess. If None, all screenshots in the group are processed.",
     )
-    phi_pipeline_preset: str = Field(default="hipaa_compliant")
+    phi_pipeline_preset: str = Field(default="screen_time")
     phi_redaction_method: str = Field(default="redbox")
     phi_detection_enabled: bool = Field(default=True)
     run_ocr_after: bool = Field(default=False)
@@ -607,12 +607,16 @@ class StagePreprocessRequest(BaseModel):
         default=None,
         description="Required if screenshot_ids is None.",
     )
+    stage: str | None = Field(
+        default=None,
+        description="Stage name (used by reset endpoint).",
+    )
 
 
 class PHIDetectionStageRequest(StagePreprocessRequest):
     """PHI detection stage with preset."""
 
-    phi_pipeline_preset: str = Field(default="hipaa_compliant")
+    phi_pipeline_preset: str = Field(default="screen_time")
 
 
 class PHIRedactionStageRequest(StagePreprocessRequest):

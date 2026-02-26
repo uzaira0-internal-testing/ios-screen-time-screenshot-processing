@@ -96,6 +96,7 @@ interface PreprocessingState {
   loadScreenshots: () => Promise<void>;
   loadSummary: () => Promise<void>;
   runStage: (stage: Stage, screenshotIds?: number[]) => Promise<void>;
+  resetStage: (stage: Stage) => Promise<void>;
   invalidateFromStage: (screenshotId: number, stage: string) => Promise<void>;
   loadEventLog: (screenshotId: number) => Promise<void>;
   clearEventLog: () => void;
@@ -119,6 +120,7 @@ interface PreprocessingState {
   getScreenshotsForStage: (stage: Stage) => Screenshot[];
   getScreenshotStageStatus: (screenshot: Screenshot, stage: Stage) => StageStatus;
   isScreenshotException: (screenshot: Screenshot, stage: Stage) => boolean;
+  getEligibleCount: (stage: Stage) => { eligible: number; blockedByPrereq: number };
 }
 
 export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
@@ -132,7 +134,7 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
   isRunningStage: false,
   stageProgress: null,
   filter: "all",
-  phiPreset: "hipaa_compliant",
+  phiPreset: "screen_time",
   redactionMethod: "redbox",
   selectedScreenshotId: null,
   eventLog: null,
@@ -186,11 +188,13 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
       return;
     }
 
-    set({ isLoading: true });
+    // Only show loading spinner on initial load, not background refreshes
+    const isInitialLoad = get().screenshots.length === 0;
+    if (isInitialLoad) set({ isLoading: true });
     try {
       const data = await api.screenshots.list({
         group_id: selectedGroupId,
-        page_size: 500,
+        page_size: 5000,
         sort_by: "id",
         sort_order: "asc",
       });
@@ -199,9 +203,9 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
       }
     } catch (err) {
       console.error("Failed to load screenshots:", err);
-      toast.error("Failed to load screenshots");
+      if (isInitialLoad) toast.error("Failed to load screenshots");
     } finally {
-      set({ isLoading: false });
+      if (isInitialLoad) set({ isLoading: false });
     }
   },
 
@@ -213,6 +217,22 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
       const data = await api.preprocessing.getSummary(selectedGroupId);
       if (data) {
         set({ summary: data as PreprocessingSummaryData });
+
+        // Auto-detect running tasks and start polling if not already polling
+        const summaryData = data as PreprocessingSummaryData;
+        const activeStage = get().activeStage;
+        const stageSummary = summaryData[activeStage];
+        const alreadyPolling = get()._pollInterval !== null;
+        if (stageSummary && stageSummary.running > 0 && !alreadyPolling) {
+          const total = stageSummary.running + stageSummary.completed + stageSummary.pending;
+          set({
+            isRunningStage: true,
+            stageProgress: { completed: stageSummary.completed, total },
+            _pollCount: 0,
+            _queuedCount: total,
+          });
+          get().startPolling();
+        }
       }
     } catch (err) {
       console.error("Failed to load preprocessing summary:", err);
@@ -250,6 +270,20 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
       console.error(`Failed to run ${stage}:`, err);
       toast.error(`Failed to queue ${stage}`);
       set({ isRunningStage: false });
+    }
+  },
+
+  resetStage: async (stage) => {
+    const { selectedGroupId } = get();
+    if (!selectedGroupId) return;
+    try {
+      const result = await api.preprocessing.resetStage(stage, selectedGroupId);
+      toast.success(result.message || `Stage ${stage.replace(/_/g, " ")} reset`);
+      await get().loadScreenshots();
+      await get().loadSummary();
+    } catch (err) {
+      console.error("Failed to reset stage:", err);
+      toast.error("Failed to reset stage");
     }
   },
 
@@ -357,28 +391,33 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
     const interval = setInterval(async () => {
       set({ _pollCount: get()._pollCount + 1 });
       await get().loadSummary();
+      await get().loadScreenshots();
       const summary = get().summary;
       if (summary) {
         const stage = get().activeStage;
         const stageSummary = summary[stage];
         const pollCount = get()._pollCount;
+        const queuedCount = get()._queuedCount;
+        // Check how many have completed vs what was queued
+        const completedSoFar = stageSummary ? stageSummary.completed : 0;
         // Wait at least 3 polls (6s) before concluding "done" to give
         // Celery workers time to pick up tasks and set status to "running"
         const minPollsBeforeComplete = 3;
-        if (
-          stageSummary &&
+        const allDone = stageSummary &&
           stageSummary.running === 0 &&
-          pollCount >= minPollsBeforeComplete
-        ) {
+          pollCount >= minPollsBeforeComplete &&
+          // Only stop if completed count actually increased from the queued batch,
+          // or if there's truly nothing pending/running for this stage
+          (stageSummary.pending === 0 || completedSoFar >= queuedCount);
+        if (allDone) {
           // Done — refresh everything and stop polling
           get().stopPolling();
-          await get().loadScreenshots();
           set({ isRunningStage: false, stageProgress: null });
         } else if (stageSummary) {
           set({
             stageProgress: {
-              completed: stageSummary.completed,
-              total: summary.total,
+              completed: completedSoFar,
+              total: queuedCount || summary.total,
             },
           });
         }
@@ -474,6 +513,28 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
       if (result.phi_detected && !result.redacted) return true;
     }
     return false;
+  },
+
+  getEligibleCount: (stage) => {
+    const { screenshots } = get();
+    const stageIdx = STAGES.indexOf(stage);
+    const prereqs = STAGES.slice(0, stageIdx);
+    let eligible = 0;
+    let blockedByPrereq = 0;
+    for (const s of screenshots) {
+      const pp = (s.processing_metadata as Record<string, unknown>)?.preprocessing as Record<string, unknown> | undefined;
+      const statuses = (pp?.stage_status as Record<string, string>) ?? {};
+      const thisStatus = statuses[stage] ?? "pending";
+      if (thisStatus !== "pending" && thisStatus !== "invalidated" && thisStatus !== "failed") continue;
+      // Check prerequisites
+      const prereqsMet = prereqs.every((p) => statuses[p] === "completed");
+      if (prereqsMet) {
+        eligible++;
+      } else {
+        blockedByPrereq++;
+      }
+    }
+    return { eligible, blockedByPrereq };
   },
 }));
 

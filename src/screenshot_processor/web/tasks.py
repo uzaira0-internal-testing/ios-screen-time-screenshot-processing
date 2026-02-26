@@ -412,6 +412,17 @@ def cropping_task(self, screenshot_id: int) -> dict:
         }
         if was_cropped and device:
             result_data["original_dimensions"] = [device.width, device.height]
+            # Get cropped dimensions from output image
+            import cv2
+            import numpy as np
+            arr = np.frombuffer(cropped_bytes, np.uint8)
+            cropped_img = cv2.imdecode(arr, cv2.IMREAD_UNCHANGED)
+            if cropped_img is not None:
+                result_data["cropped_dimensions"] = [cropped_img.shape[1], cropped_img.shape[0]]
+        elif device:
+            # Not cropped — output same as original
+            result_data["original_dimensions"] = [device.width, device.height]
+            result_data["cropped_dimensions"] = [device.width, device.height]
 
         params = {"auto_detected_device": device.device_category}
 
@@ -448,7 +459,7 @@ def cropping_task(self, screenshot_id: int) -> dict:
     soft_time_limit=PREPROCESSING_SOFT_LIMIT,
     time_limit=PREPROCESSING_HARD_LIMIT,
 )
-def phi_detection_task(self, screenshot_id: int, preset: str = "hipaa_compliant") -> dict:
+def phi_detection_task(self, screenshot_id: int, preset: str = "screen_time") -> dict:
     """Run PHI detection stage only."""
     from pathlib import Path
 

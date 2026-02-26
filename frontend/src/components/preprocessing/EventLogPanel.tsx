@@ -24,8 +24,9 @@ export const EventLogPanel = () => {
         <button
           onClick={clearEventLog}
           className="text-gray-400 hover:text-gray-600 text-lg leading-none"
+          aria-label="Close event log"
         >
-          x
+          &times;
         </button>
       </div>
 

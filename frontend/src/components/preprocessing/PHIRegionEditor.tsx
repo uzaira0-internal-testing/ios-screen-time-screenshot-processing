@@ -24,7 +24,29 @@ interface PHIRegionEditorProps {
 
 type Tool = "draw" | "select" | "delete";
 
-const LABELS = ["PERSON_NAME", "DATE", "PHONE", "EMAIL", "ADDRESS", "OTHER"];
+const LABELS = [
+  // Presidio entity types
+  "PERSON",
+  "DATE_TIME",
+  "PHONE_NUMBER",
+  "EMAIL_ADDRESS",
+  "LOCATION",
+  "CREDIT_CARD",
+  "URL",
+  "IP_ADDRESS",
+  "US_SSN",
+  "US_DRIVER_LICENSE",
+  "US_PASSPORT",
+  // Custom pattern types
+  "DEVICE_SERIAL",
+  "MRN",
+  "STUDY_ID",
+  "AGE",
+  "ZIP_CODE",
+  // Generic
+  "OTHER",
+  "UNKNOWN",
+];
 
 export const PHIRegionEditor = ({
   screenshotId,
@@ -44,17 +66,30 @@ export const PHIRegionEditor = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isRedacting, setIsRedacting] = useState(false);
   const [redactionMethod, setRedactionMethod] = useState("redbox");
+  const [imageError, setImageError] = useState(false);
+
+  // Close on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
 
   // Load image and regions on open
   useEffect(() => {
     if (!isOpen) return;
+    setImageError(false);
 
     // Load image
     const img = new Image();
     img.crossOrigin = "anonymous";
-    const imageUrl = `${config.apiBaseUrl}/screenshots/${screenshotId}/original-image`;
+    const imageUrl = `${config.apiBaseUrl}/screenshots/${screenshotId}/image`;
     img.src = imageUrl;
     img.onload = () => setImage(img);
+    img.onerror = () => setImageError(true);
 
     // Load existing regions
     api.preprocessing.getPHIRegions(screenshotId).then((data: { regions: PHIRegion[] }) => {
@@ -233,6 +268,11 @@ export const PHIRegionEditor = ({
   };
 
   const handleRedact = async () => {
+    const confirmed = window.confirm(
+      `Apply ${redactionMethod} redaction to ${regions.length} region(s)? This will create a new redacted image and mark the redaction stage as complete.`,
+    );
+    if (!confirmed) return;
+
     setIsRedacting(true);
     try {
       await api.preprocessing.applyRedaction(screenshotId, { regions, redaction_method: redactionMethod });
@@ -257,14 +297,24 @@ export const PHIRegionEditor = ({
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b">
           <h3 className="text-lg font-semibold">PHI Region Editor - Screenshot #{screenshotId}</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">x</button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none" aria-label="Close PHI region editor">&times;</button>
         </div>
 
         {/* Content */}
         <div className="flex-1 flex overflow-hidden">
           {/* Canvas area */}
           <div className="flex-1 overflow-auto p-4">
-            {image ? (
+            {imageError ? (
+              <div className="flex flex-col items-center justify-center h-64 gap-2">
+                <span className="text-red-500 text-sm">Failed to load image</span>
+                <button
+                  onClick={onClose}
+                  className="px-3 py-1 text-sm text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+                >
+                  Close
+                </button>
+              </div>
+            ) : image ? (
               <canvas
                 ref={canvasRef}
                 style={{ cursor: getCursor() }}
@@ -274,7 +324,8 @@ export const PHIRegionEditor = ({
                 onMouseLeave={handleMouseUp}
               />
             ) : (
-              <div className="flex items-center justify-center h-64">
+              <div className="flex items-center justify-center h-64 gap-2">
+                <span className="inline-block w-5 h-5 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
                 <span className="text-gray-400">Loading image...</span>
               </div>
             )}
@@ -288,6 +339,8 @@ export const PHIRegionEditor = ({
                 <button
                   key={t}
                   onClick={() => setTool(t)}
+                  aria-label={`${t === "select" ? "Select" : t === "draw" ? "Draw" : "Delete"} tool`}
+                  aria-pressed={tool === t}
                   className={`px-3 py-1.5 text-xs rounded font-medium ${
                     tool === t
                       ? "bg-blue-100 text-blue-700 border border-blue-300"
@@ -322,7 +375,7 @@ export const PHIRegionEditor = ({
                     className="text-xs border rounded px-1 py-0.5 flex-1"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    {LABELS.map((l) => (
+                    {(!LABELS.includes(region.label) ? [region.label, ...LABELS] : LABELS).map((l) => (
                       <option key={l} value={l}>{l}</option>
                     ))}
                   </select>
@@ -335,10 +388,11 @@ export const PHIRegionEditor = ({
                   </span>
                   <button
                     onClick={(e) => { e.stopPropagation(); deleteRegion(i); }}
-                    className="text-gray-400 hover:text-red-500"
+                    className="text-gray-400 hover:text-red-500 leading-none"
                     title="Delete region"
+                    aria-label={`Delete region ${i + 1}`}
                   >
-                    x
+                    &times;
                   </button>
                 </div>
               ))}

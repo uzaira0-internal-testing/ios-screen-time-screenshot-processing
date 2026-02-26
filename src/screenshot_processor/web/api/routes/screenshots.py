@@ -1852,13 +1852,21 @@ async def preprocess_screenshots_batch(
 # ============================================================================
 
 
+_STAGE_ORDER = ["device_detection", "cropping", "phi_detection", "phi_redaction"]
+
+
 async def _get_eligible_screenshot_ids(
     db: AsyncSession,
     stage: str,
     group_id: str | None,
     screenshot_ids: list[int] | None,
 ) -> list[int]:
-    """Get screenshot IDs eligible for a stage (pending or invalidated)."""
+    """Get screenshot IDs eligible for a stage (pending or invalidated).
+
+    A screenshot is only eligible if:
+    1. Its status for this stage is pending, invalidated, or failed
+    2. ALL prerequisite stages (earlier in the pipeline) are completed
+    """
     if screenshot_ids:
         stmt = select(Screenshot).where(Screenshot.id.in_(screenshot_ids))
     elif group_id:
@@ -1871,13 +1879,82 @@ async def _get_eligible_screenshot_ids(
     result = await db.execute(stmt)
     screenshots = result.scalars().all()
 
+    # Determine prerequisite stages
+    stage_idx = _STAGE_ORDER.index(stage) if stage in _STAGE_ORDER else 0
+    prerequisite_stages = _STAGE_ORDER[:stage_idx]
+
     eligible = []
     for s in screenshots:
         pp = (s.processing_metadata or {}).get("preprocessing", {})
-        stage_status = pp.get("stage_status", {}).get(stage, "pending")
-        if stage_status in ("pending", "invalidated", "failed"):
+        statuses = pp.get("stage_status", {})
+        stage_status = statuses.get(stage, "pending")
+        if stage_status not in ("pending", "invalidated", "failed"):
+            continue
+        # Check all prerequisite stages are completed
+        if all(statuses.get(prereq, "pending") == "completed" for prereq in prerequisite_stages):
             eligible.append(s.id)
     return eligible
+
+
+@router.post("/preprocess-stage/reset", response_model=StagePreprocessResponse)
+async def reset_stage(
+    request: StagePreprocessRequest,
+    db: DatabaseSession,
+    current_user: CurrentUser,
+):
+    """Reset a stage to 'pending' for all completed/failed screenshots in a group.
+
+    Also invalidates all downstream stages. This allows re-running a stage
+    that has already completed.
+    """
+    from sqlalchemy.orm.attributes import flag_modified
+
+    from screenshot_processor.web.services.preprocessing_service import (
+        STAGE_ORDER,
+        init_preprocessing_metadata,
+        invalidate_downstream,
+        update_file_path,
+    )
+
+    stage = request.stage
+    if not stage or stage not in STAGE_ORDER:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"stage is required and must be one of: {STAGE_ORDER}",
+        )
+
+    if request.screenshot_ids:
+        stmt = select(Screenshot).where(Screenshot.id.in_(request.screenshot_ids))
+    elif request.group_id:
+        stmt = select(Screenshot).where(Screenshot.group_id == request.group_id)
+    else:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="group_id or screenshot_ids required")
+
+    result = await db.execute(stmt)
+    screenshots = result.scalars().all()
+
+    reset_ids = []
+    for s in screenshots:
+        pp = init_preprocessing_metadata(s)
+        stage_status = pp.get("stage_status", {}).get(stage, "pending")
+        if stage_status in ("completed", "failed"):
+            pp["stage_status"][stage] = "pending"
+            pp["current_events"][stage] = None
+            invalidate_downstream(s, stage)
+            update_file_path(s)
+            flag_modified(s, "processing_metadata")
+            reset_ids.append(s.id)
+
+    if reset_ids:
+        await db.commit()
+
+    logger.info(f"Stage {stage} reset for {len(reset_ids)} screenshots by {current_user.username}")
+    return StagePreprocessResponse(
+        queued_count=0,
+        screenshot_ids=reset_ids,
+        stage=stage,
+        message=f"Reset {len(reset_ids)} screenshots to pending for {stage}",
+    )
 
 
 @router.post("/preprocess-stage/device-detection", response_model=StagePreprocessResponse)
@@ -2203,7 +2280,6 @@ async def upload_browser(
 async def get_original_image(
     screenshot_id: int,
     db: DatabaseSession,
-    current_user: CurrentUser,
 ):
     """Serve the immutable original image (base_file_path) for crop editing."""
     screenshot = await get_screenshot_or_404(db, screenshot_id)
@@ -2211,10 +2287,16 @@ async def get_original_image(
     pp = (screenshot.processing_metadata or {}).get("preprocessing", {})
     base_path = pp.get("base_file_path", screenshot.file_path)
 
+    # Resolve relative to CWD (same approach as /image endpoint)
+    file_path = Path(base_path).resolve()
+
+    # Path traversal protection
+    settings = get_settings()
+    upload_dir = Path(settings.UPLOAD_DIR).resolve()
     try:
-        file_path = _resolve_image_path(base_path)
-    except (ValueError, OSError):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file path")
+        file_path.relative_to(upload_dir)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
     if not file_path.exists():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Original image not found")

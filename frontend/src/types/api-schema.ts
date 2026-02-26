@@ -608,6 +608,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/screenshots/preprocess-stage/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset Stage
+         * @description Reset a stage to 'pending' for all completed/failed screenshots in a group.
+         *
+         *     Also invalidates all downstream stages. This allows re-running a stage
+         *     that has already completed.
+         */
+        post: operations["reset_stage_api_v1_screenshots_preprocess_stage_reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/screenshots/preprocess-stage/device-detection": {
         parameters: {
             query?: never;
@@ -1581,7 +1604,7 @@ export interface components {
             screenshot_ids?: number[] | null;
             /**
              * Phi Pipeline Preset
-             * @default hipaa_compliant
+             * @default screen_time
              */
             phi_pipeline_preset: string;
             /**
@@ -2116,8 +2139,13 @@ export interface components {
              */
             group_id?: string | null;
             /**
+             * Stage
+             * @description Stage name (used by reset endpoint).
+             */
+            stage?: string | null;
+            /**
              * Phi Pipeline Preset
-             * @default hipaa_compliant
+             * @default screen_time
              */
             phi_pipeline_preset: string;
         };
@@ -2136,6 +2164,11 @@ export interface components {
              * @description Required if screenshot_ids is None.
              */
             group_id?: string | null;
+            /**
+             * Stage
+             * @description Stage name (used by reset endpoint).
+             */
+            stage?: string | null;
             /**
              * Phi Redaction Method
              * @default redbox
@@ -2262,7 +2295,7 @@ export interface components {
             /**
              * Phi Pipeline Preset
              * @description PHI detection pipeline preset: fast, balanced, hipaa_compliant, thorough
-             * @default hipaa_compliant
+             * @default screen_time
              */
             phi_pipeline_preset: string;
             /**
@@ -3110,6 +3143,11 @@ export interface components {
              * @description Required if screenshot_ids is None.
              */
             group_id?: string | null;
+            /**
+             * Stage
+             * @description Stage name (used by reset endpoint).
+             */
+            stage?: string | null;
         };
         /**
          * StagePreprocessResponse
@@ -4330,6 +4368,42 @@ export interface operations {
             };
         };
     };
+    reset_stage_api_v1_screenshots_preprocess_stage_reset_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StagePreprocessRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StagePreprocessResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     run_device_detection_stage_api_v1_screenshots_preprocess_stage_device_detection_post: {
         parameters: {
             query?: never;
@@ -4585,10 +4659,7 @@ export interface operations {
     get_original_image_api_v1_screenshots__screenshot_id__original_image_get: {
         parameters: {
             query?: never;
-            header?: {
-                "X-Username"?: string | null;
-                "X-Site-Password"?: string | null;
-            };
+            header?: never;
             path: {
                 screenshot_id: number;
             };

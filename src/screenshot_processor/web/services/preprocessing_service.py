@@ -176,13 +176,13 @@ def crop_screenshot_if_ipad(
 
 def detect_phi(
     image_bytes: bytes,
-    preset: str = "hipaa_compliant",
+    preset: str = "screen_time",
 ) -> PHIDetectionResult:
     """Detect PHI regions in an image.
 
     Args:
         image_bytes: Image data
-        preset: Pipeline preset (fast/balanced/hipaa_compliant/thorough)
+        preset: Pipeline preset (fast/balanced/hipaa_compliant/thorough/screen_time)
     """
     try:
         from phi_detector_remover import PHIPipelineBuilder
@@ -192,9 +192,35 @@ def detect_phi(
             "balanced": PHIPipelineBuilder.balanced,
             "hipaa_compliant": PHIPipelineBuilder.hipaa_compliant,
             "thorough": PHIPipelineBuilder.thorough,
+            "screen_time": PHIPipelineBuilder.screen_time,
         }
-        builder_fn = builders.get(preset, PHIPipelineBuilder.hipaa_compliant)
-        pipeline = builder_fn().build()
+
+        if preset == "screen_time":
+            # Custom pipeline for screen time: Presidio only (no regex).
+            # The default DEVICE_SERIAL regex ([A-Z0-9]{10,17}) matches
+            # any 10+ char word and produces massive false positives on
+            # UI text like "Entertainment", "Authentication", etc.
+            builder = (
+                PHIPipelineBuilder()
+                .with_ocr("tesseract")
+                .add_presidio(score_threshold=0.4)
+                .with_prompt("screen_time")
+                .union_aggregation()
+                .with_min_bbox_area(100)
+                .with_merge_nearby(enabled=False)
+                .with_allow_list([
+                    # Common OCR artifacts from bar charts that Presidio misreads
+                    "INFO", "INFO Paget", "Camera Lo",
+                    "My Tom", "My Talking Tom",
+                    "al l", "al l - Daily",
+                    "YtKids", "Yt Kids",
+                ])
+            )
+        else:
+            builder_fn = builders.get(preset, PHIPipelineBuilder.screen_time)
+            builder = builder_fn()
+
+        pipeline = builder.build()
         result = pipeline.process(image_bytes)
 
         # PipelineResult API: .has_phi, .region_count, .aggregated_regions, .get_regions_for_redaction()
@@ -203,13 +229,13 @@ def detect_phi(
         detector_results: dict[str, float] = {}
         for region in regions:
             detector_name = getattr(region, "source", "unknown")
-            confidence = getattr(region, "score", 0.0)
+            confidence = getattr(region, "confidence", getattr(region, "score", 0.0))
             if detector_name not in detector_results or confidence > detector_results[detector_name]:
                 detector_results[detector_name] = confidence
 
         return PHIDetectionResult(
-            phi_detected=result.has_phi,
-            regions_count=result.region_count,
+            phi_detected=len(regions) > 0,
+            regions_count=len(regions),
             regions=regions,
             detector_results=detector_results,
         )
@@ -240,20 +266,24 @@ def redact_phi(
             if isinstance(region, PHIRegion):
                 phi_regions.append(region)
             elif isinstance(region, dict):
-                bbox = region.get("bbox", {})
+                bbox = region.get("bbox")
                 if isinstance(bbox, dict):
+                    # Nested bbox format: {x, y, width, height}
                     bbox_tuple = (bbox.get("x", 0), bbox.get("y", 0), bbox.get("width", 0), bbox.get("height", 0))
                 elif isinstance(bbox, (list, tuple)) and len(bbox) == 4:
                     bbox_tuple = tuple(bbox)
+                elif "x" in region and "y" in region:
+                    # Flat serialized format from serialize_phi_regions: {x, y, w, h}
+                    bbox_tuple = (region["x"], region["y"], region.get("w", 0), region.get("h", 0))
                 else:
                     continue
                 phi_regions.append(
                     PHIRegion(
-                        entity_type=region.get("type", "UNKNOWN"),
+                        entity_type=region.get("label", region.get("type", "UNKNOWN")),
                         text=region.get("text", ""),
                         score=region.get("confidence", 0.0),
                         bbox=bbox_tuple,
-                        source=region.get("source", "llm"),
+                        source=region.get("source", "auto"),
                     )
                 )
 
@@ -744,16 +774,24 @@ def serialize_phi_regions(regions: list) -> list[dict]:
         if isinstance(region, dict):
             serialized.append(region)
         else:
-            # PHIRegion object
-            bbox = getattr(region, "bbox", (0, 0, 0, 0))
+            # PHIRegion object — bbox may be a tuple OR a BoundingBox dataclass
+            bbox = getattr(region, "bbox", None)
+            if bbox is None:
+                x, y, w, h = 0, 0, 0, 0
+            elif hasattr(bbox, "x"):
+                # BoundingBox dataclass with .x, .y, .width, .height
+                x, y, w, h = bbox.x, bbox.y, bbox.width, bbox.height
+            else:
+                # Plain tuple (x, y, w, h)
+                x, y, w, h = bbox[0], bbox[1], bbox[2], bbox[3]
             serialized.append({
-                "x": bbox[0] if len(bbox) > 0 else 0,
-                "y": bbox[1] if len(bbox) > 1 else 0,
-                "w": bbox[2] if len(bbox) > 2 else 0,
-                "h": bbox[3] if len(bbox) > 3 else 0,
+                "x": x,
+                "y": y,
+                "w": w,
+                "h": h,
                 "label": getattr(region, "entity_type", "UNKNOWN"),
                 "source": getattr(region, "source", "auto"),
-                "confidence": getattr(region, "score", 0.0),
+                "confidence": getattr(region, "confidence", getattr(region, "score", 0.0)),
                 "text": getattr(region, "text", ""),
             })
     return serialized

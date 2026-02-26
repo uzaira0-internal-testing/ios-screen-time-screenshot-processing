@@ -37,16 +37,27 @@ export const CropAdjustModal = ({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [cropStart, setCropStart] = useState<CropRect>({ left: 0, top: 0, right: 100, bottom: 100 });
   const [isApplying, setIsApplying] = useState(false);
+  const [imageError, setImageError] = useState(false);
+
+  // Close on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
 
   // Load original image
   useEffect(() => {
     if (!isOpen) return;
+    setImageError(false);
     const img = new Image();
     img.crossOrigin = "anonymous";
     api.preprocessing.getOriginalImageUrl(screenshotId).then((url) => {
-      // Add auth headers via fetch approach for images
       img.src = url;
-    });
+    }).catch(() => setImageError(true));
     img.onload = () => {
       setImage(img);
       if (initialCrop) {
@@ -55,15 +66,16 @@ export const CropAdjustModal = ({
         setCrop({ left: 0, top: 0, right: img.naturalWidth, bottom: img.naturalHeight });
       }
     };
+    img.onerror = () => setImageError(true);
   }, [isOpen, screenshotId, initialCrop]);
 
-  // Calculate scale to fit canvas
+  // Calculate scale to fit canvas — use most of the viewport
   useEffect(() => {
     if (!image || !canvasRef.current) return;
     const container = canvasRef.current.parentElement;
     if (!container) return;
     const maxW = container.clientWidth - 20;
-    const maxH = window.innerHeight - 200;
+    const maxH = window.innerHeight * 0.82; // Use ~82% of viewport height for canvas
     const s = Math.min(maxW / image.naturalWidth, maxH / image.naturalHeight, 1);
     setScale(s);
   }, [image]);
@@ -124,8 +136,8 @@ export const CropAdjustModal = ({
     const cropH = crop.bottom - crop.top;
     if (cropW <= 0 || cropH <= 0) return;
 
-    const maxPreviewW = 300;
-    const maxPreviewH = 400;
+    const maxPreviewW = 500;
+    const maxPreviewH = 600;
     const previewScale = Math.min(maxPreviewW / cropW, maxPreviewH / cropH, 1);
     canvas.width = Math.round(cropW * previewScale);
     canvas.height = Math.round(cropH * previewScale);
@@ -236,6 +248,11 @@ export const CropAdjustModal = ({
   };
 
   const handleApply = async () => {
+    const confirmed = window.confirm(
+      `Apply crop (${crop.right - crop.left}x${crop.bottom - crop.top}px)? This will overwrite the current cropped image and invalidate downstream stages.`,
+    );
+    if (!confirmed) return;
+
     setIsApplying(true);
     try {
       await api.preprocessing.applyManualCrop(screenshotId, crop);
@@ -255,19 +272,29 @@ export const CropAdjustModal = ({
   const cropH = crop.bottom - crop.top;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center">
-      <div className="bg-white rounded-lg shadow-xl max-w-[95vw] max-h-[95vh] flex flex-col">
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl w-[98vw] h-[94vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b">
+        <div className="flex items-center justify-between px-6 py-3 border-b shrink-0">
           <h3 className="text-lg font-semibold">Adjust Crop - Screenshot #{screenshotId}</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">x</button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none" aria-label="Close crop editor">&times;</button>
         </div>
 
         {/* Content */}
-        <div className="flex-1 flex overflow-hidden p-4 gap-4">
+        <div className="flex-1 flex overflow-hidden p-6 gap-6 min-h-0">
           {/* Left: Main canvas */}
-          <div className="flex-1 overflow-auto">
-            {image ? (
+          <div className="flex-1 overflow-auto flex items-start justify-center">
+            {imageError ? (
+              <div className="flex flex-col items-center justify-center h-64 gap-2">
+                <span className="text-red-500 text-sm">Failed to load image</span>
+                <button
+                  onClick={onClose}
+                  className="px-3 py-1 text-sm text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+                >
+                  Close
+                </button>
+              </div>
+            ) : image ? (
               <canvas
                 ref={canvasRef}
                 onMouseDown={handleMouseDown}
@@ -276,16 +303,17 @@ export const CropAdjustModal = ({
                 onMouseLeave={handleMouseUp}
               />
             ) : (
-              <div className="flex items-center justify-center h-64">
+              <div className="flex items-center justify-center h-64 gap-2">
+                <span className="inline-block w-5 h-5 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
                 <span className="text-gray-400">Loading image...</span>
               </div>
             )}
           </div>
 
-          {/* Right: Preview */}
-          <div className="w-80 flex flex-col gap-4">
+          {/* Right: Preview + controls */}
+          <div className="w-[420px] shrink-0 flex flex-col gap-4 overflow-auto">
             <div className="text-sm font-medium text-gray-700">Preview</div>
-            <div className="border rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center min-h-[200px]">
+            <div className="border rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center min-h-[300px]">
               <canvas ref={previewRef} />
             </div>
 
@@ -313,7 +341,7 @@ export const CropAdjustModal = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-4 py-3 border-t">
+        <div className="flex items-center justify-end gap-3 px-6 py-3 border-t shrink-0">
           <button
             onClick={onClose}
             className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"

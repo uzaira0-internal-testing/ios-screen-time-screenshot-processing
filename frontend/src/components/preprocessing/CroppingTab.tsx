@@ -5,10 +5,56 @@ import { usePreprocessingStore } from "@/store/preprocessingStore";
 import { StageReviewTable } from "./StageReviewTable";
 import { CropAdjustModal } from "./CropAdjustModal";
 
-const RESULT_HEADERS = ["Device", "Cropped", "Patched", "Original Size", ""];
+interface CropRect {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+const RESULT_HEADERS = ["Device", "Cropped", "Patched", "Original Size", "Cropped Size", ""];
+
+/** Extract crop bounds from a cropping event result. Auto-crop is right-aligned (removes left sidebar). */
+function getCropRectFromEvent(event: PreprocessingEventData | null): CropRect | undefined {
+  if (!event) return undefined;
+  const result = event.result as Record<string, unknown> | undefined;
+  if (!result?.was_cropped) return undefined;
+
+  // If manual crop, params has the exact bounds
+  if (result.manual) {
+    const params = event.params as Record<string, unknown> | undefined;
+    if (params && typeof params.left === "number") {
+      return {
+        left: params.left as number,
+        top: params.top as number,
+        right: params.right as number,
+        bottom: params.bottom as number,
+      };
+    }
+  }
+
+  // Auto-crop: right-aligned (removes left sidebar)
+  const origDims = result.original_dimensions as number[] | undefined;
+  const croppedDims = result.cropped_dimensions as number[] | undefined;
+  if (origDims?.length === 2 && croppedDims?.length === 2) {
+    const origW = origDims[0]!;
+    const origH = origDims[1]!;
+    const cropW = croppedDims[0]!;
+    const cropH = croppedDims[1]!;
+    return {
+      left: origW - cropW,
+      top: origH - cropH, // typically 0
+      right: origW,
+      bottom: origH,
+    };
+  }
+
+  return undefined;
+}
 
 function CroppingTabInner() {
   const [cropModalScreenshotId, setCropModalScreenshotId] = useState<number | null>(null);
+  const [cropModalInitialCrop, setCropModalInitialCrop] = useState<CropRect | undefined>(undefined);
   const loadScreenshots = usePreprocessingStore((s) => s.loadScreenshots);
   const loadSummary = usePreprocessingStore((s) => s.loadSummary);
 
@@ -59,9 +105,17 @@ function CroppingTabInner() {
             ? `${(result.original_dimensions as number[])[0]} x ${(result.original_dimensions as number[])[1]}`
             : "\u2014"}
         </td>
+        <td className="px-3 py-2 text-xs text-gray-600">
+          {result?.cropped_dimensions
+            ? `${(result.cropped_dimensions as number[])[0]} x ${(result.cropped_dimensions as number[])[1]}`
+            : "\u2014"}
+        </td>
         <td className="px-3 py-2">
           <button
-            onClick={() => setCropModalScreenshotId(s.id)}
+            onClick={() => {
+              setCropModalScreenshotId(s.id);
+              setCropModalInitialCrop(getCropRectFromEvent(event));
+            }}
             className="px-2 py-1 text-xs text-blue-600 border border-blue-200 rounded hover:bg-blue-50"
             title="Adjust crop manually"
           >
@@ -83,8 +137,12 @@ function CroppingTabInner() {
         <CropAdjustModal
           screenshotId={cropModalScreenshotId}
           isOpen={true}
-          onClose={() => setCropModalScreenshotId(null)}
+          onClose={() => {
+            setCropModalScreenshotId(null);
+            setCropModalInitialCrop(undefined);
+          }}
           onCropApplied={handleCropApplied}
+          initialCrop={cropModalInitialCrop}
         />
       )}
     </>

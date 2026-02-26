@@ -1,3 +1,4 @@
+import { useEffect, useMemo } from "react";
 import { usePreprocessingStore } from "@/store/preprocessingStore";
 import type { FilterMode } from "@/store/preprocessingStore";
 
@@ -15,10 +16,24 @@ export const StageSummaryBar = () => {
   const activeStage = usePreprocessingStore((s) => s.activeStage);
   const screenshots = usePreprocessingStore((s) => s.screenshots);
   const getStageStatus = usePreprocessingStore((s) => s.getStageStatus);
+  const getEligibleCount = usePreprocessingStore((s) => s.getEligibleCount);
   const summary = usePreprocessingStore((s) => s.summary);
   const isRunningStage = usePreprocessingStore((s) => s.isRunningStage);
   const stageProgress = usePreprocessingStore((s) => s.stageProgress);
   const runStage = usePreprocessingStore((s) => s.runStage);
+  const resetStage = usePreprocessingStore((s) => s.resetStage);
+
+  const loadSummary = usePreprocessingStore((s) => s.loadSummary);
+  const loadScreenshots = usePreprocessingStore((s) => s.loadScreenshots);
+
+  // Auto-refresh counts every 5 seconds so progress is always visible
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadSummary();
+      loadScreenshots();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [loadSummary, loadScreenshots]);
 
   const counts = summary ? summary[activeStage] : getStageStatus(activeStage);
   const total = summary?.total ?? screenshots.length;
@@ -32,11 +47,25 @@ export const StageSummaryBar = () => {
     pending: counts.pending,
   };
 
-  // Eligible for running = pending + invalidated
-  const eligibleCount = counts.pending + counts.invalidated;
+  // Eligible = pending/invalidated AND prerequisites completed
+  const { eligible, blockedByPrereq } = useMemo(
+    () => getEligibleCount(activeStage),
+    [getEligibleCount, activeStage, screenshots],
+  );
 
   // Stage label for the run button
   const stageLabel = activeStage.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+  // Previous stage label for the "blocked" message
+  const STAGE_LABELS: Record<string, string> = {
+    device_detection: "Device Detection",
+    cropping: "Cropping",
+    phi_detection: "PHI Detection",
+    phi_redaction: "PHI Redaction",
+  };
+  const STAGE_ORDER = ["device_detection", "cropping", "phi_detection", "phi_redaction"];
+  const stageIdx = STAGE_ORDER.indexOf(activeStage);
+  const prevStageLabel = stageIdx > 0 ? STAGE_LABELS[STAGE_ORDER[stageIdx - 1]!] : null;
 
   return (
     <div className="flex flex-wrap items-center gap-2 p-3 bg-gray-50 rounded-lg">
@@ -77,15 +106,32 @@ export const StageSummaryBar = () => {
         </div>
       )}
 
+      {/* Blocked-by-prerequisite hint */}
+      {!isRunningStage && blockedByPrereq > 0 && (
+        <span className="text-xs text-amber-600 ml-2">
+          {blockedByPrereq} blocked — complete {prevStageLabel} first
+        </span>
+      )}
+
+      {/* Re-run button — shows when all are completed and nothing is eligible */}
+      {!isRunningStage && eligible === 0 && counts.completed > 0 && (
+        <button
+          onClick={() => resetStage(activeStage)}
+          className="ml-auto px-4 py-1.5 text-sm font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded-md hover:bg-orange-100 transition-colors"
+        >
+          Reset & Re-run {stageLabel} ({counts.completed})
+        </button>
+      )}
+
       {/* Run button */}
       <button
         onClick={() => runStage(activeStage)}
-        disabled={isRunningStage || eligibleCount === 0}
-        className="ml-auto px-4 py-1.5 bg-primary-600 text-white text-sm font-medium rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        disabled={isRunningStage || eligible === 0}
+        className={`${eligible === 0 && counts.completed > 0 ? "" : "ml-auto "}px-4 py-1.5 bg-primary-600 text-white text-sm font-medium rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
       >
         {isRunningStage
           ? "Running..."
-          : `Run ${stageLabel} on ${eligibleCount} screenshot${eligibleCount !== 1 ? "s" : ""}`}
+          : `Run ${stageLabel} on ${eligible} screenshot${eligible !== 1 ? "s" : ""}`}
       </button>
     </div>
   );

@@ -85,7 +85,11 @@ export const BrowserUpload = () => {
       <UploadDropZone onFilesSelected={appendFiles} compact />
       <div className="flex items-center justify-between">
         <button
-          onClick={() => setUploadFiles([])}
+          onClick={() => {
+            if (uploadFiles.length > 0 && window.confirm(`Clear all ${uploadFiles.length} selected files?`)) {
+              setUploadFiles([]);
+            }
+          }}
           className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
         >
           Clear

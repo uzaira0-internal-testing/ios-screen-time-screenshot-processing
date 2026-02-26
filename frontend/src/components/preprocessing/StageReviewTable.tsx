@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { usePreprocessingStore } from "@/store/preprocessingStore";
 import type { Stage, StageStatus, PreprocessingEventData } from "@/store/preprocessingStore";
 import type { Screenshot } from "@/types";
@@ -36,12 +36,28 @@ export const StageReviewTable = ({
   renderResultColumns,
   resultHeaders,
 }: StageReviewTableProps) => {
-  const screenshots = usePreprocessingStore((s) => s.getScreenshotsForStage(stage));
+  const allScreenshots = usePreprocessingStore((s) => s.screenshots);
+  const filter = usePreprocessingStore((s) => s.filter);
   const getScreenshotStageStatus = usePreprocessingStore((s) => s.getScreenshotStageStatus);
   const isScreenshotException = usePreprocessingStore((s) => s.isScreenshotException);
   const loadEventLog = usePreprocessingStore((s) => s.loadEventLog);
   const highlightedScreenshotId = usePreprocessingStore((s) => s.highlightedScreenshotId);
   const setHighlightedScreenshotId = usePreprocessingStore((s) => s.setHighlightedScreenshotId);
+
+  // Memoize filtered screenshots to avoid new array reference each render
+  const screenshots = useMemo(() => {
+    if (filter === "all") return allScreenshots;
+    return allScreenshots.filter((s) => {
+      const status = getScreenshotStageStatus(s, stage);
+      switch (filter) {
+        case "completed": return status === "completed";
+        case "pending": return status === "pending";
+        case "invalidated": return status === "invalidated";
+        case "needs_review": return isScreenshotException(s, stage);
+        default: return true;
+      }
+    });
+  }, [allScreenshots, filter, stage, getScreenshotStageStatus, isScreenshotException]);
 
   const highlightedRef = useRef<HTMLTableRowElement>(null);
 
@@ -53,7 +69,7 @@ export const StageReviewTable = ({
       const timer = setTimeout(() => setHighlightedScreenshotId(null), 5000);
       return () => clearTimeout(timer);
     }
-  }, [highlightedScreenshotId, setHighlightedScreenshotId, screenshots]);
+  }, [highlightedScreenshotId, setHighlightedScreenshotId]);
 
   return (
     <div className="overflow-x-auto">
@@ -92,7 +108,9 @@ export const StageReviewTable = ({
                   <img
                     src={`${IMAGE_URL_PREFIX}/${s.id}/image`}
                     alt={`Screenshot ${s.id}`}
-                    className="w-10 h-14 object-cover rounded"
+                    className="w-10 h-14 object-cover rounded bg-gray-200"
+                    loading="lazy"
+                    onError={(e) => { e.currentTarget.src = ""; }}
                   />
                 </td>
                 <td className="px-3 py-2 font-mono text-gray-600">{s.id}</td>
@@ -129,10 +147,11 @@ export const StageReviewTable = ({
                 <td className="px-3 py-2">
                   <button
                     onClick={() => loadEventLog(s.id)}
-                    className="p-1 text-gray-400 hover:text-primary-600"
+                    className="px-2 py-1 text-xs text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded"
                     title="View event log"
+                    aria-label={`View event log for screenshot ${s.id}`}
                   >
-                    ...
+                    Log
                   </button>
                 </td>
               </tr>

@@ -2193,6 +2193,82 @@
         }
       }
     },
+    "/api/v1/screenshots/preprocess-stage/reset": {
+      "post": {
+        "tags": [
+          "Screenshots"
+        ],
+        "summary": "Reset Stage",
+        "description": "Reset a stage to 'pending' for all completed/failed screenshots in a group.\n\nAlso invalidates all downstream stages. This allows re-running a stage\nthat has already completed.",
+        "operationId": "reset_stage_api_v1_screenshots_preprocess_stage_reset_post",
+        "parameters": [
+          {
+            "name": "X-Username",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Username"
+            }
+          },
+          {
+            "name": "X-Site-Password",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Site-Password"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StagePreprocessRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StagePreprocessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/screenshots/preprocess-stage/device-detection": {
       "post": {
         "tags": [
@@ -2749,38 +2825,6 @@
             "schema": {
               "type": "integer",
               "title": "Screenshot Id"
-            }
-          },
-          {
-            "name": "X-Username",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Username"
-            }
-          },
-          {
-            "name": "X-Site-Password",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Site-Password"
             }
           }
         ],
@@ -5769,7 +5813,7 @@
           "phi_pipeline_preset": {
             "type": "string",
             "title": "Phi Pipeline Preset",
-            "default": "hipaa_compliant"
+            "default": "screen_time"
           },
           "phi_redaction_method": {
             "type": "string",
@@ -6920,10 +6964,22 @@
             "title": "Group Id",
             "description": "Required if screenshot_ids is None."
           },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage",
+            "description": "Stage name (used by reset endpoint)."
+          },
           "phi_pipeline_preset": {
             "type": "string",
             "title": "Phi Pipeline Preset",
-            "default": "hipaa_compliant"
+            "default": "screen_time"
           }
         },
         "type": "object",
@@ -6958,6 +7014,18 @@
             ],
             "title": "Group Id",
             "description": "Required if screenshot_ids is None."
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage",
+            "description": "Stage name (used by reset endpoint)."
           },
           "phi_redaction_method": {
             "type": "string",
@@ -7179,7 +7247,7 @@
             "type": "string",
             "title": "Phi Pipeline Preset",
             "description": "PHI detection pipeline preset: fast, balanced, hipaa_compliant, thorough",
-            "default": "hipaa_compliant"
+            "default": "screen_time"
           },
           "phi_redaction_method": {
             "type": "string",
@@ -9667,6 +9735,18 @@
             ],
             "title": "Group Id",
             "description": "Required if screenshot_ids is None."
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage",
+            "description": "Stage name (used by reset endpoint)."
           }
         },
         "type": "object",
