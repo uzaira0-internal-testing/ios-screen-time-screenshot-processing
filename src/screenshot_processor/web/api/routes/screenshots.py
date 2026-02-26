@@ -2028,7 +2028,11 @@ async def run_phi_detection_stage(
     from celery import group as celery_group
     from screenshot_processor.web.tasks import phi_detection_task
 
-    task_group = celery_group(phi_detection_task.s(sid, preset=request.phi_pipeline_preset) for sid in ids)
+    task_group = celery_group(
+        phi_detection_task.s(sid, preset=request.phi_pipeline_preset,
+                             llm_endpoint=request.llm_endpoint, llm_model=request.llm_model)
+        for sid in ids
+    )
     task_group.apply_async()
 
     logger.info("PHI detection queued", extra={"count": len(ids), "username": current_user.username})

@@ -59,6 +59,9 @@ interface PreprocessingState {
   // Options
   phiPreset: string;
   redactionMethod: string;
+  llmEnabled: boolean;
+  llmEndpoint: string;
+  llmModel: string;
 
   // Event log detail
   selectedScreenshotId: number | null;
@@ -91,6 +94,9 @@ interface PreprocessingState {
   setSelectedGroupId: (groupId: string) => void;
   setPhiPreset: (preset: string) => void;
   setRedactionMethod: (method: string) => void;
+  setLlmEnabled: (enabled: boolean) => void;
+  setLlmEndpoint: (endpoint: string) => void;
+  setLlmModel: (model: string) => void;
 
   loadGroups: () => Promise<void>;
   loadScreenshots: () => Promise<void>;
@@ -136,6 +142,9 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
   filter: "all",
   phiPreset: "screen_time",
   redactionMethod: "redbox",
+  llmEnabled: false,
+  llmEndpoint: "http://10.23.7.55:1234/v1",
+  llmModel: "gpt-oss-20b",
   selectedScreenshotId: null,
   eventLog: null,
   isLoading: false,
@@ -166,6 +175,9 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
   },
   setPhiPreset: (preset) => set({ phiPreset: preset }),
   setRedactionMethod: (method) => set({ redactionMethod: method }),
+  setLlmEnabled: (enabled) => set({ llmEnabled: enabled }),
+  setLlmEndpoint: (endpoint) => set({ llmEndpoint: endpoint }),
+  setLlmModel: (model) => set({ llmModel: model }),
 
   loadGroups: async () => {
     try {
@@ -240,17 +252,22 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
   },
 
   runStage: async (stage, screenshotIds) => {
-    const { selectedGroupId, phiPreset, redactionMethod } = get();
+    const { selectedGroupId, phiPreset, redactionMethod, llmEnabled, llmEndpoint, llmModel } = get();
     if (!selectedGroupId && !screenshotIds) return;
 
     set({ isRunningStage: true, stageProgress: null, _pollCount: 0, _queuedCount: 0 });
     try {
-      const result = await api.preprocessing.runStage(stage, {
+      const options: Parameters<typeof api.preprocessing.runStage>[1] = {
         group_id: selectedGroupId || undefined,
         screenshot_ids: screenshotIds,
         phi_pipeline_preset: phiPreset,
         phi_redaction_method: redactionMethod,
-      });
+      };
+      if (llmEnabled && stage === "phi_detection") {
+        options.llm_endpoint = llmEndpoint;
+        options.llm_model = llmModel;
+      }
+      const result = await api.preprocessing.runStage(stage, options);
       if (result && result.queued_count > 0) {
         toast.success(result.message);
         set({

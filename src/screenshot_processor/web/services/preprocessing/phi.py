@@ -31,6 +31,8 @@ class PHIRedactionResult:
 def detect_phi(
     image_bytes: bytes,
     preset: str = "screen_time",
+    llm_endpoint: str | None = None,
+    llm_model: str | None = None,
 ) -> PHIDetectionResult:
     """Detect PHI regions in an image.
 
@@ -73,6 +75,9 @@ def detect_phi(
         else:
             builder_fn = builders.get(preset, PHIPipelineBuilder.screen_time)
             builder = builder_fn()
+
+        if llm_endpoint and llm_model:
+            builder = builder.add_llm(model=llm_model, api_endpoint=llm_endpoint)
 
         pipeline = builder.build()
         result = pipeline.process(image_bytes)

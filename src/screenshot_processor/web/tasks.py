@@ -460,7 +460,8 @@ def cropping_task(self, screenshot_id: int) -> dict:
     soft_time_limit=PREPROCESSING_SOFT_LIMIT,
     time_limit=PREPROCESSING_HARD_LIMIT,
 )
-def phi_detection_task(self, screenshot_id: int, preset: str = "screen_time") -> dict:
+def phi_detection_task(self, screenshot_id: int, preset: str = "screen_time",
+                       llm_endpoint: str | None = None, llm_model: str | None = None) -> dict:
     """Run PHI detection stage only."""
     from pathlib import Path
 
@@ -491,7 +492,7 @@ def phi_detection_task(self, screenshot_id: int, preset: str = "screen_time") ->
         input_file = get_current_input_file(screenshot, "phi_detection")
         image_bytes = Path(input_file).read_bytes()
 
-        detection = detect_phi(image_bytes, preset=preset)
+        detection = detect_phi(image_bytes, preset=preset, llm_endpoint=llm_endpoint, llm_model=llm_model)
 
         result_data = {
             "phi_detected": detection.phi_detected,
@@ -500,8 +501,11 @@ def phi_detection_task(self, screenshot_id: int, preset: str = "screen_time") ->
             "regions": serialize_phi_regions(detection.regions),
         }
 
+        params: dict = {"preset": preset}
+        if llm_model:
+            params["llm_model"] = llm_model
         append_event(
-            screenshot, "phi_detection", "auto", {"preset": preset}, result_data,
+            screenshot, "phi_detection", "auto", params, result_data,
             input_file=input_file,
         )
         flag_modified(screenshot, "processing_metadata")

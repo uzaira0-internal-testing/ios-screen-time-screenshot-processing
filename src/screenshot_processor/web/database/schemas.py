@@ -617,6 +617,8 @@ class PHIDetectionStageRequest(StagePreprocessRequest):
     """PHI detection stage with preset."""
 
     phi_pipeline_preset: str = Field(default="screen_time")
+    llm_endpoint: str | None = Field(default=None, description="LLM API endpoint for assisted detection")
+    llm_model: str | None = Field(default=None, description="LLM model name (e.g. gpt-oss-20b)")
 
 
 class PHIRedactionStageRequest(StagePreprocessRequest):

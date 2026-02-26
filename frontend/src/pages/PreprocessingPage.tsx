@@ -27,6 +27,12 @@ export const PreprocessingPage = () => {
   const setPhiPreset = usePreprocessingStore((s) => s.setPhiPreset);
   const redactionMethod = usePreprocessingStore((s) => s.redactionMethod);
   const setRedactionMethod = usePreprocessingStore((s) => s.setRedactionMethod);
+  const llmEnabled = usePreprocessingStore((s) => s.llmEnabled);
+  const setLlmEnabled = usePreprocessingStore((s) => s.setLlmEnabled);
+  const llmEndpoint = usePreprocessingStore((s) => s.llmEndpoint);
+  const setLlmEndpoint = usePreprocessingStore((s) => s.setLlmEndpoint);
+  const llmModel = usePreprocessingStore((s) => s.llmModel);
+  const setLlmModel = usePreprocessingStore((s) => s.setLlmModel);
   const stopPolling = usePreprocessingStore((s) => s.stopPolling);
   const pageMode = usePreprocessingStore((s) => s.pageMode);
   const setPageMode = usePreprocessingStore((s) => s.setPageMode);
@@ -191,22 +197,58 @@ export const PreprocessingPage = () => {
           {(activeStage === "phi_detection" || activeStage === "phi_redaction") && (
             <div className="mt-3 flex flex-wrap items-center gap-4 p-3 bg-white rounded-lg border border-gray-200">
               {activeStage === "phi_detection" && (
-                <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium text-gray-700">
-                    Preset:
-                  </label>
-                  <select
-                    value={phiPreset}
-                    onChange={(e) => setPhiPreset(e.target.value)}
-                    className="text-sm border border-gray-300 rounded-md px-2 py-1"
-                  >
-                    <option value="screen_time">Screen Time</option>
-                    <option value="fast">Fast</option>
-                    <option value="balanced">Balanced</option>
-                    <option value="hipaa_compliant">HIPAA Compliant</option>
-                    <option value="thorough">Thorough</option>
-                  </select>
-                </div>
+                <>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      Preset:
+                    </label>
+                    <select
+                      value={phiPreset}
+                      onChange={(e) => setPhiPreset(e.target.value)}
+                      className="text-sm border border-gray-300 rounded-md px-2 py-1"
+                    >
+                      <option value="screen_time">Screen Time</option>
+                      <option value="fast">Fast</option>
+                      <option value="balanced">Balanced</option>
+                      <option value="hipaa_compliant">HIPAA Compliant</option>
+                      <option value="thorough">Thorough</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2 border-l border-gray-300 pl-4">
+                    <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={llmEnabled}
+                        onChange={(e) => setLlmEnabled(e.target.checked)}
+                        className="rounded border-gray-300"
+                      />
+                      LLM-Assisted
+                    </label>
+                  </div>
+                  {llmEnabled && (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm text-gray-600">Endpoint:</label>
+                        <input
+                          type="text"
+                          value={llmEndpoint}
+                          onChange={(e) => setLlmEndpoint(e.target.value)}
+                          className="text-sm border border-gray-300 rounded-md px-2 py-1 w-56"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm text-gray-600">Model:</label>
+                        <input
+                          type="text"
+                          value={llmModel}
+                          onChange={(e) => setLlmModel(e.target.value)}
+                          className="text-sm border border-gray-300 rounded-md px-2 py-1 w-36"
+                        />
+                      </div>
+                      <span className="text-xs text-gray-400">Runs LLM alongside Presidio for higher accuracy</span>
+                    </>
+                  )}
+                </>
               )}
               {activeStage === "phi_redaction" && (
                 <div className="flex items-center gap-2">
