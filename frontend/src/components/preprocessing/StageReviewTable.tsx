@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePreprocessingStore } from "@/store/preprocessingStore";
 import type { Stage, StageStatus, PreprocessingEventData } from "@/store/preprocessingStore";
 import type { Screenshot } from "@/types";
 import { config } from "@/config";
 
 const IMAGE_URL_PREFIX = config.apiBaseUrl + "/screenshots";
+
+type SortColumn = "id" | "participant" | "status";
+type SortDirection = "asc" | "desc";
 
 interface StageReviewTableProps {
   stage: Stage;
@@ -20,6 +23,14 @@ const STATUS_BADGES: Record<StageStatus, { label: string; classes: string }> = {
   failed: { label: "Failed", classes: "bg-red-100 text-red-700" },
 };
 
+const STATUS_SORT_ORDER: Record<string, number> = {
+  running: 0,
+  failed: 1,
+  pending: 2,
+  invalidated: 3,
+  completed: 4,
+};
+
 function getCurrentEvent(screenshot: Screenshot, stage: Stage): PreprocessingEventData | null {
   const pp = (screenshot.processing_metadata as Record<string, unknown>)?.preprocessing as Record<string, unknown> | undefined;
   if (!pp) return null;
@@ -29,6 +40,13 @@ function getCurrentEvent(screenshot: Screenshot, stage: Stage): PreprocessingEve
   const eid = currentEvents[stage];
   if (!eid) return null;
   return events.find((e) => e.event_id === eid) ?? null;
+}
+
+function SortIcon({ column, sortColumn, sortDirection }: { column: SortColumn; sortColumn: SortColumn; sortDirection: SortDirection }) {
+  if (column !== sortColumn) {
+    return <span className="text-gray-300 ml-1">&#8597;</span>;
+  }
+  return <span className="text-primary-600 ml-1">{sortDirection === "asc" ? "\u25B2" : "\u25BC"}</span>;
 }
 
 export const StageReviewTable = ({
@@ -44,20 +62,55 @@ export const StageReviewTable = ({
   const highlightedScreenshotId = usePreprocessingStore((s) => s.highlightedScreenshotId);
   const setHighlightedScreenshotId = usePreprocessingStore((s) => s.setHighlightedScreenshotId);
 
-  // Memoize filtered screenshots to avoid new array reference each render
+  const [sortColumn, setSortColumn] = useState<SortColumn>("id");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
+  // Memoize filtered + sorted screenshots
   const screenshots = useMemo(() => {
-    if (filter === "all") return allScreenshots;
-    return allScreenshots.filter((s) => {
-      const status = getScreenshotStageStatus(s, stage);
-      switch (filter) {
-        case "completed": return status === "completed";
-        case "pending": return status === "pending";
-        case "invalidated": return status === "invalidated";
-        case "needs_review": return isScreenshotException(s, stage);
-        default: return true;
+    let filtered = allScreenshots;
+    if (filter !== "all") {
+      filtered = allScreenshots.filter((s) => {
+        const status = getScreenshotStageStatus(s, stage);
+        switch (filter) {
+          case "completed": return status === "completed";
+          case "pending": return status === "pending";
+          case "invalidated": return status === "invalidated";
+          case "needs_review": return isScreenshotException(s, stage);
+          default: return true;
+        }
+      });
+    }
+
+    const sorted = [...filtered].sort((a, b) => {
+      let cmp = 0;
+      switch (sortColumn) {
+        case "id":
+          cmp = a.id - b.id;
+          break;
+        case "participant":
+          cmp = (a.participant_id || "").localeCompare(b.participant_id || "");
+          break;
+        case "status": {
+          const sa = getScreenshotStageStatus(a, stage);
+          const sb = getScreenshotStageStatus(b, stage);
+          cmp = (STATUS_SORT_ORDER[sa] ?? 99) - (STATUS_SORT_ORDER[sb] ?? 99);
+          break;
+        }
       }
+      return sortDirection === "asc" ? cmp : -cmp;
     });
-  }, [allScreenshots, filter, stage, getScreenshotStageStatus, isScreenshotException]);
+
+    return sorted;
+  }, [allScreenshots, filter, stage, getScreenshotStageStatus, isScreenshotException, sortColumn, sortDirection]);
 
   const highlightedRef = useRef<HTMLTableRowElement>(null);
 
@@ -71,15 +124,23 @@ export const StageReviewTable = ({
     }
   }, [highlightedScreenshotId, setHighlightedScreenshotId]);
 
+  const sortableThClass = "px-3 py-2 cursor-pointer select-none hover:text-gray-700 transition-colors";
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-200 text-left text-gray-500">
             <th className="px-3 py-2 w-16">Thumb</th>
-            <th className="px-3 py-2 w-16">ID</th>
-            <th className="px-3 py-2">Participant</th>
-            <th className="px-3 py-2 w-28">Status</th>
+            <th className={`${sortableThClass} w-16`} onClick={() => handleSort("id")}>
+              ID <SortIcon column="id" sortColumn={sortColumn} sortDirection={sortDirection} />
+            </th>
+            <th className={sortableThClass} onClick={() => handleSort("participant")}>
+              Participant <SortIcon column="participant" sortColumn={sortColumn} sortDirection={sortDirection} />
+            </th>
+            <th className={`${sortableThClass} w-28`} onClick={() => handleSort("status")}>
+              Status <SortIcon column="status" sortColumn={sortColumn} sortDirection={sortDirection} />
+            </th>
             {resultHeaders.map((h) => (
               <th key={h} className="px-3 py-2">{h}</th>
             ))}
