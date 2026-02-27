@@ -481,6 +481,8 @@ def is_exception(stage: str, result: dict) -> bool:
         if result.get("is_ipad") and not result.get("was_cropped"):
             return True
     elif stage == "phi_detection":
+        if result.get("reviewed"):
+            return False  # Manually reviewed — no longer needs review
         if result.get("phi_detected"):
             return True
         if result.get("regions_count", 0) > 10:

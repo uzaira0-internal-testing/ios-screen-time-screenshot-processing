@@ -74,6 +74,7 @@ interface PreprocessingState {
   _pollInterval: ReturnType<typeof setInterval> | null;
   _pollCount: number;
   _queuedCount: number;
+  _completedBaseline: number;
 
   // Upload state (Phase 2)
   uploadFiles: UploadFileItem[];
@@ -86,6 +87,11 @@ interface PreprocessingState {
   // Deep-link state
   highlightedScreenshotId: number | null;
   returnUrl: string | null;
+
+  // Queue review mode
+  queueMode: boolean;
+  queueIndex: number;
+  queueScreenshotIds: number[];
 
   // Actions
   setActiveStage: (stage: Stage) => void;
@@ -112,6 +118,13 @@ interface PreprocessingState {
   setUploadImageType: (type: "battery" | "screen_time") => void;
   setUploadGroupId: (groupId: string) => void;
   startBrowserUpload: () => Promise<void>;
+
+  // Queue review actions
+  enterQueue: (screenshotIds: number[], startIndex?: number) => void;
+  exitQueue: () => void;
+  queueNext: () => void;
+  queuePrev: () => void;
+  queueGoTo: (index: number) => void;
 
   // Deep-link actions
   setHighlightedScreenshotId: (id: number | null) => void;
@@ -151,6 +164,7 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
   _pollInterval: null,
   _pollCount: 0,
   _queuedCount: 0,
+  _completedBaseline: 0,
 
   // Upload state
   uploadFiles: [],
@@ -163,6 +177,11 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
   // Deep-link state
   highlightedScreenshotId: null,
   returnUrl: null,
+
+  // Queue review mode
+  queueMode: false,
+  queueIndex: 0,
+  queueScreenshotIds: [],
 
   setActiveStage: (stage) => set({ activeStage: stage }),
   setPageMode: (mode) => set({ pageMode: mode }),
@@ -236,12 +255,12 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
         const stageSummary = summaryData[activeStage];
         const alreadyPolling = get()._pollInterval !== null;
         if (stageSummary && stageSummary.running > 0 && !alreadyPolling) {
-          const total = stageSummary.running + stageSummary.completed + stageSummary.pending;
           set({
             isRunningStage: true,
-            stageProgress: { completed: stageSummary.completed, total },
+            stageProgress: { completed: 0, total: stageSummary.running },
             _pollCount: 0,
-            _queuedCount: total,
+            _queuedCount: stageSummary.running,
+            _completedBaseline: stageSummary.completed,
           });
           get().startPolling();
         }
@@ -255,7 +274,10 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
     const { selectedGroupId, phiPreset, redactionMethod, llmEnabled, llmEndpoint, llmModel } = get();
     if (!selectedGroupId && !screenshotIds) return;
 
-    set({ isRunningStage: true, stageProgress: null, _pollCount: 0, _queuedCount: 0 });
+    // Capture how many are already completed before this batch starts
+    const summary = get().summary;
+    const baseline = summary ? summary[stage]?.completed ?? 0 : 0;
+    set({ isRunningStage: true, stageProgress: null, _pollCount: 0, _queuedCount: 0, _completedBaseline: baseline });
     try {
       const options: Parameters<typeof api.preprocessing.runStage>[1] = {
         group_id: selectedGroupId || undefined,
@@ -397,6 +419,30 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
     }
   },
 
+  // Queue review actions
+  enterQueue: (screenshotIds, startIndex = 0) =>
+    set({ queueMode: true, queueScreenshotIds: screenshotIds, queueIndex: startIndex }),
+  exitQueue: () =>
+    set({ queueMode: false, queueIndex: 0, queueScreenshotIds: [] }),
+  queueNext: () => {
+    const { queueIndex, queueScreenshotIds } = get();
+    if (queueIndex < queueScreenshotIds.length - 1) {
+      set({ queueIndex: queueIndex + 1 });
+    }
+  },
+  queuePrev: () => {
+    const { queueIndex } = get();
+    if (queueIndex > 0) {
+      set({ queueIndex: queueIndex - 1 });
+    }
+  },
+  queueGoTo: (index) => {
+    const { queueScreenshotIds } = get();
+    if (index >= 0 && index < queueScreenshotIds.length) {
+      set({ queueIndex: index });
+    }
+  },
+
   // Deep-link actions
   setHighlightedScreenshotId: (id) => set({ highlightedScreenshotId: id }),
   setReturnUrl: (url) => set({ returnUrl: url }),
@@ -415,8 +461,10 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
         const stageSummary = summary[stage];
         const pollCount = get()._pollCount;
         const queuedCount = get()._queuedCount;
-        // Check how many have completed vs what was queued
+        const baseline = get()._completedBaseline;
+        // How many from THIS batch have completed (subtract pre-existing completed)
         const completedSoFar = stageSummary ? stageSummary.completed : 0;
+        const batchCompleted = Math.max(0, completedSoFar - baseline);
         // Wait at least 3 polls (6s) before concluding "done" to give
         // Celery workers time to pick up tasks and set status to "running"
         const minPollsBeforeComplete = 3;
@@ -425,7 +473,7 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
           pollCount >= minPollsBeforeComplete &&
           // Only stop if completed count actually increased from the queued batch,
           // or if there's truly nothing pending/running for this stage
-          (stageSummary.pending === 0 || completedSoFar >= queuedCount);
+          (stageSummary.pending === 0 || batchCompleted >= queuedCount);
         if (allDone) {
           // Done — refresh everything and stop polling
           get().stopPolling();
@@ -433,7 +481,7 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
         } else if (stageSummary) {
           set({
             stageProgress: {
-              completed: completedSoFar,
+              completed: batchCompleted,
               total: queuedCount || summary.total,
             },
           });
@@ -524,6 +572,7 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
     } else if (stage === "cropping") {
       if (result.is_ipad && !result.was_cropped) return true;
     } else if (stage === "phi_detection") {
+      if (result.reviewed) return false; // Manually reviewed — no longer needs review
       if (result.phi_detected) return true;
       if ((result.regions_count as number) > 10) return true;
     } else if (stage === "phi_redaction") {

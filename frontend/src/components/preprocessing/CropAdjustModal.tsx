@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { api } from "@/services/apiClient";
 import toast from "react-hot-toast";
 
-interface CropRect {
+export interface CropRect {
   left: number;
   top: number;
   right: number;
@@ -15,6 +15,9 @@ interface CropAdjustModalProps {
   onClose: () => void;
   onCropApplied: () => void;
   initialCrop?: CropRect;
+  inline?: boolean;
+  onApplyAndNext?: () => void;
+  recentCrops?: CropRect[];
 }
 
 type DragMode = "none" | "move" | "top" | "bottom" | "left" | "right" | "tl" | "tr" | "bl" | "br";
@@ -27,6 +30,9 @@ export const CropAdjustModal = ({
   onClose,
   onCropApplied,
   initialCrop,
+  inline = false,
+  onApplyAndNext,
+  recentCrops,
 }: CropAdjustModalProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
@@ -39,20 +45,21 @@ export const CropAdjustModal = ({
   const [isApplying, setIsApplying] = useState(false);
   const [imageError, setImageError] = useState(false);
 
-  // Close on Escape key
+  // Close on Escape key (skip in inline mode — queue view handles keyboard)
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || inline) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, inline]);
 
-  // Load original image
+  // Load original image (inline mode is always "open")
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen && !inline) return;
     setImageError(false);
+    setImage(null);
     const img = new Image();
     img.crossOrigin = "anonymous";
     api.preprocessing.getOriginalImageUrl(screenshotId).then((url) => {
@@ -67,7 +74,7 @@ export const CropAdjustModal = ({
       }
     };
     img.onerror = () => setImageError(true);
-  }, [isOpen, screenshotId, initialCrop]);
+  }, [isOpen, inline, screenshotId, initialCrop]);
 
   // Calculate scale to fit canvas — use most of the viewport
   useEffect(() => {
@@ -266,10 +273,144 @@ export const CropAdjustModal = ({
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen && !inline) return null;
 
   const cropW = crop.right - crop.left;
   const cropH = crop.bottom - crop.top;
+
+  const handleApplyAndNext = async () => {
+    setIsApplying(true);
+    try {
+      await api.preprocessing.applyManualCrop(screenshotId, crop);
+      toast.success("Manual crop applied");
+      onCropApplied();
+      onApplyAndNext?.();
+    } catch (err) {
+      toast.error(`Crop failed: ${err}`);
+    } finally {
+      setIsApplying(false);
+    }
+  };
+
+  const editorContent = (
+    <>
+      {/* Content */}
+      <div className="flex-1 flex overflow-hidden p-6 gap-6 min-h-0">
+        {/* Left: Main canvas */}
+        <div className="flex-1 overflow-auto flex items-start justify-center">
+          {imageError ? (
+            <div className="flex flex-col items-center justify-center h-64 gap-2">
+              <span className="text-red-500 text-sm">Failed to load image</span>
+              {!inline && (
+                <button
+                  onClick={onClose}
+                  className="px-3 py-1 text-sm text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+                >
+                  Close
+                </button>
+              )}
+            </div>
+          ) : image ? (
+            <canvas
+              ref={canvasRef}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-64 gap-2">
+              <span className="inline-block w-5 h-5 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
+              <span className="text-gray-400">Loading image...</span>
+            </div>
+          )}
+        </div>
+
+        {/* Right: Preview + controls */}
+        <div className="w-[420px] shrink-0 flex flex-col gap-4 overflow-auto">
+          {/* Recent crops (inline queue mode only) */}
+          {inline && recentCrops && recentCrops.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold text-gray-500 mb-1.5">Recent Crops</div>
+              <div className="flex flex-wrap gap-1.5">
+                {recentCrops.map((rc, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setCrop(rc)}
+                    className="px-2 py-1 text-xs font-mono bg-gray-100 text-gray-700 border border-gray-200 rounded hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors"
+                    title={`Left: ${rc.left}, Top: ${rc.top}, Right: ${rc.right}, Bottom: ${rc.bottom}`}
+                  >
+                    {rc.right - rc.left}&times;{rc.bottom - rc.top}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="text-sm font-medium text-gray-700">Preview</div>
+          <div className="border rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center min-h-[300px]">
+            <canvas ref={previewRef} />
+          </div>
+
+          {/* Numeric inputs */}
+          <div className="grid grid-cols-2 gap-2">
+            {(["left", "top", "right", "bottom"] as const).map((field) => (
+              <div key={field} className="flex items-center gap-1">
+                <label className="text-xs text-gray-500 w-12 capitalize">{field}:</label>
+                <input
+                  type="number"
+                  value={crop[field]}
+                  onChange={(e) => setCrop({ ...crop, [field]: Math.max(0, parseInt(e.target.value) || 0) })}
+                  className="w-full text-xs border border-gray-200 rounded px-2 py-1"
+                  min={0}
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="text-xs text-gray-500">
+            Crop: {cropW} x {cropH}px
+            {image && <span className="ml-2">(Original: {image.naturalWidth} x {image.naturalHeight})</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-end gap-3 px-6 py-3 border-t shrink-0">
+        {!inline && (
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+        )}
+        <button
+          onClick={handleApply}
+          disabled={isApplying || cropW < 10 || cropH < 10}
+          className="px-6 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+        >
+          {isApplying ? "Applying..." : "Apply Crop"}
+        </button>
+        {onApplyAndNext && (
+          <button
+            onClick={handleApplyAndNext}
+            disabled={isApplying || cropW < 10 || cropH < 10}
+            className="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
+          >
+            {isApplying ? "Applying..." : "Apply & Next"}
+          </button>
+        )}
+      </div>
+    </>
+  );
+
+  if (inline) {
+    return (
+      <div className="flex flex-col h-full bg-white rounded-lg border border-gray-200">
+        {editorContent}
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
@@ -279,83 +420,7 @@ export const CropAdjustModal = ({
           <h3 className="text-lg font-semibold">Adjust Crop - Screenshot #{screenshotId}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none" aria-label="Close crop editor">&times;</button>
         </div>
-
-        {/* Content */}
-        <div className="flex-1 flex overflow-hidden p-6 gap-6 min-h-0">
-          {/* Left: Main canvas */}
-          <div className="flex-1 overflow-auto flex items-start justify-center">
-            {imageError ? (
-              <div className="flex flex-col items-center justify-center h-64 gap-2">
-                <span className="text-red-500 text-sm">Failed to load image</span>
-                <button
-                  onClick={onClose}
-                  className="px-3 py-1 text-sm text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
-                >
-                  Close
-                </button>
-              </div>
-            ) : image ? (
-              <canvas
-                ref={canvasRef}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-              />
-            ) : (
-              <div className="flex items-center justify-center h-64 gap-2">
-                <span className="inline-block w-5 h-5 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
-                <span className="text-gray-400">Loading image...</span>
-              </div>
-            )}
-          </div>
-
-          {/* Right: Preview + controls */}
-          <div className="w-[420px] shrink-0 flex flex-col gap-4 overflow-auto">
-            <div className="text-sm font-medium text-gray-700">Preview</div>
-            <div className="border rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center min-h-[300px]">
-              <canvas ref={previewRef} />
-            </div>
-
-            {/* Numeric inputs */}
-            <div className="grid grid-cols-2 gap-2">
-              {(["left", "top", "right", "bottom"] as const).map((field) => (
-                <div key={field} className="flex items-center gap-1">
-                  <label className="text-xs text-gray-500 w-12 capitalize">{field}:</label>
-                  <input
-                    type="number"
-                    value={crop[field]}
-                    onChange={(e) => setCrop({ ...crop, [field]: Math.max(0, parseInt(e.target.value) || 0) })}
-                    className="w-full text-xs border border-gray-200 rounded px-2 py-1"
-                    min={0}
-                  />
-                </div>
-              ))}
-            </div>
-
-            <div className="text-xs text-gray-500">
-              Crop: {cropW} x {cropH}px
-              {image && <span className="ml-2">(Original: {image.naturalWidth} x {image.naturalHeight})</span>}
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-3 border-t shrink-0">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleApply}
-            disabled={isApplying || cropW < 10 || cropH < 10}
-            className="px-6 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
-          >
-            {isApplying ? "Applying..." : "Apply Crop"}
-          </button>
-        </div>
+        {editorContent}
       </div>
     </div>
   );

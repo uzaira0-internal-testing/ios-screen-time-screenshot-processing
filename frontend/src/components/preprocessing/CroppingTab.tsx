@@ -15,7 +15,7 @@ interface CropRect {
 const RESULT_HEADERS = ["Device", "Cropped", "Patched", "Original Size", "Cropped Size", ""];
 
 /** Extract crop bounds from a cropping event result. Auto-crop is right-aligned (removes left sidebar). */
-function getCropRectFromEvent(event: PreprocessingEventData | null): CropRect | undefined {
+export function getCropRectFromEvent(event: PreprocessingEventData | null): CropRect | undefined {
   if (!event) return undefined;
   const result = event.result as Record<string, unknown> | undefined;
   if (!result?.was_cropped) return undefined;

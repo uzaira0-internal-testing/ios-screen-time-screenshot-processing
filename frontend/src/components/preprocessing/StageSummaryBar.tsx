@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { usePreprocessingStore } from "@/store/preprocessingStore";
 import type { FilterMode } from "@/store/preprocessingStore";
+import type { Screenshot } from "@/types";
 
 const FILTER_DEFS: { id: FilterMode; label: string; color: string }[] = [
   { id: "all", label: "All", color: "text-gray-700 bg-gray-100" },
@@ -25,6 +26,8 @@ export const StageSummaryBar = () => {
 
   const loadSummary = usePreprocessingStore((s) => s.loadSummary);
   const loadScreenshots = usePreprocessingStore((s) => s.loadScreenshots);
+  const enterQueue = usePreprocessingStore((s) => s.enterQueue);
+  const getScreenshotsForStage = usePreprocessingStore((s) => s.getScreenshotsForStage);
 
   // Auto-refresh counts every 5 seconds so progress is always visible
   useEffect(() => {
@@ -111,6 +114,21 @@ export const StageSummaryBar = () => {
         <span className="text-xs text-amber-600 ml-2">
           {blockedByPrereq} blocked — complete {prevStageLabel} first
         </span>
+      )}
+
+      {/* Review queue button */}
+      {total > 0 && (
+        <button
+          onClick={() => {
+            const filtered = getScreenshotsForStage(activeStage);
+            if (filtered.length > 0) {
+              enterQueue(filtered.map((s: Screenshot) => s.id));
+            }
+          }}
+          className="ml-2 px-3 py-1.5 text-sm font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-md hover:bg-primary-100 transition-colors"
+        >
+          Review ({filterCounts[filter]})
+        </button>
       )}
 
       {/* Re-run button — shows when all are completed and nothing is eligible */}

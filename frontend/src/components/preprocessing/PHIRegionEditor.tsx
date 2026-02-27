@@ -3,7 +3,7 @@ import { api } from "@/services/apiClient";
 import { config } from "@/config";
 import toast from "react-hot-toast";
 
-interface PHIRegion {
+export interface PHIRegion {
   x: number;
   y: number;
   w: number;
@@ -14,12 +14,20 @@ interface PHIRegion {
   text: string;
 }
 
+export interface RecentPHIConfig {
+  regions: PHIRegion[];
+  label: string;
+}
+
 interface PHIRegionEditorProps {
   screenshotId: number;
   isOpen: boolean;
   onClose: () => void;
   onRegionsSaved: () => void;
   onRedactionApplied: () => void;
+  inline?: boolean;
+  onSaveAndNext?: () => void;
+  recentPHIConfigs?: RecentPHIConfig[];
 }
 
 type Tool = "draw" | "select" | "delete";
@@ -54,6 +62,9 @@ export const PHIRegionEditor = ({
   onClose,
   onRegionsSaved,
   onRedactionApplied,
+  inline = false,
+  onSaveAndNext,
+  recentPHIConfigs,
 }: PHIRegionEditorProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
@@ -68,25 +79,61 @@ export const PHIRegionEditor = ({
   const [redactionMethod, setRedactionMethod] = useState("redbox");
   const [imageError, setImageError] = useState(false);
 
-  // Close on Escape key
+  // Close on Escape key (skip in inline mode — queue view handles keyboard)
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || inline) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, inline]);
 
-  // Load image and regions on open
+  // Inline mode keyboard shortcuts
+  const handleDeleteAutoRef = useRef<() => void>(() => {});
+  const handleSaveAndNextRef = useRef<() => void>(() => {});
+  handleDeleteAutoRef.current = () => {
+    const autoRegions = regions.filter((r) => r.source !== "manual");
+    if (autoRegions.length === 0) return;
+    setRegions((prev) => prev.filter((r) => r.source === "manual"));
+    setSelectedIndex(null);
+    toast.success(`Removed ${autoRegions.length} auto-detected region(s)`);
+  };
+  // handleSaveAndNextRef is assigned after handleSaveAndNext is defined (below the early return)
+
   useEffect(() => {
-    if (!isOpen) return;
-    setImageError(false);
+    if (!inline) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
 
-    // Load image
+      // Shift+D: delete all auto-detected regions
+      if (e.key === "D" && e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        handleDeleteAutoRef.current();
+      }
+      // Ctrl/Cmd+Enter: save & next
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        handleSaveAndNextRef.current();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [inline]);
+
+  // Load image and regions on open (inline mode is always "open")
+  useEffect(() => {
+    if (!isOpen && !inline) return;
+    setImageError(false);
+    setImage(null);
+    setRegions([]);
+    setSelectedIndex(null);
+
+    // Load the cropped image (not the redacted one)
     const img = new Image();
     img.crossOrigin = "anonymous";
-    const imageUrl = `${config.apiBaseUrl}/screenshots/${screenshotId}/image`;
+    const imageUrl = `${config.apiBaseUrl}/screenshots/${screenshotId}/stage-image?stage=cropping`;
     img.src = imageUrl;
     img.onload = () => setImage(img);
     img.onerror = () => setImageError(true);
@@ -97,7 +144,7 @@ export const PHIRegionEditor = ({
     }).catch(() => {
       setRegions([]);
     });
-  }, [isOpen, screenshotId]);
+  }, [isOpen, inline, screenshotId]);
 
   // Calculate scale
   useEffect(() => {
@@ -286,10 +333,208 @@ export const PHIRegionEditor = ({
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen && !inline) return null;
 
   const autoCount = regions.filter((r) => r.source !== "manual").length;
   const manualCount = regions.length - autoCount;
+
+  const handleSaveAndNext = async () => {
+    setIsSaving(true);
+    try {
+      await api.preprocessing.savePHIRegions(screenshotId, { regions, preset: "manual" });
+      toast.success(`Saved ${regions.length} PHI region(s)`);
+      onRegionsSaved();
+      onSaveAndNext?.();
+    } catch (err) {
+      toast.error(`Save failed: ${err}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Wire up the ref so the keyboard shortcut can call it
+  handleSaveAndNextRef.current = onSaveAndNext ? handleSaveAndNext : () => {};
+
+  const editorContent = (
+    <div className="flex-1 flex overflow-hidden">
+      {/* Canvas area */}
+      <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
+        {imageError ? (
+          <div className="flex flex-col items-center justify-center h-64 gap-2">
+            <span className="text-red-500 text-sm">Failed to load image</span>
+            {!inline && (
+              <button
+                onClick={onClose}
+                className="px-3 py-1 text-sm text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+              >
+                Close
+              </button>
+            )}
+          </div>
+        ) : image ? (
+          <canvas
+            ref={canvasRef}
+            role="img"
+            aria-label={`PHI region editor for screenshot ${screenshotId}. ${regions.length} regions marked. Use the toolbar to select Draw, Select, or Delete tools.`}
+            style={{ cursor: getCursor() }}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+          />
+        ) : (
+          <div className="flex items-center justify-center h-64 gap-2">
+            <span className="inline-block w-5 h-5 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
+            <span className="text-gray-400">Loading image...</span>
+          </div>
+        )}
+      </div>
+
+      {/* Sidebar */}
+      <div className="w-80 border-l flex flex-col">
+        {/* Toolbar */}
+        <div className="flex items-center gap-1 p-3 border-b">
+          {(["select", "draw", "delete"] as Tool[]).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTool(t)}
+              aria-label={`${t === "select" ? "Select" : t === "draw" ? "Draw" : "Delete"} tool`}
+              aria-pressed={tool === t}
+              className={`px-3 py-1.5 text-xs rounded font-medium ${
+                tool === t
+                  ? "bg-blue-100 text-blue-700 border border-blue-300"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200 border border-transparent"
+              }`}
+            >
+              {t === "select" ? "Select" : t === "draw" ? "Draw" : "Delete"}
+            </button>
+          ))}
+        </div>
+
+        {/* Region list */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-1">
+          {/* Recent region configs (inline queue mode only) */}
+          {inline && recentPHIConfigs && recentPHIConfigs.length > 0 && (
+            <div className="mb-3">
+              <div className="text-xs font-semibold text-gray-500 mb-1.5">Recent Regions</div>
+              <div className="flex flex-wrap gap-1.5">
+                {recentPHIConfigs.map((cfg, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      if (regions.length > 0 && !window.confirm(`Replace ${regions.length} existing region(s) with this config?`)) return;
+                      setRegions(cfg.regions);
+                      setSelectedIndex(null);
+                    }}
+                    className="px-2 py-1 text-xs bg-gray-100 text-gray-700 border border-gray-200 rounded hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors"
+                    title={`Apply ${cfg.regions.length} region(s): ${cfg.label}`}
+                  >
+                    {cfg.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="text-xs text-gray-500 mb-2">
+            {autoCount} auto-detected, {manualCount} manual
+          </div>
+          {regions.map((region, i) => (
+            <div
+              key={i}
+              className={`flex items-center gap-2 p-2 rounded text-xs cursor-pointer ${
+                i === selectedIndex ? "bg-blue-50 border border-blue-200" : "hover:bg-gray-50 border border-transparent"
+              }`}
+              onClick={() => setSelectedIndex(i)}
+            >
+              <span className="font-mono text-gray-400 w-4">{i + 1}</span>
+              <span className="text-gray-500">
+                {region.x},{region.y} {region.w}x{region.h}
+              </span>
+              <select
+                value={region.label}
+                onChange={(e) => updateRegion(i, { label: e.target.value })}
+                className="text-xs border rounded px-1 py-0.5 flex-1"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {(!LABELS.includes(region.label) ? [region.label, ...LABELS] : LABELS).map((l) => (
+                  <option key={l} value={l}>{l}</option>
+                ))}
+              </select>
+              <span
+                className={`px-1.5 py-0.5 rounded text-[10px] ${
+                  region.source === "manual" ? "bg-blue-100 text-blue-600" : "bg-red-100 text-red-600"
+                }`}
+              >
+                {region.source === "manual" ? "M" : "A"}
+              </span>
+              <button
+                onClick={(e) => { e.stopPropagation(); deleteRegion(i); }}
+                className="text-gray-400 hover:text-red-500 leading-none"
+                title="Delete region"
+                aria-label={`Delete region ${i + 1}`}
+              >
+                &times;
+              </button>
+            </div>
+          ))}
+          {regions.length === 0 && (
+            <div className="text-center text-gray-400 py-8 text-sm">
+              No PHI regions. Use Draw tool to add regions.
+            </div>
+          )}
+        </div>
+
+        {/* Redaction method */}
+        <div className="p-3 border-t space-y-3">
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-500">Method:</label>
+            <select
+              value={redactionMethod}
+              onChange={(e) => setRedactionMethod(e.target.value)}
+              className="text-xs border rounded px-2 py-1 flex-1"
+            >
+              <option value="redbox">Red Box</option>
+              <option value="blackbox">Black Box</option>
+              <option value="pixelate">Pixelate</option>
+            </select>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="flex-1 px-3 py-2 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200"
+            >
+              {isSaving ? "Saving..." : "Save Regions"}
+            </button>
+            <button
+              onClick={handleRedact}
+              disabled={isRedacting || regions.length === 0}
+              className="flex-1 px-3 py-2 text-xs font-medium text-white bg-orange-600 rounded hover:bg-orange-700 disabled:bg-gray-400 disabled:text-gray-200"
+            >
+              {isRedacting ? "Redacting..." : "Apply Redaction"}
+            </button>
+          </div>
+          {onSaveAndNext && (
+            <button
+              onClick={handleSaveAndNext}
+              disabled={isSaving}
+              className="w-full px-3 py-2 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700 disabled:bg-gray-400 disabled:text-gray-200"
+            >
+              {isSaving ? "Saving..." : "Save & Next"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  if (inline) {
+    return (
+      <div className="flex flex-col h-full bg-white rounded-lg border border-gray-200">
+        {editorContent}
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center">
@@ -299,145 +544,7 @@ export const PHIRegionEditor = ({
           <h3 className="text-lg font-semibold">PHI Region Editor - Screenshot #{screenshotId}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none" aria-label="Close PHI region editor">&times;</button>
         </div>
-
-        {/* Content */}
-        <div className="flex-1 flex overflow-hidden">
-          {/* Canvas area */}
-          <div className="flex-1 overflow-auto p-4">
-            {imageError ? (
-              <div className="flex flex-col items-center justify-center h-64 gap-2">
-                <span className="text-red-500 text-sm">Failed to load image</span>
-                <button
-                  onClick={onClose}
-                  className="px-3 py-1 text-sm text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
-                >
-                  Close
-                </button>
-              </div>
-            ) : image ? (
-              <canvas
-                ref={canvasRef}
-                role="img"
-                aria-label={`PHI region editor for screenshot ${screenshotId}. ${regions.length} regions marked. Use the toolbar to select Draw, Select, or Delete tools.`}
-                style={{ cursor: getCursor() }}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-              />
-            ) : (
-              <div className="flex items-center justify-center h-64 gap-2">
-                <span className="inline-block w-5 h-5 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
-                <span className="text-gray-400">Loading image...</span>
-              </div>
-            )}
-          </div>
-
-          {/* Sidebar */}
-          <div className="w-80 border-l flex flex-col">
-            {/* Toolbar */}
-            <div className="flex items-center gap-1 p-3 border-b">
-              {(["select", "draw", "delete"] as Tool[]).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTool(t)}
-                  aria-label={`${t === "select" ? "Select" : t === "draw" ? "Draw" : "Delete"} tool`}
-                  aria-pressed={tool === t}
-                  className={`px-3 py-1.5 text-xs rounded font-medium ${
-                    tool === t
-                      ? "bg-blue-100 text-blue-700 border border-blue-300"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200 border border-transparent"
-                  }`}
-                >
-                  {t === "select" ? "Select" : t === "draw" ? "Draw" : "Delete"}
-                </button>
-              ))}
-            </div>
-
-            {/* Region list */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-1">
-              <div className="text-xs text-gray-500 mb-2">
-                {autoCount} auto-detected, {manualCount} manual
-              </div>
-              {regions.map((region, i) => (
-                <div
-                  key={i}
-                  className={`flex items-center gap-2 p-2 rounded text-xs cursor-pointer ${
-                    i === selectedIndex ? "bg-blue-50 border border-blue-200" : "hover:bg-gray-50 border border-transparent"
-                  }`}
-                  onClick={() => setSelectedIndex(i)}
-                >
-                  <span className="font-mono text-gray-400 w-4">{i + 1}</span>
-                  <span className="text-gray-500">
-                    {region.x},{region.y} {region.w}x{region.h}
-                  </span>
-                  <select
-                    value={region.label}
-                    onChange={(e) => updateRegion(i, { label: e.target.value })}
-                    className="text-xs border rounded px-1 py-0.5 flex-1"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {(!LABELS.includes(region.label) ? [region.label, ...LABELS] : LABELS).map((l) => (
-                      <option key={l} value={l}>{l}</option>
-                    ))}
-                  </select>
-                  <span
-                    className={`px-1.5 py-0.5 rounded text-[10px] ${
-                      region.source === "manual" ? "bg-blue-100 text-blue-600" : "bg-red-100 text-red-600"
-                    }`}
-                  >
-                    {region.source === "manual" ? "M" : "A"}
-                  </span>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); deleteRegion(i); }}
-                    className="text-gray-400 hover:text-red-500 leading-none"
-                    title="Delete region"
-                    aria-label={`Delete region ${i + 1}`}
-                  >
-                    &times;
-                  </button>
-                </div>
-              ))}
-              {regions.length === 0 && (
-                <div className="text-center text-gray-400 py-8 text-sm">
-                  No PHI regions. Use Draw tool to add regions.
-                </div>
-              )}
-            </div>
-
-            {/* Redaction method */}
-            <div className="p-3 border-t space-y-3">
-              <div className="flex items-center gap-2">
-                <label className="text-xs text-gray-500">Method:</label>
-                <select
-                  value={redactionMethod}
-                  onChange={(e) => setRedactionMethod(e.target.value)}
-                  className="text-xs border rounded px-2 py-1 flex-1"
-                >
-                  <option value="redbox">Red Box</option>
-                  <option value="blackbox">Black Box</option>
-                  <option value="pixelate">Pixelate</option>
-                </select>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={handleSave}
-                  disabled={isSaving}
-                  className="flex-1 px-3 py-2 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200"
-                >
-                  {isSaving ? "Saving..." : "Save Regions"}
-                </button>
-                <button
-                  onClick={handleRedact}
-                  disabled={isRedacting || regions.length === 0}
-                  className="flex-1 px-3 py-2 text-xs font-medium text-white bg-orange-600 rounded hover:bg-orange-700 disabled:bg-gray-400 disabled:text-gray-200"
-                >
-                  {isRedacting ? "Redacting..." : "Apply Redaction"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        {editorContent}
       </div>
     </div>
   );

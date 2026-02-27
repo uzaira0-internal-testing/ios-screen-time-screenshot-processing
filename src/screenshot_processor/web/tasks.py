@@ -320,8 +320,8 @@ def device_detection_task(self, screenshot_id: int) -> dict:
                 append_error_event(screenshot, "device_detection", "auto", {}, str(e))
                 flag_modified(screenshot, "processing_metadata")
                 db.commit()
-        except Exception:
-            pass
+        except Exception as inner:
+            logger.warning("Failed to record device_detection error event", extra={"screenshot_id": screenshot_id, "inner_error": str(inner)})
         return {"success": False, "error": str(e), "screenshot_id": screenshot_id}
     finally:
         db.close()
@@ -446,8 +446,8 @@ def cropping_task(self, screenshot_id: int) -> dict:
                 append_error_event(screenshot, "cropping", "auto", {}, str(e))
                 flag_modified(screenshot, "processing_metadata")
                 db.commit()
-        except Exception:
-            pass
+        except Exception as inner:
+            logger.warning("Failed to record cropping error event", extra={"screenshot_id": screenshot_id, "inner_error": str(inner)})
         return {"success": False, "error": str(e), "screenshot_id": screenshot_id}
     finally:
         db.close()
@@ -523,8 +523,8 @@ def phi_detection_task(self, screenshot_id: int, preset: str = "screen_time",
                 append_error_event(screenshot, "phi_detection", "auto", {"preset": preset}, str(e))
                 flag_modified(screenshot, "processing_metadata")
                 db.commit()
-        except Exception:
-            pass
+        except Exception as inner:
+            logger.warning("Failed to record phi_detection error event", extra={"screenshot_id": screenshot_id, "inner_error": str(inner)})
         return {"success": False, "error": str(e), "screenshot_id": screenshot_id}
     finally:
         db.close()
@@ -623,8 +623,8 @@ def phi_redaction_task(self, screenshot_id: int, method: str = "redbox") -> dict
                 append_error_event(screenshot, "phi_redaction", "auto", {"method": method}, str(e))
                 flag_modified(screenshot, "processing_metadata")
                 db.commit()
-        except Exception:
-            pass
+        except Exception as inner:
+            logger.warning("Failed to record phi_redaction error event", extra={"screenshot_id": screenshot_id, "inner_error": str(inner)})
         return {"success": False, "error": str(e), "screenshot_id": screenshot_id}
     finally:
         db.close()

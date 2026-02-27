@@ -31,7 +31,7 @@ const STATUS_SORT_ORDER: Record<string, number> = {
   completed: 4,
 };
 
-function getCurrentEvent(screenshot: Screenshot, stage: Stage): PreprocessingEventData | null {
+export function getCurrentEvent(screenshot: Screenshot, stage: Stage): PreprocessingEventData | null {
   const pp = (screenshot.processing_metadata as Record<string, unknown>)?.preprocessing as Record<string, unknown> | undefined;
   if (!pp) return null;
   const currentEvents = pp.current_events as Record<string, number | null> | undefined;
@@ -112,6 +112,8 @@ export const StageReviewTable = ({
     return sorted;
   }, [allScreenshots, filter, stage, getScreenshotStageStatus, isScreenshotException, sortColumn, sortDirection]);
 
+  const enterQueue = usePreprocessingStore((s) => s.enterQueue);
+
   const highlightedRef = useRef<HTMLTableRowElement>(null);
 
   // Auto-scroll to highlighted screenshot
@@ -166,13 +168,24 @@ export const StageReviewTable = ({
                 }`}
               >
                 <td className="px-3 py-2">
-                  <img
-                    src={`${IMAGE_URL_PREFIX}/${s.id}/image`}
-                    alt={`Screenshot ${s.id}`}
-                    className="w-10 h-14 object-cover rounded bg-gray-200"
-                    loading="lazy"
-                    onError={(e) => { e.currentTarget.src = ""; }}
-                  />
+                  <button
+                    onClick={() => {
+                      const ids = screenshots.map((ss) => ss.id);
+                      const idx = ids.indexOf(s.id);
+                      enterQueue(ids, idx >= 0 ? idx : 0);
+                    }}
+                    className="block cursor-pointer hover:ring-2 hover:ring-primary-300 rounded transition-shadow"
+                    title="Open in review queue"
+                    aria-label={`Review screenshot ${s.id} in queue`}
+                  >
+                    <img
+                      src={`${IMAGE_URL_PREFIX}/${s.id}/image`}
+                      alt={`Screenshot ${s.id}`}
+                      className="w-10 h-14 object-cover rounded bg-gray-200"
+                      loading="lazy"
+                      onError={(e) => { e.currentTarget.src = ""; }}
+                    />
+                  </button>
                 </td>
                 <td className="px-3 py-2 font-mono text-gray-600">{s.id}</td>
                 <td className="px-3 py-2">{s.participant_id || "\u2014"}</td>

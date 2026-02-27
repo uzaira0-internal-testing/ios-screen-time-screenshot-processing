@@ -880,7 +880,12 @@ def _resolve_image_path(path_str: str) -> Path:
     file_path = Path(path_str)
     if not file_path.is_absolute():
         settings = get_settings()
-        file_path = Path(settings.UPLOAD_DIR) / file_path
+        upload_dir = Path(settings.UPLOAD_DIR)
+        # Avoid double-prepending if path already starts with UPLOAD_DIR
+        try:
+            file_path.relative_to(upload_dir)
+        except ValueError:
+            file_path = upload_dir / file_path
     return file_path.resolve()
 
 
@@ -2253,8 +2258,10 @@ async def upload_browser(
                 await db.flush()
 
                 # Initialize preprocessing metadata (no Celery tasks)
+                from sqlalchemy.orm.attributes import flag_modified as _flag_modified
                 screenshot = await get_screenshot_or_404(db, screenshot_id)
                 init_preprocessing_metadata(screenshot)
+                _flag_modified(screenshot, "processing_metadata")
                 await db.flush()
 
             results.append(BrowserUploadItemResult(index=i, success=True, screenshot_id=screenshot_id))
@@ -2304,6 +2311,62 @@ async def get_original_image(
 
     if not file_path.exists():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Original image not found")
+
+    media_type = "image/png" if file_path.suffix.lower() == ".png" else "image/jpeg"
+    return FileResponse(str(file_path), media_type=media_type)
+
+
+@router.get("/{screenshot_id}/stage-image")
+async def get_stage_image(
+    screenshot_id: int,
+    db: DatabaseSession,
+    stage: str = Query(..., description="Stage whose output to serve (e.g. 'cropping')"),
+):
+    """Serve the output image of a specific preprocessing stage.
+
+    Walks the event log to find the current event for the given stage and
+    serves its output_file.  Falls back to the stage's input_file, then to
+    base_file_path.
+    """
+    VALID_STAGES = {"device_detection", "cropping", "phi_detection", "phi_redaction"}
+    if stage not in VALID_STAGES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid stage '{stage}'. Must be one of: {', '.join(sorted(VALID_STAGES))}",
+        )
+
+    screenshot = await get_screenshot_or_404(db, screenshot_id)
+
+    pp = (screenshot.processing_metadata or {}).get("preprocessing", {})
+    base_path = pp.get("base_file_path", screenshot.file_path)
+    current_events = pp.get("current_events", {})
+    events = pp.get("events", [])
+
+    target_path = base_path  # ultimate fallback
+
+    eid = current_events.get(stage)
+    if eid:
+        ev = next((e for e in events if e.get("event_id") == eid), None)
+        if ev:
+            if ev.get("output_file"):
+                target_path = ev["output_file"]
+            elif ev.get("input_file"):
+                target_path = ev["input_file"]
+
+    file_path = Path(target_path).resolve()
+
+    settings = get_settings()
+    upload_dir = Path(settings.UPLOAD_DIR).resolve()
+    try:
+        file_path.relative_to(upload_dir)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    if not file_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Image not found for stage '{stage}'",
+        )
 
     media_type = "image/png" if file_path.suffix.lower() == ".png" else "image/jpeg"
     return FileResponse(str(file_path), media_type=media_type)
@@ -2385,6 +2448,8 @@ async def manual_crop(
         input_file=base_path,
     )
 
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(screenshot, "processing_metadata")
     await db.commit()
 
     return ManualCropResponse(
@@ -2470,6 +2535,8 @@ async def save_phi_regions(
     current_user: CurrentUser,
 ):
     """Save manually-adjusted PHI regions. Invalidates phi_redaction downstream."""
+    from sqlalchemy.orm.attributes import flag_modified
+
     from screenshot_processor.web.services.preprocessing_service import (
         append_event,
         get_current_input_file,
@@ -2496,10 +2563,12 @@ async def save_phi_regions(
             "regions_count": len(request_body.regions),
             "regions": regions_dicts,
             "preset": request_body.preset,
+            "reviewed": True,
         },
         input_file=input_file,
     )
 
+    flag_modified(screenshot, "processing_metadata")
     await db.commit()
 
     return ManualPHIRegionsResponse(
@@ -2518,6 +2587,8 @@ async def apply_redaction(
     current_user: CurrentUser,
 ):
     """Apply PHI redaction to confirmed regions."""
+    from sqlalchemy.orm.attributes import flag_modified
+
     from screenshot_processor.web.services.preprocessing_service import (
         append_event,
         get_current_input_file,
@@ -2586,6 +2657,7 @@ async def apply_redaction(
         input_file=input_file,
     )
 
+    flag_modified(screenshot, "processing_metadata")
     await db.commit()
 
     return ApplyPHIRedactionResponse(

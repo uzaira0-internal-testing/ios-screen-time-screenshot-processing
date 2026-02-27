@@ -197,6 +197,9 @@ async def process_screenshot_async(
 
     # Update model and commit
     update_screenshot_from_result(screenshot, result)
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(screenshot, "extracted_hourly_data")
+    flag_modified(screenshot, "processing_issues")
     await db.commit()
     await db.refresh(screenshot)
 
@@ -236,6 +239,9 @@ def process_screenshot_sync(
     )
 
     update_screenshot_from_result(screenshot, result)
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(screenshot, "extracted_hourly_data")
+    flag_modified(screenshot, "processing_issues")
     db.commit()
     db.refresh(screenshot)
 
