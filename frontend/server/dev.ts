@@ -10,7 +10,7 @@
  * consider adding workbox-cli or a custom solution.
  */
 
-import { watch } from "fs";
+import { watch, rmSync, mkdirSync } from "fs";
 import { join, resolve } from "path";
 
 const ROOT_DIR = resolve(import.meta.dir, "..");
@@ -19,6 +19,8 @@ const PUBLIC_DIR = join(ROOT_DIR, "public");
 const OUT_DIR = join(ROOT_DIR, ".bun-dev");
 const PORT = parseInt(process.env.PORT || "5173");
 const BACKEND_URL = process.env.BACKEND_URL || "http://127.0.0.1:8000";
+// Base path for reverse proxy deployments (e.g. "/ios-screen-time-screenshot-processing")
+const BASE_PATH = (process.env.BASE_PATH || "").replace(/\/+$/, "");
 
 // Track connected WebSocket clients for live reload
 const clients = new Set<WebSocket>();
@@ -60,6 +62,10 @@ const pathAliasPlugin: import("bun").BunPlugin = {
 
 // Bundle the app
 async function bundle() {
+  // Clean old bundles so getMainBundle() always finds the latest
+  rmSync(OUT_DIR, { recursive: true, force: true });
+  mkdirSync(OUT_DIR, { recursive: true });
+
   const start = performance.now();
   const result = await Bun.build({
     entrypoints: [join(SRC_DIR, "main.tsx")],
@@ -112,14 +118,18 @@ async function generateHtml(): Promise<string> {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>iOS Screenshot Processing</title>
-    <link rel="stylesheet" href="/dist/index.css" />
+    <link rel="stylesheet" href="${BASE_PATH}/dist/index.css" />
+    <script>window.__CONFIG__ = { basePath: "${BASE_PATH}" };</script>
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/dist/${mainBundle}"></script>
+    <script type="module" src="${BASE_PATH}/dist/${mainBundle}"></script>
     <script>
-      // Live reload client
-      const ws = new WebSocket('ws://localhost:${PORT}/__livereload');
+      // Live reload client - connect directly to dev server port
+      const wsUrl = location.port
+        ? 'ws://' + location.hostname + ':' + location.port + '/__livereload'
+        : 'ws://' + location.hostname + '${BASE_PATH}/__livereload';
+      const ws = new WebSocket(wsUrl);
       ws.onmessage = (e) => {
         if (e.data === 'reload') {
           console.log('[bun] Reloading...');
@@ -187,7 +197,12 @@ async function startServer() {
     port: PORT,
     async fetch(req) {
       const url = new URL(req.url);
-      const pathname = url.pathname;
+      // Strip BASE_PATH prefix if present (Traefik does this for proxied requests,
+      // but direct access needs it too)
+      let pathname = url.pathname;
+      if (BASE_PATH && pathname.startsWith(BASE_PATH)) {
+        pathname = pathname.slice(BASE_PATH.length) || "/";
+      }
 
       // WebSocket upgrade for live reload
       if (pathname === "/__livereload") {

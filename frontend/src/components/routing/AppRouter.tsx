@@ -16,6 +16,7 @@ import { ConsensusPage } from "@/pages/ConsensusPage";
 import { ConsensusComparisonPage } from "@/pages/ConsensusComparisonPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { PreprocessingPage } from "@/pages/PreprocessingPage";
+import { UploadPage } from "@/pages/UploadPage";
 
 // Auth guard
 import { useAuthStore } from "@/store/authStore";
@@ -87,6 +88,15 @@ export const AppRouter: React.FC = () => {
         element={
           <ProtectedRoute>
             <ConsensusComparisonPage />
+          </ProtectedRoute>
+        }
+      />
+      {/* Upload */}
+      <Route
+        path="/upload"
+        element={
+          <ProtectedRoute>
+            <UploadPage />
           </ProtectedRoute>
         }
       />

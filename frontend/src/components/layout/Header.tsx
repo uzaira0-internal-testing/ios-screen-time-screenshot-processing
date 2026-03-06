@@ -27,22 +27,28 @@ export const Header = () => {
             {isAuthenticated && (
               <nav className="hidden md:flex space-x-4">
                 <Link
-                  to="/"
+                  to="/upload"
                   className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
                 >
-                  Groups
-                </Link>
-                <Link
-                  to="/consensus"
-                  className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                >
-                  Consensus
+                  Upload
                 </Link>
                 <Link
                   to="/preprocessing"
                   className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
                 >
                   Preprocessing
+                </Link>
+                <Link
+                  to="/"
+                  className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                >
+                  Annotate
+                </Link>
+                <Link
+                  to="/consensus"
+                  className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                >
+                  Consensus
                 </Link>
                 {isAdmin && (
                   <Link

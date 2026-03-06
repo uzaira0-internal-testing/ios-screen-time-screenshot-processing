@@ -1,0 +1,17 @@
+import { Layout } from "@/components/layout/Layout";
+import { BrowserUpload } from "@/components/preprocessing/BrowserUpload";
+
+export const UploadPage = () => {
+  return (
+    <Layout>
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">
+          Upload Screenshots
+        </h1>
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <BrowserUpload />
+        </div>
+      </div>
+    </Layout>
+  );
+};

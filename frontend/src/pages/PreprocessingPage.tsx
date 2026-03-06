@@ -1,7 +1,8 @@
 import { useEffect, useCallback } from "react";
 import { useSearchParams, Link } from "react-router-dom";
+import { Layout } from "@/components/layout/Layout";
 import { usePreprocessingStore } from "@/store/preprocessingStore";
-import type { Stage, PageMode } from "@/store/preprocessingStore";
+import type { Stage } from "@/store/preprocessingStore";
 import { PreprocessingWizard } from "@/components/preprocessing/PreprocessingWizard";
 import { StageSummaryBar } from "@/components/preprocessing/StageSummaryBar";
 import { DeviceDetectionTab } from "@/components/preprocessing/DeviceDetectionTab";
@@ -9,7 +10,6 @@ import { CroppingTab } from "@/components/preprocessing/CroppingTab";
 import { PHIDetectionTab } from "@/components/preprocessing/PHIDetectionTab";
 import { PHIRedactionTab } from "@/components/preprocessing/PHIRedactionTab";
 import { EventLogPanel } from "@/components/preprocessing/EventLogPanel";
-import { BrowserUpload } from "@/components/preprocessing/BrowserUpload";
 import { PreprocessingQueueView } from "@/components/preprocessing/PreprocessingQueueView";
 import { api } from "@/services/apiClient";
 
@@ -35,8 +35,6 @@ export const PreprocessingPage = () => {
   const llmModel = usePreprocessingStore((s) => s.llmModel);
   const setLlmModel = usePreprocessingStore((s) => s.setLlmModel);
   const stopPolling = usePreprocessingStore((s) => s.stopPolling);
-  const pageMode = usePreprocessingStore((s) => s.pageMode);
-  const setPageMode = usePreprocessingStore((s) => s.setPageMode);
   const setHighlightedScreenshotId = usePreprocessingStore((s) => s.setHighlightedScreenshotId);
   const setReturnUrl = usePreprocessingStore((s) => s.setReturnUrl);
   const returnUrl = usePreprocessingStore((s) => s.returnUrl);
@@ -49,21 +47,16 @@ export const PreprocessingPage = () => {
   }, [loadGroups, stopPolling]);
 
   const VALID_STAGES = ["device_detection", "cropping", "phi_detection", "phi_redaction"];
-  const VALID_MODES = ["upload", "pipeline"];
 
   // Restore state from URL params on mount
   useEffect(() => {
     const stageParam = searchParams.get("stage");
-    const modeParam = searchParams.get("mode");
     const groupParam = searchParams.get("group");
     const screenshotId = searchParams.get("screenshot_id");
     const returnUrlParam = searchParams.get("returnUrl");
 
     if (returnUrlParam) {
       setReturnUrl(returnUrlParam);
-    }
-    if (modeParam && VALID_MODES.includes(modeParam)) {
-      setPageMode(modeParam as PageMode);
     }
     if (stageParam && VALID_STAGES.includes(stageParam)) {
       setActiveStage(stageParam as Stage);
@@ -75,18 +68,15 @@ export const PreprocessingPage = () => {
     if (screenshotId) {
       const id = parseInt(screenshotId, 10);
       if (!isNaN(id)) {
-        // Fetch the screenshot to get its group_id, then navigate to it
         api.screenshots.getById(id).then((screenshot) => {
           if (screenshot?.group_id) {
             setSelectedGroupId(screenshot.group_id);
           }
           setHighlightedScreenshotId(id);
 
-          // Navigate to specified stage or first incomplete/invalidated stage
           if (stageParam && VALID_STAGES.includes(stageParam)) {
             setActiveStage(stageParam as Stage);
           } else {
-            // Find first problematic stage from preprocessing metadata
             const pp = (screenshot?.processing_metadata as Record<string, unknown>)?.preprocessing as Record<string, unknown> | undefined;
             const stageStatus = pp?.stage_status as Record<string, string> | undefined;
             if (stageStatus) {
@@ -108,24 +98,24 @@ export const PreprocessingPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Sync active stage, page mode, and group to URL (without triggering full re-render)
+  // Sync active stage and group to URL
   const syncToUrl = useCallback(() => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.set("stage", activeStage);
-      next.set("mode", pageMode);
       if (selectedGroupId) {
         next.set("group", selectedGroupId);
       }
       return next;
     }, { replace: true });
-  }, [activeStage, pageMode, selectedGroupId, setSearchParams]);
+  }, [activeStage, selectedGroupId, setSearchParams]);
 
   useEffect(() => {
     syncToUrl();
   }, [syncToUrl]);
 
   return (
+    <Layout>
     <div className="max-w-7xl mx-auto px-4 py-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
@@ -143,173 +133,138 @@ export const PreprocessingPage = () => {
           </h1>
         </div>
         <div className="flex items-center gap-3">
-          {/* Upload/Pipeline toggle */}
-          <div className="flex items-center bg-gray-100 rounded-md p-0.5">
-            <button
-              onClick={() => setPageMode("upload")}
-              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                pageMode === "upload" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
-              }`}
-            >
-              Upload
-            </button>
-            <button
-              onClick={() => setPageMode("pipeline")}
-              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                pageMode === "pipeline" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
-              }`}
-            >
-              Pipeline
-            </button>
-          </div>
-
-          {pageMode === "pipeline" && (
-            <>
-              <label className="text-sm font-medium text-gray-700">Group:</label>
-              <select
-                value={selectedGroupId}
-                onChange={(e) => setSelectedGroupId(e.target.value)}
-                className="text-sm border border-gray-300 rounded-md px-3 py-1.5"
-              >
-                {groups.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name} ({g.screenshot_count})
-                  </option>
-                ))}
-              </select>
-            </>
-          )}
+          <label className="text-sm font-medium text-gray-700">Group:</label>
+          <select
+            value={selectedGroupId}
+            onChange={(e) => setSelectedGroupId(e.target.value)}
+            className="text-sm border border-gray-300 rounded-md px-3 py-1.5"
+          >
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name} ({g.screenshot_count})
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
-      {/* Upload mode */}
-      {pageMode === "upload" && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <BrowserUpload />
-        </div>
-      )}
-
-      {/* Pipeline mode */}
-      {pageMode === "pipeline" && (
+      {queueMode ? (
+        <PreprocessingQueueView />
+      ) : (
         <>
-          {queueMode ? (
-            <PreprocessingQueueView />
-          ) : (
-            <>
-              {/* Pipeline wizard steps */}
-              <PreprocessingWizard />
+          {/* Pipeline wizard steps */}
+          <PreprocessingWizard />
 
-              {/* Options - show preset/method controls for PHI stages */}
-              {(activeStage === "phi_detection" || activeStage === "phi_redaction") && (
-                <div className="mt-3 flex flex-wrap items-center gap-4 p-3 bg-white rounded-lg border border-gray-200">
-                  {activeStage === "phi_detection" && (
+          {/* Options - show preset/method controls for PHI stages */}
+          {(activeStage === "phi_detection" || activeStage === "phi_redaction") && (
+            <div className="mt-3 flex flex-wrap items-center gap-4 p-3 bg-white rounded-lg border border-gray-200">
+              {activeStage === "phi_detection" && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      Preset:
+                    </label>
+                    <select
+                      value={phiPreset}
+                      onChange={(e) => setPhiPreset(e.target.value)}
+                      className="text-sm border border-gray-300 rounded-md px-2 py-1"
+                    >
+                      <option value="screen_time">Screen Time</option>
+                      <option value="fast">Fast</option>
+                      <option value="balanced">Balanced</option>
+                      <option value="hipaa_compliant">HIPAA Compliant</option>
+                      <option value="thorough">Thorough</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2 border-l border-gray-300 pl-4">
+                    <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={llmEnabled}
+                        onChange={(e) => setLlmEnabled(e.target.checked)}
+                        className="rounded border-gray-300"
+                      />
+                      LLM-Assisted
+                    </label>
+                  </div>
+                  {llmEnabled && (
                     <>
                       <div className="flex items-center gap-2">
-                        <label className="text-sm font-medium text-gray-700">
-                          Preset:
-                        </label>
-                        <select
-                          value={phiPreset}
-                          onChange={(e) => setPhiPreset(e.target.value)}
-                          className="text-sm border border-gray-300 rounded-md px-2 py-1"
-                        >
-                          <option value="screen_time">Screen Time</option>
-                          <option value="fast">Fast</option>
-                          <option value="balanced">Balanced</option>
-                          <option value="hipaa_compliant">HIPAA Compliant</option>
-                          <option value="thorough">Thorough</option>
-                        </select>
+                        <label className="text-sm text-gray-600">Endpoint:</label>
+                        <input
+                          type="text"
+                          value={llmEndpoint}
+                          onChange={(e) => setLlmEndpoint(e.target.value)}
+                          className="text-sm border border-gray-300 rounded-md px-2 py-1 w-56"
+                        />
                       </div>
-                      <div className="flex items-center gap-2 border-l border-gray-300 pl-4">
-                        <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={llmEnabled}
-                            onChange={(e) => setLlmEnabled(e.target.checked)}
-                            className="rounded border-gray-300"
-                          />
-                          LLM-Assisted
-                        </label>
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm text-gray-600">Model:</label>
+                        <input
+                          type="text"
+                          value={llmModel}
+                          onChange={(e) => setLlmModel(e.target.value)}
+                          className="text-sm border border-gray-300 rounded-md px-2 py-1 w-36"
+                        />
                       </div>
-                      {llmEnabled && (
-                        <>
-                          <div className="flex items-center gap-2">
-                            <label className="text-sm text-gray-600">Endpoint:</label>
-                            <input
-                              type="text"
-                              value={llmEndpoint}
-                              onChange={(e) => setLlmEndpoint(e.target.value)}
-                              className="text-sm border border-gray-300 rounded-md px-2 py-1 w-56"
-                            />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <label className="text-sm text-gray-600">Model:</label>
-                            <input
-                              type="text"
-                              value={llmModel}
-                              onChange={(e) => setLlmModel(e.target.value)}
-                              className="text-sm border border-gray-300 rounded-md px-2 py-1 w-36"
-                            />
-                          </div>
-                          <span className="text-xs text-gray-400">Runs LLM alongside Presidio for higher accuracy</span>
-                        </>
-                      )}
+                      <span className="text-xs text-gray-400">Runs LLM alongside Presidio for higher accuracy</span>
                     </>
                   )}
-                  {activeStage === "phi_redaction" && (
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium text-gray-700">
-                        Method:
-                      </label>
-                      <select
-                        value={redactionMethod}
-                        onChange={(e) => setRedactionMethod(e.target.value)}
-                        className="text-sm border border-gray-300 rounded-md px-2 py-1"
-                      >
-                        <option value="redbox">Red Box</option>
-                        <option value="blackbox">Black Box</option>
-                        <option value="pixelate">Pixelate</option>
-                      </select>
-                    </div>
-                  )}
+                </>
+              )}
+              {activeStage === "phi_redaction" && (
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700">
+                    Method:
+                  </label>
+                  <select
+                    value={redactionMethod}
+                    onChange={(e) => setRedactionMethod(e.target.value)}
+                    className="text-sm border border-gray-300 rounded-md px-2 py-1"
+                  >
+                    <option value="redbox">Red Box</option>
+                    <option value="blackbox">Black Box</option>
+                    <option value="pixelate">Pixelate</option>
+                  </select>
                 </div>
               )}
-
-              {/* Filter bar and run button */}
-              <div className="mt-3">
-                <StageSummaryBar />
-              </div>
-
-              {/* Stage content */}
-              <div className="mt-4 bg-white rounded-lg border border-gray-200">
-                {isLoading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <span className="inline-block w-6 h-6 border-2 border-gray-300 border-t-primary-600 rounded-full animate-spin" />
-                    <span className="ml-2 text-gray-500">Loading screenshots...</span>
-                  </div>
-                ) : (
-                  <>
-                    {activeStage === "device_detection" && <DeviceDetectionTab />}
-                    {activeStage === "cropping" && <CroppingTab />}
-                    {activeStage === "phi_detection" && <PHIDetectionTab />}
-                    {activeStage === "phi_redaction" && <PHIRedactionTab />}
-                  </>
-                )}
-              </div>
-
-              {/* Footer info */}
-              <div className="mt-4 text-xs text-gray-400">
-                {screenshots.length} screenshot{screenshots.length !== 1 ? "s" : ""} in
-                group
-                {selectedGroupId && ` "${selectedGroupId}"`}
-              </div>
-
-              {/* Event log side panel */}
-              {eventLog && <EventLogPanel />}
-            </>
+            </div>
           )}
+
+          {/* Filter bar and run button */}
+          <div className="mt-3">
+            <StageSummaryBar />
+          </div>
+
+          {/* Stage content */}
+          <div className="mt-4 bg-white rounded-lg border border-gray-200">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <span className="inline-block w-6 h-6 border-2 border-gray-300 border-t-primary-600 rounded-full animate-spin" />
+                <span className="ml-2 text-gray-500">Loading screenshots...</span>
+              </div>
+            ) : (
+              <>
+                {activeStage === "device_detection" && <DeviceDetectionTab />}
+                {activeStage === "cropping" && <CroppingTab />}
+                {activeStage === "phi_detection" && <PHIDetectionTab />}
+                {activeStage === "phi_redaction" && <PHIRedactionTab />}
+              </>
+            )}
+          </div>
+
+          {/* Footer info */}
+          <div className="mt-4 text-xs text-gray-400">
+            {screenshots.length} screenshot{screenshots.length !== 1 ? "s" : ""} in
+            group
+            {selectedGroupId && ` "${selectedGroupId}"`}
+          </div>
+
+          {/* Event log side panel */}
+          {eventLog && <EventLogPanel />}
         </>
       )}
     </div>
+    </Layout>
   );
 };
