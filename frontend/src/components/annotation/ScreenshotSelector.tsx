@@ -102,7 +102,7 @@ export const ScreenshotSelector = ({
       case "failed":
         return "text-red-600";
       case "pending":
-        return "text-blue-600";
+        return "text-primary-600";
       case "skipped":
         return "text-slate-500";
       default:

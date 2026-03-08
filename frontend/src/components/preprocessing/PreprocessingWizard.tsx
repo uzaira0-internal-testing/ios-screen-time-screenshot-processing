@@ -80,7 +80,7 @@ export const PreprocessingWizard = () => {
                 </span>
               )}
               {counts.running > 0 && (
-                <span className="text-blue-500">
+                <span className="text-primary-500">
                   {counts.running} running
                 </span>
               )}

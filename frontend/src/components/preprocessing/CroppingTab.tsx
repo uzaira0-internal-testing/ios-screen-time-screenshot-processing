@@ -116,7 +116,7 @@ function CroppingTabInner() {
               setCropModalScreenshotId(s.id);
               setCropModalInitialCrop(getCropRectFromEvent(event));
             }}
-            className="px-2 py-1 text-xs text-blue-600 border border-blue-200 rounded hover:bg-blue-50"
+            className="px-2 py-1 text-xs text-primary-600 border border-primary-200 rounded hover:bg-primary-50"
             title="Adjust crop manually"
           >
             Edit Crop

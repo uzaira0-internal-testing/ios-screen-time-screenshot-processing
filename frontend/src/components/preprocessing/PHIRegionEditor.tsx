@@ -387,7 +387,7 @@ export const PHIRegionEditor = ({
           />
         ) : (
           <div className="flex items-center justify-center h-64 gap-2">
-            <span className="inline-block w-5 h-5 border-2 border-slate-300 border-t-blue-500 rounded-full animate-spin" />
+            <span className="inline-block w-5 h-5 border-2 border-slate-300 border-t-primary-500 rounded-full animate-spin" />
             <span className="text-slate-400">Loading image...</span>
           </div>
         )}
@@ -405,7 +405,7 @@ export const PHIRegionEditor = ({
               aria-pressed={tool === t}
               className={`px-3 py-1.5 text-xs rounded font-medium ${
                 tool === t
-                  ? "bg-blue-100 text-blue-700 border border-blue-300"
+                  ? "bg-primary-100 text-primary-700 border border-primary-300"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200 border border-transparent"
               }`}
             >
@@ -429,7 +429,7 @@ export const PHIRegionEditor = ({
                       setRegions(cfg.regions);
                       setSelectedIndex(null);
                     }}
-                    className="px-2 py-1 text-xs bg-slate-100 text-slate-700 border border-slate-200 rounded hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors"
+                    className="px-2 py-1 text-xs bg-slate-100 text-slate-700 border border-slate-200 rounded hover:bg-primary-50 hover:border-primary-300 hover:text-primary-700 transition-colors"
                     title={`Apply ${cfg.regions.length} region(s): ${cfg.label}`}
                   >
                     {cfg.label}
@@ -445,7 +445,7 @@ export const PHIRegionEditor = ({
             <div
               key={i}
               className={`flex items-center gap-2 p-2 rounded text-xs cursor-pointer ${
-                i === selectedIndex ? "bg-blue-50 border border-blue-200" : "hover:bg-slate-50 border border-transparent"
+                i === selectedIndex ? "bg-primary-50 border border-primary-200" : "hover:bg-slate-50 border border-transparent"
               }`}
               onClick={() => setSelectedIndex(i)}
             >
@@ -465,7 +465,7 @@ export const PHIRegionEditor = ({
               </select>
               <span
                 className={`px-1.5 py-0.5 rounded text-[10px] ${
-                  region.source === "manual" ? "bg-blue-100 text-blue-600" : "bg-red-100 text-red-600"
+                  region.source === "manual" ? "bg-primary-100 text-primary-600" : "bg-red-100 text-red-600"
                 }`}
               >
                 {region.source === "manual" ? "M" : "A"}
@@ -505,7 +505,7 @@ export const PHIRegionEditor = ({
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className="flex-1 px-3 py-2 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200"
+              className="flex-1 px-3 py-2 text-xs font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded hover:bg-primary-100 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200"
             >
               {isSaving ? "Saving..." : "Save Regions"}
             </button>

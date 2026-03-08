@@ -320,7 +320,7 @@ export const CropAdjustModal = ({
             />
           ) : (
             <div className="flex items-center justify-center h-64 gap-2">
-              <span className="inline-block w-5 h-5 border-2 border-slate-300 border-t-blue-500 rounded-full animate-spin" />
+              <span className="inline-block w-5 h-5 border-2 border-slate-300 border-t-primary-500 rounded-full animate-spin" />
               <span className="text-slate-400">Loading image...</span>
             </div>
           )}
@@ -337,7 +337,7 @@ export const CropAdjustModal = ({
                   <button
                     key={i}
                     onClick={() => setCrop(rc)}
-                    className="px-2 py-1 text-xs font-mono bg-slate-100 text-slate-700 border border-slate-200 rounded hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors"
+                    className="px-2 py-1 text-xs font-mono bg-slate-100 text-slate-700 border border-slate-200 rounded hover:bg-primary-50 hover:border-primary-300 hover:text-primary-700 transition-colors"
                     title={`Left: ${rc.left}, Top: ${rc.top}, Right: ${rc.right}, Bottom: ${rc.bottom}`}
                   >
                     {rc.right - rc.left}&times;{rc.bottom - rc.top}
@@ -387,7 +387,7 @@ export const CropAdjustModal = ({
         <button
           onClick={handleApply}
           disabled={isApplying || cropW < 10 || cropH < 10}
-          className="px-6 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+          className="px-6 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50"
         >
           {isApplying ? "Applying..." : "Apply Crop"}
         </button>

@@ -33,7 +33,7 @@ export class WASMProcessingService implements IProcessingService {
 
   private initializeWorker(): void {
     this.worker = new Worker(
-      new URL("./processing/workers/imageProcessor.worker.ts", import.meta.url),
+      new URL("./processing/workers/imageProcessor.worker.canvas.ts", import.meta.url),
       { type: "module" },
     );
 

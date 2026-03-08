@@ -194,7 +194,7 @@ export const HourlyUsageOverlay = ({
                 {/* Bar - only render if value > 0 */}
                 {value > 0 ? (
                   <div
-                    className="w-4/5 bg-blue-500/70 transition-all duration-300 hover:bg-blue-500/80 rounded-t-md"
+                    className="w-4/5 bg-primary-500/70 transition-all duration-300 hover:bg-primary-500/80 rounded-t-md"
                     style={{
                       height: `${heightPercentage}%`,
                       minHeight: "2px",
@@ -226,7 +226,7 @@ export const HourlyUsageOverlay = ({
                 type="button"
                 onClick={() => handleChange(i, 1)}
                 disabled={readOnly}
-                className="w-full h-5 flex items-center justify-center text-[10px] bg-slate-100 hover:bg-blue-50 hover:text-blue-600 rounded text-slate-600 disabled:opacity-50 transition-colors"
+                className="w-full h-5 flex items-center justify-center text-[10px] bg-slate-100 hover:bg-primary-50 hover:text-primary-600 rounded text-slate-600 disabled:opacity-50 transition-colors"
               >
                 ▲
               </button>
@@ -245,7 +245,7 @@ export const HourlyUsageOverlay = ({
                 type="button"
                 onClick={() => handleChange(i, -1)}
                 disabled={readOnly}
-                className="w-full h-5 flex items-center justify-center text-[10px] bg-slate-100 hover:bg-blue-50 hover:text-blue-600 rounded text-slate-600 disabled:opacity-50 transition-colors"
+                className="w-full h-5 flex items-center justify-center text-[10px] bg-slate-100 hover:bg-primary-50 hover:text-primary-600 rounded text-slate-600 disabled:opacity-50 transition-colors"
               >
                 ▼
               </button>

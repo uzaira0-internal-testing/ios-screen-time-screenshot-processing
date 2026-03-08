@@ -127,7 +127,7 @@ export const ProcessingStatusBadge = ({
         return "bg-red-100 text-red-800 border-red-300";
       case "pending":
       default:
-        return "bg-blue-100 text-blue-800 border-blue-300";
+        return "bg-primary-100 text-primary-800 border-primary-300";
     }
   };
 

@@ -13,7 +13,7 @@ export function SaveStatusIndicator({
     <div
       className={`text-xs text-center py-2 px-3 rounded-md transition-all duration-300 ${
         isSaving
-          ? "bg-blue-50 text-blue-700 border border-blue-200"
+          ? "bg-primary-50 text-primary-700 border border-primary-200"
           : lastSaved
             ? "bg-green-50 text-green-700 border border-green-200"
             : "bg-slate-50 text-slate-500 border border-slate-200"
@@ -22,7 +22,7 @@ export function SaveStatusIndicator({
     >
       {isSaving ? (
         <span className="flex items-center justify-center gap-2">
-          <div className="animate-spin h-3 w-3 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+          <div className="animate-spin h-3 w-3 border-2 border-primary-500 border-t-transparent rounded-full"></div>
           <span className="font-medium">Saving changes...</span>
         </span>
       ) : lastSaved ? (

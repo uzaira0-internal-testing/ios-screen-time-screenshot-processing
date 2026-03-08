@@ -136,8 +136,8 @@ export const ProcessingProgress = ({
 
         {/* First-time user hint */}
         {stage === 'loading' && progress < 20 && (
-          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-xs text-blue-800">
+          <div className="mt-4 p-3 bg-primary-50 border border-primary-200 rounded-lg">
+            <p className="text-xs text-primary-800">
               <strong>First-time setup:</strong> Loading OCR engine and
               language data. This only happens once and will be cached for
               future use.

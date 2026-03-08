@@ -47,7 +47,7 @@ export const EventLogPanel = () => {
                       : status === "failed"
                         ? "text-red-500"
                         : status === "running"
-                          ? "text-blue-500"
+                          ? "text-primary-500"
                           : "text-slate-400"
                 }`}
               >
@@ -88,7 +88,7 @@ export const EventLogPanel = () => {
                     <span
                       className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
                         event.source === "auto"
-                          ? "bg-blue-100 text-blue-600"
+                          ? "bg-primary-100 text-primary-600"
                           : "bg-purple-100 text-purple-600"
                       }`}
                     >

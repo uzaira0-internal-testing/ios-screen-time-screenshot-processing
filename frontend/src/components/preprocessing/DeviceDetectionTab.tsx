@@ -14,7 +14,7 @@ function renderResultColumns(_s: Screenshot, event: PreprocessingEventData | nul
           <span
             className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
               result.device_category === "ipad"
-                ? "bg-blue-100 text-blue-700"
+                ? "bg-primary-100 text-primary-700"
                 : result.device_category === "iphone"
                   ? "bg-green-100 text-green-700"
                   : "bg-slate-100 text-slate-600"

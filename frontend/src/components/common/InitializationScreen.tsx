@@ -78,11 +78,11 @@ export const InitializationScreen = ({
               </div>
 
               {/* Info Box */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-blue-900 mb-2">
+              <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-primary-900 mb-2">
                   First-Time Setup
                 </h3>
-                <p className="text-xs text-blue-800 leading-relaxed">
+                <p className="text-xs text-primary-800 leading-relaxed">
                   We're loading the OCR engine and language data (about 5MB).
                   This only happens once and will be cached for future visits.
                   Future processing will be much faster!

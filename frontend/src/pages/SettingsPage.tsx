@@ -41,7 +41,7 @@ function SyncSection() {
   return (
     <div className="bg-white border border-slate-200 rounded-lg p-6">
       <div className="flex items-center gap-3 mb-4">
-        <Server className="w-6 h-6 text-teal-700" />
+        <Server className="w-6 h-6 text-primary-700" />
         <div>
           <h2 className="text-xl font-semibold text-slate-900">
             Sync to Server
@@ -77,7 +77,7 @@ function SyncSection() {
             placeholder="http://localhost:8002/api/v1"
             value={serverUrl}
             onChange={(e) => setServerUrl(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+            className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
           />
         </div>
 
@@ -94,7 +94,7 @@ function SyncSection() {
             placeholder="your-username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+            className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
           />
         </div>
 
@@ -102,7 +102,7 @@ function SyncSection() {
           <button
             onClick={syncNow}
             disabled={isSyncing || !serverUrl || !username}
-            className="flex items-center gap-2 px-4 py-2 bg-teal-700 text-white rounded-md text-sm font-medium hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-ring"
+            className="flex items-center gap-2 px-4 py-2 bg-primary-700 text-white rounded-md text-sm font-medium hover:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-ring"
           >
             {isSyncing ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -167,9 +167,9 @@ export const SettingsPage: React.FC = () => {
         <div className="bg-white border border-slate-200 rounded-lg p-6">
           <div className="flex items-center gap-3 mb-4">
             {isWasmMode ? (
-              <HardDrive className="w-8 h-8 text-teal-700" />
+              <HardDrive className="w-8 h-8 text-primary-700" />
             ) : (
-              <Monitor className="w-8 h-8 text-teal-700" />
+              <Monitor className="w-8 h-8 text-primary-700" />
             )}
             <div>
               <h2 className="text-xl font-semibold text-slate-900">
@@ -238,7 +238,7 @@ export const SettingsPage: React.FC = () => {
                     className="sr-only peer"
                     defaultChecked
                   />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
                 </label>
               </div>
 
@@ -257,7 +257,7 @@ export const SettingsPage: React.FC = () => {
                     className="sr-only peer"
                     defaultChecked
                   />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
                 </label>
               </div>
             </div>
@@ -289,7 +289,7 @@ export const SettingsPage: React.FC = () => {
         <div className="flex justify-center">
           <Link
             to="/"
-            className="flex items-center gap-2 px-6 py-3 text-teal-700 bg-teal-50 rounded-lg hover:bg-teal-100 transition-colors font-medium focus-ring"
+            className="flex items-center gap-2 px-6 py-3 text-primary-700 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors font-medium focus-ring"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Home

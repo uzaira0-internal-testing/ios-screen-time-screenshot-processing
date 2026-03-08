@@ -199,7 +199,7 @@ function DeviceInfoPanel({
               <span className="text-slate-500">Category:</span>{" "}
               <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
                 result.device_category === "ipad"
-                  ? "bg-blue-100 text-blue-700"
+                  ? "bg-primary-100 text-primary-700"
                   : result.device_category === "iphone"
                     ? "bg-green-100 text-green-700"
                     : "bg-slate-100 text-slate-600"
@@ -289,7 +289,7 @@ function RedactionReviewPanel({
               onClick={() => setView("before")}
               className={`px-3 py-1 text-xs rounded font-medium ${
                 view === "before"
-                  ? "bg-blue-100 text-blue-700 ring-1 ring-blue-300"
+                  ? "bg-primary-100 text-primary-700 ring-1 ring-primary-300"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
@@ -345,7 +345,7 @@ function RedactionReviewPanel({
                   <div key={i} className="flex items-center gap-2 text-xs p-1.5 rounded bg-slate-50">
                     <span className="font-mono text-slate-400 w-4">{i + 1}</span>
                     <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                      String(r.source) === "manual" ? "bg-blue-100 text-blue-600" : "bg-red-100 text-red-600"
+                      String(r.source) === "manual" ? "bg-primary-100 text-primary-600" : "bg-red-100 text-red-600"
                     }`}>
                       {String(r.label || r.type || "?")}
                     </span>

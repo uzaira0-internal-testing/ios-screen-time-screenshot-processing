@@ -19,7 +19,7 @@ const STATUS_BADGES: Record<StageStatus, { label: string; classes: string }> = {
   completed: { label: "Done", classes: "bg-green-100 text-green-700" },
   invalidated: { label: "Invalidated", classes: "bg-orange-100 text-orange-700" },
   pending: { label: "Pending", classes: "bg-slate-100 text-slate-500" },
-  running: { label: "Running", classes: "bg-blue-100 text-blue-600" },
+  running: { label: "Running", classes: "bg-primary-100 text-primary-600" },
   failed: { label: "Failed", classes: "bg-red-100 text-red-700" },
 };
 
@@ -162,7 +162,7 @@ export const StageReviewTable = ({
                 key={s.id}
                 ref={isHighlighted ? highlightedRef : undefined}
                 className={`border-b border-slate-100 hover:bg-slate-50 ${
-                  isHighlighted ? "bg-blue-50 ring-2 ring-blue-300" : ""
+                  isHighlighted ? "bg-primary-50 ring-2 ring-primary-300" : ""
                 } ${isException ? "bg-yellow-50" : ""} ${
                   status === "invalidated" ? "bg-orange-50/40" : ""
                 }`}
@@ -213,7 +213,7 @@ export const StageReviewTable = ({
                       </span>
                     )}
                     {status === "running" && (
-                      <span className="inline-block w-3 h-3 border-2 border-slate-300 border-t-blue-500 rounded-full animate-spin" />
+                      <span className="inline-block w-3 h-3 border-2 border-slate-300 border-t-primary-500 rounded-full animate-spin" />
                     )}
                   </div>
                 </td>

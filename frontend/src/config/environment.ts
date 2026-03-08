@@ -24,8 +24,8 @@ export interface EnvironmentConfig {
  * Mode is determined by presence of apiBaseUrl.
  */
 export function createEnvironmentConfig(): EnvironmentConfig {
-  const apiBaseUrl = config.apiBaseUrl;
-  const mode: AppMode = apiBaseUrl ? "server" : "wasm";
+  const apiBaseUrl = config.hasApi ? config.apiBaseUrl : null;
+  const mode: AppMode = config.hasApi ? "server" : "wasm";
 
   return {
     mode,

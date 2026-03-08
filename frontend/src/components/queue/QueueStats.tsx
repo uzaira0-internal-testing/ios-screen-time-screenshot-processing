@@ -28,7 +28,7 @@ export const QueueStats = ({ compact = false }: QueueStatsProps) => {
         </div>
         <div className="flex justify-between text-xs">
           <span className="text-slate-500">Pending</span>
-          <span className="font-semibold text-blue-600">
+          <span className="font-semibold text-primary-600">
             {queueStats.pending_screenshots}
           </span>
         </div>
@@ -60,7 +60,7 @@ export const QueueStats = ({ compact = false }: QueueStatsProps) => {
     {
       label: "Pending",
       value: queueStats.pending_screenshots,
-      color: "text-blue-600",
+      color: "text-primary-600",
     },
     {
       label: "Preprocessed",
@@ -84,8 +84,8 @@ export const QueueStats = ({ compact = false }: QueueStatsProps) => {
     {
       label: "Pending",
       value: queueStats.pending ?? 0,
-      color: "text-blue-600",
-      bg: "bg-blue-50",
+      color: "text-primary-600",
+      bg: "bg-primary-50",
     },
     {
       label: "Failed",

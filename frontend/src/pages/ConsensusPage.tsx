@@ -155,7 +155,7 @@ export const ConsensusPage = () => {
               <div className="text-sm text-slate-500">Total Screenshots</div>
             </div>
             <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-blue-600">{totals.verified}</div>
+              <div className="text-2xl font-bold text-primary-600">{totals.verified}</div>
               <div className="text-sm text-slate-500">Verified</div>
             </div>
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
@@ -291,7 +291,7 @@ export const ConsensusPage = () => {
                 {/* Total Verified */}
                 <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-100">
                   <span className="text-sm text-slate-600">Verified Screenshots</span>
-                  <span className="text-lg font-bold text-blue-600">
+                  <span className="text-lg font-bold text-primary-600">
                     {group.total_verified} / {group.total_screenshots}
                   </span>
                 </div>

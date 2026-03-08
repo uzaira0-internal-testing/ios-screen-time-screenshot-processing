@@ -115,7 +115,7 @@ async function generateHtml(): Promise<string> {
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>iOS Screenshot Processing</title>
     <link rel="stylesheet" href="${BASE_PATH}/dist/index.css" />
-    <script>window.__CONFIG__ = { basePath: "${BASE_PATH}" };</script>
+    <script>window.__CONFIG__ = { basePath: "${BASE_PATH}", apiBaseUrl: "${BASE_PATH}/api/v1" };</script>
   </head>
   <body>
     <div id="root"></div>

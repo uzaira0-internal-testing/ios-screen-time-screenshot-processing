@@ -373,7 +373,7 @@ export const AnnotationWorkspace = ({
                 </span>
                 <Link
                   to={`/preprocessing?screenshot_id=${screenshot.id}&returnUrl=${encodeURIComponent(`/annotate/${screenshot.id}`)}`}
-                  className="text-blue-600 hover:text-blue-800 underline text-xs font-medium"
+                  className="text-primary-600 hover:text-primary-800 underline text-xs font-medium"
                 >
                   Fix in Preprocessing &rarr;
                 </Link>
@@ -606,8 +606,8 @@ export const AnnotationWorkspace = ({
                   }
                   className={`flex-1 py-2 px-2 text-xs border rounded flex items-center justify-center gap-1 ${
                     screenshot?.processing_method === "line_based"
-                      ? "bg-blue-100 text-blue-800 border-blue-300"
-                      : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                      ? "bg-primary-100 text-primary-800 border-primary-300"
+                      : "bg-primary-50 text-primary-700 border-primary-200 hover:bg-primary-100"
                   } disabled:opacity-50 disabled:cursor-not-allowed`}
                   title={
                     isVerifiedByMe
@@ -616,7 +616,7 @@ export const AnnotationWorkspace = ({
                   }
                 >
                   {reprocessingMethod === "line_based" ? (
-                    <div className="animate-spin h-3 w-3 border-2 border-blue-600 border-t-transparent rounded-full" />
+                    <div className="animate-spin h-3 w-3 border-2 border-primary-600 border-t-transparent rounded-full" />
                   ) : (
                     <svg
                       className="w-3 h-3"
@@ -693,7 +693,7 @@ export const AnnotationWorkspace = ({
 
               {/* Verifiers Info */}
               {allVerifierUsernames.length > 0 && (
-                <div className="text-xs text-center text-blue-700 bg-blue-50 rounded py-1">
+                <div className="text-xs text-center text-primary-700 bg-primary-50 rounded py-1">
                   Verified by: {allVerifierUsernames.join(", ")}
                 </div>
               )}

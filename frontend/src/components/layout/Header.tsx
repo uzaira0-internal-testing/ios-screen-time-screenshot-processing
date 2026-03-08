@@ -78,7 +78,7 @@ export const Header = () => {
                         : processingStatus === "failed"
                           ? "text-red-600"
                           : processingStatus === "pending"
-                            ? "text-blue-600"
+                            ? "text-primary-600"
                             : "text-slate-600"
                     )}
                   >

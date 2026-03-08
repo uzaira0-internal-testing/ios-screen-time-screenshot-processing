@@ -81,7 +81,7 @@ export const HourlyUsageEditor = ({
               >
                 {/* Bar */}
                 <div
-                  className="w-4/5 bg-blue-500 border-t border-blue-600/30 transition-all duration-300 rounded-t-md"
+                  className="w-4/5 bg-primary-500 border-t border-primary-600/30 transition-all duration-300 rounded-t-md"
                   style={{
                     height: `${heightPercentage}%`,
                     minHeight: value > 0 ? "2px" : "0",
@@ -112,7 +112,7 @@ export const HourlyUsageEditor = ({
                 type="button"
                 onClick={() => handleChange(i, 1)}
                 disabled={readOnly}
-                className="w-full h-5 flex items-center justify-center text-[10px] bg-slate-100 hover:bg-blue-50 hover:text-blue-600 rounded text-slate-600 disabled:opacity-50 transition-colors"
+                className="w-full h-5 flex items-center justify-center text-[10px] bg-slate-100 hover:bg-primary-50 hover:text-primary-600 rounded text-slate-600 disabled:opacity-50 transition-colors"
               >
                 ▲
               </button>
@@ -131,7 +131,7 @@ export const HourlyUsageEditor = ({
                 type="button"
                 onClick={() => handleChange(i, -1)}
                 disabled={readOnly}
-                className="w-full h-5 flex items-center justify-center text-[10px] bg-slate-100 hover:bg-blue-50 hover:text-blue-600 rounded text-slate-600 disabled:opacity-50 transition-colors"
+                className="w-full h-5 flex items-center justify-center text-[10px] bg-slate-100 hover:bg-primary-50 hover:text-primary-600 rounded text-slate-600 disabled:opacity-50 transition-colors"
               >
                 ▼
               </button>

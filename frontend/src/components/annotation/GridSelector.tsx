@@ -496,7 +496,7 @@ export const GridSelector = ({
               onChange={(e) => onTitleChange?.(e.target.value)}
               placeholder="Enter app name..."
               disabled={disabled}
-              className={`w-52 px-3 py-1.5 text-sm font-medium text-center border-2 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed transition-colors ${
+              className={`w-52 px-3 py-1.5 text-sm font-medium text-center border-2 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:bg-slate-100 disabled:cursor-not-allowed transition-colors ${
                 !extractedTitle
                   ? "border-orange-400 bg-orange-50"
                   : "border-slate-300 bg-white hover:border-slate-400"
@@ -538,7 +538,7 @@ export const GridSelector = ({
           <span className="text-slate-500">Click and drag to select grid</span>
         )}
         {hasSelection && (
-          <span className="text-blue-600 font-medium">
+          <span className="text-primary-600 font-medium">
             WASD: move | Shift: 10px | Ctrl: resize
           </span>
         )}

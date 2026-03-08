@@ -21,7 +21,7 @@ export const PreprocessingSummary = ({
           <span
             className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
               dd.device_category === "ipad"
-                ? "bg-blue-100 text-blue-700"
+                ? "bg-primary-100 text-primary-700"
                 : dd.device_category === "iphone"
                   ? "bg-green-100 text-green-700"
                   : "bg-slate-100 text-slate-600"

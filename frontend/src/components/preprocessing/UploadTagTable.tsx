@@ -127,7 +127,7 @@ export const UploadTagTable = ({
           <button
             type="button"
             onClick={applyRegex}
-            className="px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100"
+            className="px-3 py-1.5 text-sm font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-md hover:bg-primary-100"
           >
             Apply
           </button>

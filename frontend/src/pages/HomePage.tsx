@@ -296,7 +296,7 @@ export const HomePage = () => {
                   {/* Processing status grid - each is clickable */}
                   <div className="grid grid-cols-2 gap-2 text-center">
                     {([
-                      { status: "pending", label: "Pending", bg: "bg-blue-50", hoverBg: "hover:bg-blue-100", text: "text-blue-600" },
+                      { status: "pending", label: "Pending", bg: "bg-primary-50", hoverBg: "hover:bg-primary-100", text: "text-primary-600" },
                       { status: "completed", label: "Preprocessed", bg: "bg-green-50", hoverBg: "hover:bg-green-100", text: "text-green-600" },
                       { status: "failed", label: "Failed", bg: "bg-red-50", hoverBg: "hover:bg-red-100", text: "text-red-600" },
                       { status: "skipped", label: "Skipped", bg: "bg-slate-100", hoverBg: "hover:bg-slate-200", text: "text-slate-600" },

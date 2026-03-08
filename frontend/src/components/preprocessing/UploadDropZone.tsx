@@ -153,7 +153,7 @@ export const UploadDropZone = ({ onFilesSelected, compact }: UploadDropZoneProps
       <div
         {...getRootProps()}
         className={`border-2 border-dashed rounded-lg p-3 text-center transition-colors ${
-          isDragActive ? "border-blue-400 bg-blue-50" : "border-slate-200 hover:border-slate-300"
+          isDragActive ? "border-primary-400 bg-primary-50" : "border-slate-200 hover:border-slate-300"
         }`}
       >
         <input {...getInputProps()} />
@@ -190,7 +190,7 @@ export const UploadDropZone = ({ onFilesSelected, compact }: UploadDropZoneProps
     <div
       {...getRootProps()}
       className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors ${
-        isDragActive ? "border-blue-400 bg-blue-50" : "border-slate-300 hover:border-slate-400"
+        isDragActive ? "border-primary-400 bg-primary-50" : "border-slate-300 hover:border-slate-400"
       }`}
     >
       <input {...getInputProps()} />

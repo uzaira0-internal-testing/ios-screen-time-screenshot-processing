@@ -19,7 +19,7 @@ export const GroupCard: React.FC<GroupCardProps> = ({ group }) => {
   return (
     <Link
       to={`/annotate?group=${encodeURIComponent(group.id)}`}
-      className="block bg-white border border-slate-200 rounded-lg p-6 hover:border-blue-300 hover:shadow-md transition-all"
+      className="block bg-white border border-slate-200 rounded-lg p-6 hover:border-primary-300 hover:shadow-md transition-all"
     >
       <div className="flex justify-between items-start mb-4">
         <h3 className="text-lg font-semibold text-slate-900 truncate">
@@ -40,8 +40,8 @@ export const GroupCard: React.FC<GroupCardProps> = ({ group }) => {
 
       {/* Processing status grid */}
       <div className="grid grid-cols-2 gap-2 text-center mb-3">
-        <div className="bg-blue-50 rounded p-2">
-          <div className="text-lg font-bold text-blue-600">
+        <div className="bg-primary-50 rounded p-2">
+          <div className="text-lg font-bold text-primary-600">
             {group.processing_pending}
           </div>
           <div className="text-xs text-slate-500">Pending</div>
