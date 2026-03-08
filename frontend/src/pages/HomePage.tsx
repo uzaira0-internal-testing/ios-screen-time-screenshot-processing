@@ -296,21 +296,21 @@ export const HomePage = () => {
                   {/* Processing status grid - each is clickable */}
                   <div className="grid grid-cols-2 gap-2 text-center">
                     {([
-                      { status: "pending", label: "Pending", color: "blue" },
-                      { status: "completed", label: "Preprocessed", color: "green" },
-                      { status: "failed", label: "Failed", color: "red" },
-                      { status: "skipped", label: "Skipped", color: "slate" },
-                    ] as const).map(({ status, label, color }) => (
+                      { status: "pending", label: "Pending", bg: "bg-blue-50", hoverBg: "hover:bg-blue-100", text: "text-blue-600" },
+                      { status: "completed", label: "Preprocessed", bg: "bg-green-50", hoverBg: "hover:bg-green-100", text: "text-green-600" },
+                      { status: "failed", label: "Failed", bg: "bg-red-50", hoverBg: "hover:bg-red-100", text: "text-red-600" },
+                      { status: "skipped", label: "Skipped", bg: "bg-slate-100", hoverBg: "hover:bg-slate-200", text: "text-slate-600" },
+                    ] as const).map(({ status, label, bg, hoverBg, text }) => (
                       <div
                         key={status}
                         onClick={() => handleGroupClick(group.id, status)}
                         role="button"
                         tabIndex={0}
                         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleGroupClick(group.id, status); }}
-                        className={`bg-${color}-50 rounded p-2 cursor-pointer hover:bg-${color}-100 transition-colors focus-ring`}
+                        className={`${bg} rounded p-2 cursor-pointer ${hoverBg} transition-colors focus-ring`}
                         data-testid={`status-${status}`}
                       >
-                        <div className={`text-lg font-bold text-${color}-600`}>
+                        <div className={`text-lg font-bold ${text}`}>
                           {group[`processing_${status}` as keyof Group] as number}
                         </div>
                         <div className="text-xs text-slate-500">{label}</div>
@@ -363,10 +363,10 @@ export const HomePage = () => {
                         <div className="text-xs text-slate-500 mb-2 font-medium">Verification Status</div>
                         <div className="grid grid-cols-3 gap-2 text-center">
                           {([
-                            { key: "single_verified", label: "Once", color: "yellow" },
-                            { key: "agreed", label: "Multiple", color: "green" },
-                            { key: "disputed", label: "Disputed", color: "red" },
-                          ] as const).map(({ key, label, color }) => (
+                            { key: "single_verified", label: "Once", bg: "bg-yellow-50", hoverBg: "hover:bg-yellow-100", text: "text-yellow-600" },
+                            { key: "agreed", label: "Multiple", bg: "bg-green-50", hoverBg: "hover:bg-green-100", text: "text-green-600" },
+                            { key: "disputed", label: "Disputed", bg: "bg-red-50", hoverBg: "hover:bg-red-100", text: "text-red-600" },
+                          ] as const).map(({ key, label, bg, hoverBg, text }) => (
                             <div
                               key={key}
                               onClick={(e) => {
@@ -377,10 +377,10 @@ export const HomePage = () => {
                               role="button"
                               tabIndex={0}
                               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleVerificationTierClick(group.id, key); }}
-                              className={`bg-${color}-50 rounded p-2 cursor-pointer hover:bg-${color}-100 transition-colors focus-ring`}
+                              className={`${bg} rounded p-2 cursor-pointer ${hoverBg} transition-colors focus-ring`}
                               data-testid={`tier-${key === "single_verified" ? "verified-once" : key === "agreed" ? "verified-multiple" : "disputed"}`}
                             >
-                              <div className={`text-lg font-bold text-${color}-600`}>
+                              <div className={`text-lg font-bold ${text}`}>
                                 {tier[key]}
                               </div>
                               <div className="text-xs text-slate-500">{label}</div>

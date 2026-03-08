@@ -18,10 +18,10 @@ async function getOpfsRoot(): Promise<FileSystemDirectoryHandle | null> {
   if (opfsRoot) return opfsRoot;
 
   try {
-    opfsRoot = await navigator.storage.getDirectory();
-    const screenshotsDir = await opfsRoot.getDirectoryHandle("screenshots", { create: true });
+    const root = await navigator.storage.getDirectory();
+    opfsRoot = await root.getDirectoryHandle("screenshots", { create: true });
     opfsAvailable = true;
-    return screenshotsDir;
+    return opfsRoot;
   } catch {
     opfsAvailable = false;
     return null;

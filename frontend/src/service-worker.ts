@@ -61,6 +61,28 @@ function isStaticAsset(url: URL): boolean {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
+  // Share target: receives shared images from iOS (POST /share)
+  if (url.pathname === "/share" && event.request.method === "POST") {
+    event.respondWith(
+      (async () => {
+        const formData = await event.request.formData();
+        const files = formData.getAll("screenshots");
+
+        const cache = await caches.open("share-target");
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i] as File;
+          const response = new Response(file, {
+            headers: { "Content-Type": file.type, "X-Filename": file.name },
+          });
+          await cache.put(`/shared/${i}`, response);
+        }
+
+        return Response.redirect("/?action=upload&shared=true", 303);
+      })(),
+    );
+    return;
+  }
+
   // Skip non-GET requests
   if (event.request.method !== "GET") return;
 
@@ -123,31 +145,5 @@ self.addEventListener("fetch", (event) => {
       ),
     );
     return;
-  }
-});
-
-// Handle share target (receives shared images from iOS)
-self.addEventListener("fetch", (event) => {
-  const url = new URL(event.request.url);
-  if (url.pathname === "/share" && event.request.method === "POST") {
-    event.respondWith(
-      (async () => {
-        const formData = await event.request.formData();
-        const files = formData.getAll("screenshots");
-
-        // Store files in a temporary cache for the page to pick up
-        const cache = await caches.open("share-target");
-        for (let i = 0; i < files.length; i++) {
-          const file = files[i] as File;
-          const response = new Response(file, {
-            headers: { "Content-Type": file.type, "X-Filename": file.name },
-          });
-          await cache.put(`/shared/${i}`, response);
-        }
-
-        // Redirect to the upload page
-        return Response.redirect("/?action=upload&shared=true", 303);
-      })(),
-    );
   }
 });

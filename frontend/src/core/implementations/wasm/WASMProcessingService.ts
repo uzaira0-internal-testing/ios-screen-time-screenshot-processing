@@ -244,39 +244,30 @@ export class WASMProcessingService implements IProcessingService {
     return result;
   }
 
-  async extractTitle(imageData: ImageData | Blob): Promise<string | null> {
+  private async ensureReadyAndConvert(imageData: ImageData | Blob): Promise<ImageData> {
     if (!this.initialized) {
       await this.initialize();
     }
+    return imageData instanceof Blob
+      ? await smartConvertBlobToImageData(imageData)
+      : imageData;
+  }
 
-    const imgData =
-      imageData instanceof Blob
-        ? await smartConvertBlobToImageData(imageData)
-        : imageData;
-
+  async extractTitle(imageData: ImageData | Blob): Promise<string | null> {
+    const imgData = await this.ensureReadyAndConvert(imageData);
     const result = await this.sendMessage<{ title: string | null }>({
       type: "EXTRACT_TITLE",
       payload: { imageData: imgData },
     });
-
     return result.title;
   }
 
   async extractTotal(imageData: ImageData | Blob): Promise<string | null> {
-    if (!this.initialized) {
-      await this.initialize();
-    }
-
-    const imgData =
-      imageData instanceof Blob
-        ? await smartConvertBlobToImageData(imageData)
-        : imageData;
-
+    const imgData = await this.ensureReadyAndConvert(imageData);
     const result = await this.sendMessage<{ total: string | null }>({
       type: "EXTRACT_TOTAL",
       payload: { imageData: imgData },
     });
-
     return result.total;
   }
 
@@ -285,24 +276,11 @@ export class WASMProcessingService implements IProcessingService {
     gridCoordinates: GridCoordinates,
     imageType: ImageType,
   ): Promise<HourlyData> {
-    if (!this.initialized) {
-      await this.initialize();
-    }
-
-    const imgData =
-      imageData instanceof Blob
-        ? await smartConvertBlobToImageData(imageData)
-        : imageData;
-
+    const imgData = await this.ensureReadyAndConvert(imageData);
     const result = await this.sendMessage<{ hourlyData: HourlyData }>({
       type: "EXTRACT_HOURLY_DATA",
-      payload: {
-        imageData: imgData,
-        gridCoordinates,
-        imageType,
-      },
+      payload: { imageData: imgData, gridCoordinates, imageType },
     });
-
     return result.hourlyData;
   }
 
@@ -310,25 +288,13 @@ export class WASMProcessingService implements IProcessingService {
     imageData: ImageData | Blob,
     imageType: ImageType,
   ): Promise<GridCoordinates | null> {
-    if (!this.initialized) {
-      await this.initialize();
-    }
-
-    const imgData =
-      imageData instanceof Blob
-        ? await smartConvertBlobToImageData(imageData)
-        : imageData;
-
+    const imgData = await this.ensureReadyAndConvert(imageData);
     const result = await this.sendMessage<{
       gridCoordinates: GridCoordinates | null;
     }>({
       type: "DETECT_GRID",
-      payload: {
-        imageData: imgData,
-        imageType,
-      },
+      payload: { imageData: imgData, imageType },
     });
-
     return result.gridCoordinates;
   }
 

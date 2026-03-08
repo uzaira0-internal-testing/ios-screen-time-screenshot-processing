@@ -13,6 +13,8 @@ import type { ImageType } from "@/types";
 import type { IScreenshotService } from "@/core/interfaces";
 import type { IStorageService } from "@/core/interfaces";
 import type { IProcessingService, ProcessingProgress } from "@/core/interfaces";
+import { db } from "./storage/database";
+import { createObjectURL } from "./storage/opfsBlobStorage";
 
 export class WASMScreenshotService implements IScreenshotService {
   private storageService: IStorageService;
@@ -136,8 +138,8 @@ export class WASMScreenshotService implements IScreenshotService {
       throw new Error(`Image blob not found for screenshot ${screenshotId}`);
     }
 
-    // Create a blob URL that can be used in img tags
-    return URL.createObjectURL(imageBlob);
+    // Use LRU-cached blob URLs to avoid leaking memory
+    return createObjectURL(screenshotId, imageBlob);
   }
 
   async getProcessingResult(screenshotId: number): Promise<ProcessingResult> {
@@ -487,14 +489,8 @@ export class WASMScreenshotService implements IScreenshotService {
       (s) => s.annotation_status === "skipped",
     ).length;
 
-    // Count all annotations across all screenshots
-    let totalAnnotations = 0;
-    for (const screenshot of allScreenshots) {
-      const annotations = await this.storageService.getAnnotationsByScreenshot(
-        screenshot.id,
-      );
-      totalAnnotations += annotations.length;
-    }
+    // Count all annotations in a single query
+    const totalAnnotations = await db.annotations.count();
 
     const averageAnnotations =
       totalScreenshots > 0 ? totalAnnotations / totalScreenshots : 0;

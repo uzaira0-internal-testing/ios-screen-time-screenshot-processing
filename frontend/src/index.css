@@ -88,30 +88,6 @@ layer(base);
   @apply bg-white border border-slate-200 rounded-lg p-5 shadow-xs;
 }
 
-@utility badge {
-  @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium;
-}
-
-@utility badge-success {
-  @apply badge bg-emerald-50 text-emerald-700 border border-emerald-200;
-}
-
-@utility badge-warning {
-  @apply badge bg-amber-50 text-amber-700 border border-amber-200;
-}
-
-@utility badge-danger {
-  @apply badge bg-red-50 text-red-700 border border-red-200;
-}
-
-@utility badge-info {
-  @apply badge bg-sky-50 text-sky-700 border border-sky-200;
-}
-
-@utility badge-neutral {
-  @apply badge bg-slate-100 text-slate-700 border border-slate-200;
-}
-
 @utility scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;

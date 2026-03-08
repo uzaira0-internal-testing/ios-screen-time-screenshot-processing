@@ -1,6 +1,7 @@
 import type { Annotation, AnnotationCreate } from "@/types";
 import type { IAnnotationService } from "@/core/interfaces";
 import type { IStorageService } from "@/core/interfaces";
+import { db } from "./storage/database";
 
 export class WASMAnnotationService implements IAnnotationService {
   private storageService: IStorageService;
@@ -49,30 +50,15 @@ export class WASMAnnotationService implements IAnnotationService {
   }
 
   async getHistory(skip = 0, limit = 50): Promise<Annotation[]> {
-    const screenshotsResult = await this.storageService.getAllScreenshots({
-      annotation_status: "annotated",
-    });
-    const screenshots = Array.isArray(screenshotsResult)
-      ? screenshotsResult
-      : [];
-    const allAnnotations: Annotation[] = [];
+    // Query annotations directly, sorted by created_at descending, with pagination
+    const allAnnotations = await db.annotations
+      .orderBy("created_at")
+      .reverse()
+      .offset(skip)
+      .limit(limit)
+      .toArray();
 
-    for (const screenshot of screenshots) {
-      const annotationsResult =
-        await this.storageService.getAnnotationsByScreenshot(screenshot.id);
-      const annotations = Array.isArray(annotationsResult)
-        ? annotationsResult
-        : [];
-      allAnnotations.push(...annotations);
-    }
-
-    allAnnotations.sort((a, b) => {
-      return (
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-    });
-
-    return allAnnotations.slice(skip, skip + limit);
+    return allAnnotations;
   }
 
   async delete(id: number): Promise<void> {
