@@ -47,25 +47,25 @@ export function TotalsDisplay({
   const totalsMismatch = ocrMinutes !== null && ocrMinutes !== roundedTotalMinutes;
 
   const highlightClass = totalsMatch
-    ? "ring-2 ring-green-500 bg-green-50"
+    ? "ring-2 ring-green-500 bg-green-50 dark:bg-green-900/20"
     : totalsMismatch
-      ? "ring-2 ring-red-500 bg-red-50"
+      ? "ring-2 ring-red-500 bg-red-50 dark:bg-red-900/20"
       : "";
 
   return (
     <div
-      className={`border-b border-gray-100 pb-2 rounded-md p-2 ${highlightClass}`}
+      className={`border-b border-slate-100 dark:border-slate-700 pb-2 rounded-md p-2 ${highlightClass}`}
     >
       <div className="flex flex-col items-center text-center">
         {/* OCR Total */}
         <div className="mb-1">
-          <div className="text-xs text-gray-500 flex items-center justify-center gap-1">
+          <div className="text-xs text-slate-500 flex items-center justify-center gap-1">
             OCR Total
             {showRecalculateButton && (
               <button
                 onClick={onRecalculateOcr}
                 disabled={isRecalculatingOcr}
-                className="text-gray-400 hover:text-primary-600 disabled:opacity-50"
+                className="text-slate-400 hover:text-primary-600 disabled:opacity-50"
                 title="Recalculate OCR total"
               >
                 {isRecalculatingOcr ? (
@@ -106,14 +106,14 @@ export function TotalsDisplay({
               </button>
             )}
           </div>
-          <div className="text-lg font-medium text-gray-700" data-testid="ocr-total">
+          <div className="text-lg font-medium text-slate-700 dark:text-slate-300" data-testid="ocr-total">
             {ocrTotal || "—"}
           </div>
         </div>
 
         {/* Bar Total */}
         <div>
-          <div className="text-xs text-gray-500">Bar Total</div>
+          <div className="text-xs text-slate-500">Bar Total</div>
           <div
             className="text-lg font-bold text-primary-600 flex items-center justify-center gap-1"
             data-testid="bar-total"

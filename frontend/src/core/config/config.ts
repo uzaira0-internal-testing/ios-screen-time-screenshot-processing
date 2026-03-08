@@ -1,7 +1,9 @@
 /**
- * Application Configuration (Server Mode Only)
+ * Application Configuration
  *
- * WASM mode has been archived. This app runs in server mode exclusively.
+ * Supports dual-mode operation:
+ * - Server mode: when apiBaseUrl is present in window.__CONFIG__
+ * - WASM mode: when apiBaseUrl is absent (local-first, offline)
  */
 
 import { environment, type AppMode } from "@/config/environment";
@@ -19,16 +21,30 @@ export interface AppConfig {
 }
 
 /**
- * @deprecated Use environment.mode directly
+ * Detect application mode based on configuration.
+ * If apiBaseUrl is present → server mode, otherwise → wasm mode.
  */
 export function detectMode(): ProcessingMode {
-  return "server";
+  return environment.apiBaseUrl ? "server" : "wasm";
 }
 
 /**
- * Creates application configuration for server mode
+ * Creates application configuration based on detected mode.
  */
 export function createConfig(): AppConfig {
+  const mode = detectMode();
+
+  if (mode === "wasm") {
+    return {
+      mode: "wasm",
+      features: {
+        offlineMode: true,
+        autoProcessing: true,
+        exportToFile: true,
+      },
+    };
+  }
+
   return {
     mode: "server",
     apiBaseUrl: environment.apiBaseUrl || undefined,
@@ -38,11 +54,4 @@ export function createConfig(): AppConfig {
       exportToFile: false,
     },
   };
-}
-
-/**
- * @deprecated Mode switching is no longer supported
- */
-export function setMode(): void {
-  console.warn("Mode switching is no longer supported. App runs in server mode only.");
 }

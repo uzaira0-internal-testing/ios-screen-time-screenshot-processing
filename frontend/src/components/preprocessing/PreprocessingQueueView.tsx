@@ -74,11 +74,11 @@ export const PreprocessingQueueView = () => {
 
   if (!currentScreenshot) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+      <div className="flex flex-col items-center justify-center py-12 text-slate-400 dark:text-slate-500">
         <p>Screenshot not found</p>
         <button
           onClick={exitQueue}
-          className="mt-4 px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50"
+          className="mt-4 px-4 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700 dark:text-slate-300"
         >
           Back to Table
         </button>
@@ -178,7 +178,7 @@ function DeviceInfoPanel({
   const result = event?.result as Record<string, unknown> | undefined;
 
   return (
-    <div className="flex-1 flex overflow-hidden bg-white rounded-lg border border-gray-200 min-h-0">
+    <div className="flex-1 flex overflow-hidden bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 min-h-0">
       {/* Image */}
       <div className="flex-1 min-h-0 min-w-0 overflow-hidden flex items-center justify-center p-4">
         <img
@@ -190,29 +190,29 @@ function DeviceInfoPanel({
       </div>
 
       {/* Metadata sidebar */}
-      <div className="w-72 border-l p-4 space-y-4 overflow-y-auto">
-        <h3 className="text-sm font-semibold text-gray-700">Device Detection</h3>
+      <div className="w-72 border-l dark:border-slate-700 p-4 space-y-4 overflow-y-auto">
+        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Device Detection</h3>
 
         {result ? (
           <div className="space-y-3 text-sm">
             <div>
-              <span className="text-gray-500">Category:</span>{" "}
+              <span className="text-slate-500 dark:text-slate-400">Category:</span>{" "}
               <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
                 result.device_category === "ipad"
-                  ? "bg-blue-100 text-blue-700"
+                  ? "bg-primary-100 text-primary-700"
                   : result.device_category === "iphone"
                     ? "bg-green-100 text-green-700"
-                    : "bg-gray-100 text-gray-600"
+                    : "bg-slate-100 text-slate-600"
               }`}>
                 {result.device_category as string}
               </span>
             </div>
             <div>
-              <span className="text-gray-500">Model:</span>{" "}
-              <span className="text-gray-700">{(result.device_model as string) || "\u2014"}</span>
+              <span className="text-slate-500 dark:text-slate-400">Model:</span>{" "}
+              <span className="text-slate-700 dark:text-slate-300">{(result.device_model as string) || "\u2014"}</span>
             </div>
             <div>
-              <span className="text-gray-500">Confidence:</span>{" "}
+              <span className="text-slate-500 dark:text-slate-400">Confidence:</span>{" "}
               <span className={`font-mono ${
                 (result.confidence as number) >= 0.9
                   ? "text-green-600"
@@ -225,13 +225,13 @@ function DeviceInfoPanel({
             </div>
             {result.orientation ? (
               <div>
-                <span className="text-gray-500">Orientation:</span>{" "}
-                <span className="text-gray-700">{String(result.orientation)}</span>
+                <span className="text-slate-500 dark:text-slate-400">Orientation:</span>{" "}
+                <span className="text-slate-700 dark:text-slate-300">{String(result.orientation)}</span>
               </div>
             ) : null}
           </div>
         ) : (
-          <p className="text-sm text-gray-400">No detection data available</p>
+          <p className="text-sm text-slate-400">No detection data available</p>
         )}
       </div>
     </div>
@@ -268,19 +268,19 @@ function RedactionReviewPanel({
   const cacheBuster = `?t=${redactEid}`;
 
   return (
-    <div className="flex-1 flex overflow-hidden bg-white rounded-lg border border-gray-200 min-h-0">
+    <div className="flex-1 flex overflow-hidden bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 min-h-0">
       {/* Image area */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Before/After toggle */}
         {wasRedacted && (
-          <div className="flex items-center gap-2 px-4 py-2 border-b bg-gray-50 shrink-0">
-            <span className="text-xs text-gray-500 mr-1">View:</span>
+          <div className="flex items-center gap-2 px-4 py-2 border-b dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 shrink-0">
+            <span className="text-xs text-slate-500 mr-1">View:</span>
             <button
               onClick={() => setView("after")}
               className={`px-3 py-1 text-xs rounded font-medium ${
                 view === "after"
                   ? "bg-orange-100 text-orange-700 ring-1 ring-orange-300"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
               Redacted
@@ -289,8 +289,8 @@ function RedactionReviewPanel({
               onClick={() => setView("before")}
               className={`px-3 py-1 text-xs rounded font-medium ${
                 view === "before"
-                  ? "bg-blue-100 text-blue-700 ring-1 ring-blue-300"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  ? "bg-primary-100 text-primary-700 ring-1 ring-primary-300"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
               Original
@@ -309,47 +309,47 @@ function RedactionReviewPanel({
       </div>
 
       {/* Sidebar */}
-      <div className="w-72 border-l flex flex-col">
+      <div className="w-72 border-l dark:border-slate-700 flex flex-col">
         <div className="p-4 space-y-4 flex-1 overflow-y-auto">
-          <h3 className="text-sm font-semibold text-gray-700">Redaction Result</h3>
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Redaction Result</h3>
 
           <div className="space-y-3 text-sm">
             <div>
-              <span className="text-gray-500">Status:</span>{" "}
+              <span className="text-slate-500 dark:text-slate-400">Status:</span>{" "}
               {wasRedacted ? (
                 <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700">
                   Redacted
                 </span>
               ) : (
-                <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600">
                   No redaction needed
                 </span>
               )}
             </div>
             <div>
-              <span className="text-gray-500">Regions redacted:</span>{" "}
+              <span className="text-slate-500 dark:text-slate-400">Regions redacted:</span>{" "}
               <span className="font-mono">{regionsRedacted}</span>
             </div>
             <div>
-              <span className="text-gray-500">Method:</span>{" "}
-              <span className="text-gray-700">{method}</span>
+              <span className="text-slate-500 dark:text-slate-400">Method:</span>{" "}
+              <span className="text-slate-700 dark:text-slate-300">{method}</span>
             </div>
           </div>
 
           {/* Region list from phi_detection */}
           {regions.length > 0 && (
             <div>
-              <h4 className="text-xs font-semibold text-gray-500 mb-2">PHI Regions</h4>
+              <h4 className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">PHI Regions</h4>
               <div className="space-y-1">
                 {regions.map((r, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs p-1.5 rounded bg-gray-50">
-                    <span className="font-mono text-gray-400 w-4">{i + 1}</span>
+                  <div key={i} className="flex items-center gap-2 text-xs p-1.5 rounded bg-slate-50 dark:bg-slate-700/50">
+                    <span className="font-mono text-slate-400 w-4">{i + 1}</span>
                     <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                      String(r.source) === "manual" ? "bg-blue-100 text-blue-600" : "bg-red-100 text-red-600"
+                      String(r.source) === "manual" ? "bg-primary-100 text-primary-600" : "bg-red-100 text-red-600"
                     }`}>
                       {String(r.label || r.type || "?")}
                     </span>
-                    <span className="text-gray-500 truncate flex-1" title={String(r.text || "")}>
+                    <span className="text-slate-500 truncate flex-1" title={String(r.text || "")}>
                       {String(r.text || "\u2014")}
                     </span>
                   </div>
@@ -359,12 +359,12 @@ function RedactionReviewPanel({
           )}
 
           {!redactEvent && (
-            <p className="text-sm text-gray-400">Redaction has not been run yet for this screenshot.</p>
+            <p className="text-sm text-slate-400">Redaction has not been run yet for this screenshot.</p>
           )}
         </div>
 
         {/* Footer */}
-        <div className="p-3 border-t space-y-2">
+        <div className="p-3 border-t dark:border-slate-700 space-y-2">
           <button
             onClick={() => onNext()}
             className="w-full px-3 py-2 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700"

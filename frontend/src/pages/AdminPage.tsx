@@ -50,7 +50,7 @@ export const AdminPage = () => {
   if (!isAdmin) {
     return (
       <Layout>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-8 text-center">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-8 text-center">
           <h2 className="text-2xl font-bold text-red-800 mb-2">
             Access Denied
           </h2>
@@ -64,8 +64,8 @@ export const AdminPage = () => {
     <Layout>
       <div className="space-y-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-          <p className="text-gray-600 mt-2">
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">User Management</h1>
+          <p className="text-slate-600 dark:text-slate-400 mt-2">
             Manage user accounts and permissions
           </p>
         </div>

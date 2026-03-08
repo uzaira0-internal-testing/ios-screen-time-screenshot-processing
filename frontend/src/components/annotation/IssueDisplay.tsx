@@ -8,13 +8,13 @@ interface IssueDisplayProps {
 const getIssueStyle = (severity: "blocking" | "non_blocking") => {
   if (severity === "blocking") {
     return {
-      container: "bg-red-100 border-red-500 text-red-800",
+      container: "bg-red-100 border-red-500 text-red-800 dark:bg-red-900/30 dark:border-red-600 dark:text-red-300",
       badge: "bg-red-500 text-white",
       icon: "!",
     };
   }
   return {
-    container: "bg-orange-100 border-orange-500 text-orange-800",
+    container: "bg-orange-100 border-orange-500 text-orange-800 dark:bg-orange-900/30 dark:border-orange-600 dark:text-orange-300",
     badge: "bg-orange-500 text-white",
     icon: "?",
   };
@@ -47,7 +47,7 @@ export const IssueDisplay = ({ issues, className = "" }: IssueDisplayProps) => {
     <div className={`space-y-3 ${className}`}>
       {blockingIssues.length > 0 && (
         <div className="space-y-2">
-          <h4 className="text-sm font-semibold text-red-700 flex items-center gap-2">
+          <h4 className="text-sm font-semibold text-red-700 dark:text-red-400 flex items-center gap-2">
             <span className="w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-bold">
               !
             </span>
@@ -78,7 +78,7 @@ export const IssueDisplay = ({ issues, className = "" }: IssueDisplayProps) => {
 
       {nonBlockingIssues.length > 0 && (
         <div className="space-y-2">
-          <h4 className="text-sm font-semibold text-orange-700 flex items-center gap-2">
+          <h4 className="text-sm font-semibold text-orange-700 dark:text-orange-400 flex items-center gap-2">
             <span className="w-5 h-5 rounded-full bg-orange-500 text-white text-xs flex items-center justify-center font-bold">
               ?
             </span>
@@ -120,14 +120,14 @@ export const ProcessingStatusBadge = ({
   const getStatusStyle = () => {
     switch (status) {
       case "completed":
-        return "bg-green-100 text-green-800 border-green-300";
+        return "bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-600";
       case "skipped":
-        return "bg-gray-100 text-gray-800 border-gray-300";
+        return "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600";
       case "failed":
-        return "bg-red-100 text-red-800 border-red-300";
+        return "bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-300 dark:border-red-600";
       case "pending":
       default:
-        return "bg-blue-100 text-blue-800 border-blue-300";
+        return "bg-primary-100 text-primary-800 border-primary-300 dark:bg-primary-900/30 dark:text-primary-300 dark:border-primary-600";
     }
   };
 

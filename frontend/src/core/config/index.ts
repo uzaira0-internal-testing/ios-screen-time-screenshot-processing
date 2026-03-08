@@ -1,2 +1,2 @@
 export type { ProcessingMode, AppConfig } from './config';
-export { detectMode, createConfig, setMode } from './config';
+export { detectMode, createConfig } from './config';

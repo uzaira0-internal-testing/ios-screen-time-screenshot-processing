@@ -54,7 +54,7 @@ export { ServiceContainer, TOKENS, bootstrapServices } from "./di";
 export type { ServiceToken } from "./di";
 
 export type { ProcessingMode, AppConfig } from "./config";
-export { detectMode, createConfig, setMode } from "./config";
+export { detectMode, createConfig } from "./config";
 
 export {
   ServiceProvider,
@@ -64,5 +64,4 @@ export {
   useConsensusService,
   useStorageService,
   useProcessingService,
-  usePrefetchService,
 } from "./hooks";

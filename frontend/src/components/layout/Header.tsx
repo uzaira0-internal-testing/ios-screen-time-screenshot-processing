@@ -1,11 +1,18 @@
-import { Link, useSearchParams, useLocation } from "react-router-dom";
+import { useState } from "react";
+import { Link, useSearchParams, useLocation } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { PROCESSING_STATUS_LABELS, type ProcessingStatus } from "@/constants/processingStatus";
+import { Menu, X, LogOut } from "lucide-react";
+import { useThemeStore, THEME_OPTIONS, THEME_CYCLE } from "@/store/themeStore";
 
 export const Header = () => {
   const { username, isAuthenticated, isAdmin, logout } = useAuth();
   const [searchParams] = useSearchParams();
   const location = useLocation();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { mode: themeMode, setMode: setThemeMode } = useThemeStore();
+
+  const ThemeIcon = THEME_OPTIONS.find((o) => o.value === themeMode)!.icon;
 
   // Get current filter context from URL
   const groupId = searchParams.get("group");
@@ -13,64 +20,49 @@ export const Header = () => {
   const processingStatus = searchParams.get("processing_status");
   const isAnnotatePage = location.pathname === "/annotate";
 
+  const navLinks = [
+    { to: "/upload", label: "Upload" },
+    { to: "/preprocessing", label: "Preprocessing" },
+    { to: "/", label: "Annotate" },
+    { to: "/consensus", label: "Consensus" },
+    ...(isAdmin ? [{ to: "/admin", label: "Admin" }] : []),
+  ];
+
   return (
-    <header className="bg-white shadow-sm border-b border-gray-200">
+    <header className="bg-white dark:bg-slate-800 shadow-sm border-b border-slate-200 dark:border-slate-700">
       <div className="px-4">
         <div className="flex justify-between items-center h-16">
           {/* Left: Logo and Nav */}
           <div className="flex items-center space-x-8">
-            <Link to="/" className="text-xl font-bold text-primary-600">
+            <Link to="/" className="text-xl font-bold text-primary-700 font-heading focus-ring rounded">
               iOS Screen Time
             </Link>
 
-            {/* Navigation */}
+            {/* Desktop Navigation */}
             {isAuthenticated && (
-              <nav className="hidden md:flex space-x-4">
-                <Link
-                  to="/upload"
-                  className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                >
-                  Upload
-                </Link>
-                <Link
-                  to="/preprocessing"
-                  className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                >
-                  Preprocessing
-                </Link>
-                <Link
-                  to="/"
-                  className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                >
-                  Annotate
-                </Link>
-                <Link
-                  to="/consensus"
-                  className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                >
-                  Consensus
-                </Link>
-                {isAdmin && (
+              <nav className="hidden md:flex space-x-1">
+                {navLinks.map((link) => (
                   <Link
-                    to="/admin"
-                    className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                    key={link.to}
+                    to={link.to}
+                    className="text-slate-600 dark:text-slate-300 hover:text-primary-700 dark:hover:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 px-3 py-2 rounded-md text-sm font-medium transition-colors focus-ring"
                   >
-                    Admin
+                    {link.label}
                   </Link>
-                )}
+                ))}
               </nav>
             )}
           </div>
 
           {/* Center: Queue Context Indicator */}
           {isAnnotatePage && (groupId || participantId || processingStatus) && (
-            <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center gap-2 px-3 py-1 bg-gray-100 rounded-md text-sm">
-              <span className="text-gray-500">Queue:</span>
+            <div className="absolute left-1/2 transform -translate-x-1/2 hidden lg:flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-slate-700 rounded-md text-sm">
+              <span className="text-slate-500 dark:text-slate-400">Queue:</span>
               {groupId && (
-                <span className="font-medium text-gray-700">{groupId}</span>
+                <span className="font-medium text-slate-700 dark:text-slate-200">{groupId}</span>
               )}
               {groupId && (participantId || processingStatus) && (
-                <span className="text-gray-400">/</span>
+                <span className="text-slate-400 dark:text-slate-500">/</span>
               )}
               {participantId && (
                 <span className="font-medium text-purple-600">
@@ -78,11 +70,11 @@ export const Header = () => {
                 </span>
               )}
               {participantId && processingStatus && (
-                <span className="text-gray-400">/</span>
+                <span className="text-slate-400">/</span>
               )}
               {processingStatus && (
                 <>
-                  <span className="text-gray-500">Status:</span>
+                  <span className="text-slate-500">Status:</span>
                   <span
                     className={"font-medium " + (
                       processingStatus === "completed"
@@ -90,8 +82,8 @@ export const Header = () => {
                         : processingStatus === "failed"
                           ? "text-red-600"
                           : processingStatus === "pending"
-                            ? "text-blue-600"
-                            : "text-gray-600"
+                            ? "text-primary-600"
+                            : "text-slate-600"
                     )}
                   >
                     {PROCESSING_STATUS_LABELS[processingStatus as ProcessingStatus] || processingStatus}
@@ -101,24 +93,43 @@ export const Header = () => {
             </div>
           )}
 
-          {/* Right: User info */}
+          {/* Right: User info + Mobile menu toggle */}
           <div className="flex items-center space-x-4">
             {isAuthenticated && username ? (
               <>
-                <span className="text-sm text-gray-700">
+                <span className="text-sm text-slate-700 dark:text-slate-300 hidden sm:inline">
                   Welcome, <span className="font-medium">{username}</span>
                 </span>
                 <button
-                  onClick={logout}
-                  className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                  onClick={() => setThemeMode(THEME_CYCLE[themeMode])}
+                  className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors focus-ring"
+                  aria-label={`Theme: ${themeMode}. Click to switch.`}
+                  title={`Theme: ${themeMode}`}
                 >
+                  <ThemeIcon className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={logout}
+                  className="hidden md:inline-flex items-center gap-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 px-4 py-2 rounded-md text-sm font-medium transition-colors focus-ring"
+                  aria-label="Logout"
+                >
+                  <LogOut className="h-4 w-4" />
                   Logout
+                </button>
+                {/* Mobile hamburger */}
+                <button
+                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                  className="md:hidden p-2 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md focus-ring"
+                  aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+                  aria-expanded={mobileMenuOpen}
+                >
+                  {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
                 </button>
               </>
             ) : (
               <Link
                 to="/login"
-                className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors focus-ring"
               >
                 Login
               </Link>
@@ -126,6 +137,29 @@ export const Header = () => {
           </div>
         </div>
       </div>
+
+      {/* Mobile Navigation */}
+      {mobileMenuOpen && isAuthenticated && (
+        <nav className="md:hidden border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 space-y-1">
+          {navLinks.map((link) => (
+            <Link
+              key={link.to}
+              to={link.to}
+              onClick={() => setMobileMenuOpen(false)}
+              className="block text-slate-600 dark:text-slate-300 hover:text-primary-700 dark:hover:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 px-3 py-2 rounded-md text-sm font-medium transition-colors focus-ring"
+            >
+              {link.label}
+            </Link>
+          ))}
+          <button
+            onClick={() => { logout(); setMobileMenuOpen(false); }}
+            className="w-full text-left text-slate-600 dark:text-slate-300 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 px-3 py-2 rounded-md text-sm font-medium transition-colors focus-ring flex items-center gap-2"
+          >
+            <LogOut className="h-4 w-4" />
+            Logout
+          </button>
+        </nav>
+      )}
     </header>
   );
 };

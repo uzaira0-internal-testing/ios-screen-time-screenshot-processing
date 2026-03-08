@@ -1,7 +1,7 @@
 // Runtime configuration injected by docker-entrypoint.sh via config.js
 declare global {
   interface Window {
-    __CONFIG__?: { basePath?: string };
+    __CONFIG__?: { basePath?: string; apiBaseUrl?: string };
   }
 }
 
@@ -15,8 +15,14 @@ export const config = {
   get basePath(): string {
     return window.__CONFIG__?.basePath || "";
   },
+  /** Whether an API backend is available (server mode vs WASM mode) */
+  get hasApi(): boolean {
+    return !!window.__CONFIG__?.apiBaseUrl;
+  },
   get apiBaseUrl(): string {
-    return `${this.basePath}/api/v1`;
+    // In server mode, apiBaseUrl is explicitly set in window.__CONFIG__
+    // In WASM mode, falls back to basePath-derived URL (used by server-mode components only)
+    return window.__CONFIG__?.apiBaseUrl ?? `${this.basePath}/api/v1`;
   },
   get wsUrl(): string {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";

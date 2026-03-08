@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from "react";
+import { AlertTriangle } from "lucide-react";
 import type { GridCoordinates } from "@/types";
 import { loadImage } from "@/utils/imageUtils";
 
@@ -482,13 +483,13 @@ export const GridSelector = ({
   return (
     <div className="space-y-2" ref={containerRef} data-testid="grid-selector">
       {/* Controls row - Title field (centered) + Reset Grid */}
-      <div className="flex items-center bg-gray-100 px-3 py-2 rounded border border-gray-200 gap-3">
+      <div className="flex items-center bg-slate-100 dark:bg-slate-700 px-3 py-2 rounded border border-slate-200 dark:border-slate-600 gap-3">
         {/* Title field - for screen_time, centered */}
         {imageType === "screen_time" && (
           <div className="flex items-center gap-2 flex-1 justify-center">
-            <span className="text-xs font-semibold text-gray-500 whitespace-nowrap">
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">
               App/Title
-              {!extractedTitle && <span className="text-orange-500 ml-1">⚠</span>}
+              {!extractedTitle && <AlertTriangle className="w-4 h-4 text-orange-500 ml-1 inline" />}
             </span>
             <input
               type="text"
@@ -496,10 +497,10 @@ export const GridSelector = ({
               onChange={(e) => onTitleChange?.(e.target.value)}
               placeholder="Enter app name..."
               disabled={disabled}
-              className={`w-52 px-3 py-1.5 text-sm font-medium text-center border-2 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors ${
+              className={`w-52 px-3 py-1.5 text-sm font-medium text-center border-2 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:bg-slate-100 dark:disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors ${
                 !extractedTitle
-                  ? "border-orange-400 bg-orange-50"
-                  : "border-gray-300 bg-white hover:border-gray-400"
+                  ? "border-orange-400 bg-orange-50 dark:bg-orange-900/30 dark:border-orange-600"
+                  : "border-slate-300 bg-white dark:bg-slate-600 dark:border-slate-500 dark:text-slate-100 hover:border-slate-400"
               }`}
             />
           </div>
@@ -511,7 +512,7 @@ export const GridSelector = ({
           <button
             onClick={handleReset}
             disabled={disabled}
-            className="text-red-600 hover:text-red-800 text-xs font-medium px-3 py-1.5 border border-red-300 rounded-md hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-xs font-medium px-3 py-1.5 border border-red-300 dark:border-red-700 rounded-md hover:bg-red-50 dark:hover:bg-red-900/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Reset Grid
           </button>
@@ -519,7 +520,7 @@ export const GridSelector = ({
       </div>
 
       {/* Canvas */}
-      <div className="bg-gray-800 rounded-lg">
+      <div className="bg-slate-800 rounded-lg">
         <canvas
           ref={canvasRef}
           aria-label="Screenshot with grid selection overlay. Use mouse to drag and resize the grid region."
@@ -535,10 +536,10 @@ export const GridSelector = ({
       {/* Status indicator */}
       <div className="text-xs text-center">
         {!hasSelection && (
-          <span className="text-gray-500">Click and drag to select grid</span>
+          <span className="text-slate-500 dark:text-slate-400">Click and drag to select grid</span>
         )}
         {hasSelection && (
-          <span className="text-blue-600 font-medium">
+          <span className="text-primary-600 font-medium">
             WASD: move | Shift: 10px | Ctrl: resize
           </span>
         )}

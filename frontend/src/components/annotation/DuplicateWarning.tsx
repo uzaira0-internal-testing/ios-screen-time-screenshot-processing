@@ -12,16 +12,16 @@ export const DuplicateWarning = ({
   isLoading = false,
 }: DuplicateWarningProps) => {
   return (
-    <div className="bg-amber-50 border-l-4 border-amber-500 p-3 rounded-lg">
+    <div className="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-500 p-3 rounded-lg">
       <div className="flex items-start gap-2">
         <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-xs flex items-center justify-center font-bold flex-shrink-0 mt-0.5">
           !
         </span>
         <div className="flex-1 min-w-0">
-          <h4 className="text-sm font-semibold text-amber-800">
+          <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-400">
             Potential Duplicate Detected
           </h4>
-          <p className="mt-1 text-sm text-amber-700">
+          <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">
             Screenshot <span className="font-mono font-semibold">#{duplicateId}</span> has
             the same participant, date, app title, and total usage. You may want
             to skip one of them.
@@ -37,7 +37,7 @@ export const DuplicateWarning = ({
             <button
               onClick={onGoToDuplicate}
               disabled={isLoading}
-              className="px-3 py-1 text-xs font-medium bg-white text-amber-700 border border-amber-300 rounded hover:bg-amber-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1 text-xs font-medium bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-600 rounded hover:bg-amber-50 dark:hover:bg-amber-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Go to #{duplicateId}
             </button>

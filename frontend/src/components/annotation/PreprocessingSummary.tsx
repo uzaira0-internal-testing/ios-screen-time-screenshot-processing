@@ -14,17 +14,17 @@ export const PreprocessingSummary = ({
   const pr = preprocessing.phi_redaction;
 
   return (
-    <div className="border-b border-gray-100 pb-2">
-      <div className="text-xs text-gray-500 mb-1">Preprocessing</div>
+    <div className="border-b border-slate-100 dark:border-slate-700 pb-2">
+      <div className="text-xs text-slate-500 mb-1">Preprocessing</div>
       <div className="flex flex-wrap gap-1.5">
         {dd && (
           <span
             className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
               dd.device_category === "ipad"
-                ? "bg-blue-100 text-blue-700"
+                ? "bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400"
                 : dd.device_category === "iphone"
-                  ? "bg-green-100 text-green-700"
-                  : "bg-gray-100 text-gray-600"
+                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                  : "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400"
             }`}
             title={`Device: ${dd.device_model || dd.device_category} (${Math.round(dd.confidence * 100)}%)`}
           >
@@ -33,7 +33,7 @@ export const PreprocessingSummary = ({
         )}
         {cr?.was_cropped && (
           <span
-            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700"
+            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
             title="iPad sidebar was cropped"
           >
             Cropped
@@ -43,8 +43,8 @@ export const PreprocessingSummary = ({
           <span
             className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
               pd.phi_detected
-                ? "bg-red-100 text-red-700"
-                : "bg-green-100 text-green-700"
+                ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
             }`}
             title={
               pd.phi_detected
@@ -57,7 +57,7 @@ export const PreprocessingSummary = ({
         )}
         {pr?.redacted && (
           <span
-            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700"
+            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
             title={`${pr.regions_redacted} region(s) redacted via ${pr.method}`}
           >
             Redacted

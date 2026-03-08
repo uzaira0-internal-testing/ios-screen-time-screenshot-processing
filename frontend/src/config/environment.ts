@@ -1,36 +1,37 @@
 /**
- * Environment Configuration Module (Server Mode Only)
+ * Environment Configuration Module
  *
- * WASM mode has been archived. This app runs in server mode exclusively.
+ * Supports dual-mode: server (with API) or wasm (local-first).
  */
 
 import { config } from "@/config";
 
-export type AppMode = "server";
+export type AppMode = "server" | "wasm";
 
 export interface EnvironmentConfig {
-  /** Current application mode (always server) */
+  /** Current application mode */
   mode: AppMode;
 
-  /** API base URL */
+  /** API base URL (null in WASM mode) */
   apiBaseUrl: string | null;
 
-  /** Whether server mode is available (always true) */
+  /** Whether server mode is available */
   serverAvailable: boolean;
 }
 
 /**
- * Creates the environment configuration object
+ * Creates the environment configuration object.
+ * Mode is determined by presence of apiBaseUrl.
  */
 export function createEnvironmentConfig(): EnvironmentConfig {
+  const apiBaseUrl = config.hasApi ? config.apiBaseUrl : null;
+  const mode: AppMode = config.hasApi ? "server" : "wasm";
+
   return {
-    mode: "server",
-    apiBaseUrl: config.apiBaseUrl,
-    serverAvailable: true,
+    mode,
+    apiBaseUrl,
+    serverAvailable: !!apiBaseUrl,
   };
 }
 
-/**
- * Gets the current environment configuration
- */
 export const environment = createEnvironmentConfig();

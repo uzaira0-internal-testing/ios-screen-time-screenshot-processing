@@ -368,7 +368,7 @@ export const PHIRegionEditor = ({
             {!inline && (
               <button
                 onClick={onClose}
-                className="px-3 py-1 text-sm text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+                className="px-3 py-1 text-sm text-slate-600 border border-slate-300 rounded hover:bg-slate-50"
               >
                 Close
               </button>
@@ -387,16 +387,16 @@ export const PHIRegionEditor = ({
           />
         ) : (
           <div className="flex items-center justify-center h-64 gap-2">
-            <span className="inline-block w-5 h-5 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
-            <span className="text-gray-400">Loading image...</span>
+            <span className="inline-block w-5 h-5 border-2 border-slate-300 border-t-primary-500 rounded-full animate-spin" />
+            <span className="text-slate-400">Loading image...</span>
           </div>
         )}
       </div>
 
       {/* Sidebar */}
-      <div className="w-80 border-l flex flex-col">
+      <div className="w-80 border-l dark:border-slate-700 flex flex-col">
         {/* Toolbar */}
-        <div className="flex items-center gap-1 p-3 border-b">
+        <div className="flex items-center gap-1 p-3 border-b dark:border-slate-700">
           {(["select", "draw", "delete"] as Tool[]).map((t) => (
             <button
               key={t}
@@ -405,8 +405,8 @@ export const PHIRegionEditor = ({
               aria-pressed={tool === t}
               className={`px-3 py-1.5 text-xs rounded font-medium ${
                 tool === t
-                  ? "bg-blue-100 text-blue-700 border border-blue-300"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200 border border-transparent"
+                  ? "bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 border border-primary-300 dark:border-primary-700"
+                  : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 border border-transparent"
               }`}
             >
               {t === "select" ? "Select" : t === "draw" ? "Draw" : "Delete"}
@@ -419,7 +419,7 @@ export const PHIRegionEditor = ({
           {/* Recent region configs (inline queue mode only) */}
           {inline && recentPHIConfigs && recentPHIConfigs.length > 0 && (
             <div className="mb-3">
-              <div className="text-xs font-semibold text-gray-500 mb-1.5">Recent Regions</div>
+              <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Recent Regions</div>
               <div className="flex flex-wrap gap-1.5">
                 {recentPHIConfigs.map((cfg, i) => (
                   <button
@@ -429,7 +429,7 @@ export const PHIRegionEditor = ({
                       setRegions(cfg.regions);
                       setSelectedIndex(null);
                     }}
-                    className="px-2 py-1 text-xs bg-gray-100 text-gray-700 border border-gray-200 rounded hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors"
+                    className="px-2 py-1 text-xs bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600 rounded hover:bg-primary-50 dark:hover:bg-primary-900/30 hover:border-primary-300 hover:text-primary-700 transition-colors"
                     title={`Apply ${cfg.regions.length} region(s): ${cfg.label}`}
                   >
                     {cfg.label}
@@ -438,25 +438,25 @@ export const PHIRegionEditor = ({
               </div>
             </div>
           )}
-          <div className="text-xs text-gray-500 mb-2">
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">
             {autoCount} auto-detected, {manualCount} manual
           </div>
           {regions.map((region, i) => (
             <div
               key={i}
               className={`flex items-center gap-2 p-2 rounded text-xs cursor-pointer ${
-                i === selectedIndex ? "bg-blue-50 border border-blue-200" : "hover:bg-gray-50 border border-transparent"
+                i === selectedIndex ? "bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-700" : "hover:bg-slate-50 dark:hover:bg-slate-700 border border-transparent"
               }`}
               onClick={() => setSelectedIndex(i)}
             >
-              <span className="font-mono text-gray-400 w-4">{i + 1}</span>
-              <span className="text-gray-500">
+              <span className="font-mono text-slate-400 w-4">{i + 1}</span>
+              <span className="text-slate-500">
                 {region.x},{region.y} {region.w}x{region.h}
               </span>
               <select
                 value={region.label}
                 onChange={(e) => updateRegion(i, { label: e.target.value })}
-                className="text-xs border rounded px-1 py-0.5 flex-1"
+                className="text-xs border dark:border-slate-600 rounded px-1 py-0.5 flex-1 dark:bg-slate-700 dark:text-slate-200"
                 onClick={(e) => e.stopPropagation()}
               >
                 {(!LABELS.includes(region.label) ? [region.label, ...LABELS] : LABELS).map((l) => (
@@ -465,14 +465,14 @@ export const PHIRegionEditor = ({
               </select>
               <span
                 className={`px-1.5 py-0.5 rounded text-[10px] ${
-                  region.source === "manual" ? "bg-blue-100 text-blue-600" : "bg-red-100 text-red-600"
+                  region.source === "manual" ? "bg-primary-100 text-primary-600" : "bg-red-100 text-red-600"
                 }`}
               >
                 {region.source === "manual" ? "M" : "A"}
               </span>
               <button
                 onClick={(e) => { e.stopPropagation(); deleteRegion(i); }}
-                className="text-gray-400 hover:text-red-500 leading-none"
+                className="text-slate-400 hover:text-red-500 leading-none"
                 title="Delete region"
                 aria-label={`Delete region ${i + 1}`}
               >
@@ -481,20 +481,20 @@ export const PHIRegionEditor = ({
             </div>
           ))}
           {regions.length === 0 && (
-            <div className="text-center text-gray-400 py-8 text-sm">
+            <div className="text-center text-slate-400 dark:text-slate-500 py-8 text-sm">
               No PHI regions. Use Draw tool to add regions.
             </div>
           )}
         </div>
 
         {/* Redaction method */}
-        <div className="p-3 border-t space-y-3">
+        <div className="p-3 border-t dark:border-slate-700 space-y-3">
           <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-500">Method:</label>
+            <label className="text-xs text-slate-500 dark:text-slate-400">Method:</label>
             <select
               value={redactionMethod}
               onChange={(e) => setRedactionMethod(e.target.value)}
-              className="text-xs border rounded px-2 py-1 flex-1"
+              className="text-xs border dark:border-slate-600 rounded px-2 py-1 flex-1 dark:bg-slate-700 dark:text-slate-200"
             >
               <option value="redbox">Red Box</option>
               <option value="blackbox">Black Box</option>
@@ -505,14 +505,14 @@ export const PHIRegionEditor = ({
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className="flex-1 px-3 py-2 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200"
+              className="flex-1 px-3 py-2 text-xs font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded hover:bg-primary-100 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200"
             >
               {isSaving ? "Saving..." : "Save Regions"}
             </button>
             <button
               onClick={handleRedact}
               disabled={isRedacting || regions.length === 0}
-              className="flex-1 px-3 py-2 text-xs font-medium text-white bg-orange-600 rounded hover:bg-orange-700 disabled:bg-gray-400 disabled:text-gray-200"
+              className="flex-1 px-3 py-2 text-xs font-medium text-white bg-orange-600 rounded hover:bg-orange-700 disabled:bg-slate-400 disabled:text-slate-200"
             >
               {isRedacting ? "Redacting..." : "Apply Redaction"}
             </button>
@@ -521,7 +521,7 @@ export const PHIRegionEditor = ({
             <button
               onClick={handleSaveAndNext}
               disabled={isSaving}
-              className="w-full px-3 py-2 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700 disabled:bg-gray-400 disabled:text-gray-200"
+              className="w-full px-3 py-2 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700 disabled:bg-slate-400 disabled:text-slate-200"
             >
               {isSaving ? "Saving..." : "Save & Next"}
             </button>
@@ -533,7 +533,7 @@ export const PHIRegionEditor = ({
 
   if (inline) {
     return (
-      <div className="flex flex-col h-full bg-white rounded-lg border border-gray-200">
+      <div className="flex flex-col h-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
         {editorContent}
       </div>
     );
@@ -541,11 +541,11 @@ export const PHIRegionEditor = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center">
-      <div className="bg-white rounded-lg shadow-xl w-[95vw] h-[95vh] flex flex-col">
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-[95vw] h-[95vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b">
-          <h3 className="text-lg font-semibold">PHI Region Editor - Screenshot #{screenshotId}</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none" aria-label="Close PHI region editor">&times;</button>
+        <div className="flex items-center justify-between px-4 py-3 border-b dark:border-slate-700">
+          <h3 className="text-lg font-semibold dark:text-slate-100">PHI Region Editor - Screenshot #{screenshotId}</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-xl leading-none" aria-label="Close PHI region editor">&times;</button>
         </div>
         {editorContent}
       </div>

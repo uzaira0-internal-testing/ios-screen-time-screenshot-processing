@@ -304,7 +304,7 @@ export const CropAdjustModal = ({
               {!inline && (
                 <button
                   onClick={onClose}
-                  className="px-3 py-1 text-sm text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+                  className="px-3 py-1 text-sm text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-600 rounded hover:bg-slate-50 dark:hover:bg-slate-700"
                 >
                   Close
                 </button>
@@ -320,8 +320,8 @@ export const CropAdjustModal = ({
             />
           ) : (
             <div className="flex items-center justify-center h-64 gap-2">
-              <span className="inline-block w-5 h-5 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
-              <span className="text-gray-400">Loading image...</span>
+              <span className="inline-block w-5 h-5 border-2 border-slate-300 border-t-primary-500 rounded-full animate-spin" />
+              <span className="text-slate-400">Loading image...</span>
             </div>
           )}
         </div>
@@ -331,13 +331,13 @@ export const CropAdjustModal = ({
           {/* Recent crops (inline queue mode only) */}
           {inline && recentCrops && recentCrops.length > 0 && (
             <div>
-              <div className="text-xs font-semibold text-gray-500 mb-1.5">Recent Crops</div>
+              <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Recent Crops</div>
               <div className="flex flex-wrap gap-1.5">
                 {recentCrops.map((rc, i) => (
                   <button
                     key={i}
                     onClick={() => setCrop(rc)}
-                    className="px-2 py-1 text-xs font-mono bg-gray-100 text-gray-700 border border-gray-200 rounded hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors"
+                    className="px-2 py-1 text-xs font-mono bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600 rounded hover:bg-primary-50 dark:hover:bg-primary-900/30 hover:border-primary-300 hover:text-primary-700 transition-colors"
                     title={`Left: ${rc.left}, Top: ${rc.top}, Right: ${rc.right}, Bottom: ${rc.bottom}`}
                   >
                     {rc.right - rc.left}&times;{rc.bottom - rc.top}
@@ -346,8 +346,8 @@ export const CropAdjustModal = ({
               </div>
             </div>
           )}
-          <div className="text-sm font-medium text-gray-700">Preview</div>
-          <div className="border rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center min-h-[300px]">
+          <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Preview</div>
+          <div className="border dark:border-slate-600 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-700 flex items-center justify-center min-h-[300px]">
             <canvas ref={previewRef} />
           </div>
 
@@ -355,19 +355,19 @@ export const CropAdjustModal = ({
           <div className="grid grid-cols-2 gap-2">
             {(["left", "top", "right", "bottom"] as const).map((field) => (
               <div key={field} className="flex items-center gap-1">
-                <label className="text-xs text-gray-500 w-12 capitalize">{field}:</label>
+                <label className="text-xs text-slate-500 dark:text-slate-400 w-12 capitalize">{field}:</label>
                 <input
                   type="number"
                   value={crop[field]}
                   onChange={(e) => setCrop({ ...crop, [field]: Math.max(0, parseInt(e.target.value) || 0) })}
-                  className="w-full text-xs border border-gray-200 rounded px-2 py-1"
+                  className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded px-2 py-1 dark:bg-slate-700 dark:text-slate-200"
                   min={0}
                 />
               </div>
             ))}
           </div>
 
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-slate-500 dark:text-slate-400">
             Crop: {cropW} x {cropH}px
             {image && <span className="ml-2">(Original: {image.naturalWidth} x {image.naturalHeight})</span>}
           </div>
@@ -375,11 +375,11 @@ export const CropAdjustModal = ({
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-end gap-3 px-6 py-3 border-t shrink-0">
+      <div className="flex items-center justify-end gap-3 px-6 py-3 border-t dark:border-slate-700 shrink-0">
         {!inline && (
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+            className="px-4 py-2 text-sm text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700 focus-ring"
           >
             Cancel
           </button>
@@ -387,7 +387,7 @@ export const CropAdjustModal = ({
         <button
           onClick={handleApply}
           disabled={isApplying || cropW < 10 || cropH < 10}
-          className="px-6 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+          className="px-6 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50 focus-ring"
         >
           {isApplying ? "Applying..." : "Apply Crop"}
         </button>
@@ -406,7 +406,7 @@ export const CropAdjustModal = ({
 
   if (inline) {
     return (
-      <div className="flex flex-col h-full bg-white rounded-lg border border-gray-200">
+      <div className="flex flex-col h-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
         {editorContent}
       </div>
     );
@@ -414,11 +414,11 @@ export const CropAdjustModal = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-[98vw] h-[94vh] flex flex-col">
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-[98vw] h-[94vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-3 border-b shrink-0">
-          <h3 className="text-lg font-semibold">Adjust Crop - Screenshot #{screenshotId}</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none" aria-label="Close crop editor">&times;</button>
+        <div className="flex items-center justify-between px-6 py-3 border-b dark:border-slate-700 shrink-0">
+          <h3 className="text-lg font-semibold dark:text-slate-100">Adjust Crop - Screenshot #{screenshotId}</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-xl leading-none" aria-label="Close crop editor">&times;</button>
         </div>
         {editorContent}
       </div>

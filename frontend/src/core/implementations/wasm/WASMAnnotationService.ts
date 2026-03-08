@@ -1,0 +1,66 @@
+import type { Annotation, AnnotationCreate } from "@/types";
+import type { IAnnotationService } from "@/core/interfaces";
+import type { IStorageService } from "@/core/interfaces";
+import { db } from "./storage/database";
+
+export class WASMAnnotationService implements IAnnotationService {
+  private storageService: IStorageService;
+
+  constructor(storageService: IStorageService) {
+    this.storageService = storageService;
+  }
+
+  async create(data: AnnotationCreate): Promise<Annotation> {
+    // AnnotationCreate uses grid_upper_left/grid_lower_right + hourly_values
+    const annotation: Annotation = {
+      id: Date.now(),
+      screenshot_id: data.screenshot_id,
+      user_id: 1,
+      grid_upper_left: data.grid_upper_left ?? null,
+      grid_lower_right: data.grid_lower_right ?? null,
+      hourly_values: data.hourly_values,
+      notes: data.notes ?? null,
+      status: "completed",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as Annotation;
+
+    const id = await this.storageService.saveAnnotation(annotation);
+    annotation.id = id;
+
+    await this.storageService.updateScreenshot(data.screenshot_id, {
+      annotation_status: "annotated",
+    });
+
+    return annotation;
+  }
+
+  async update(
+    _id: number,
+    _data: Partial<AnnotationCreate>,
+  ): Promise<Annotation> {
+    throw new Error("WASMAnnotationService.update: Not implemented yet");
+  }
+
+  async getByScreenshot(screenshotId: number): Promise<Annotation[]> {
+    const result =
+      await this.storageService.getAnnotationsByScreenshot(screenshotId);
+    return Array.isArray(result) ? result : [];
+  }
+
+  async getHistory(skip = 0, limit = 50): Promise<Annotation[]> {
+    // Query annotations directly, sorted by created_at descending, with pagination
+    const allAnnotations = await db.annotations
+      .orderBy("created_at")
+      .reverse()
+      .offset(skip)
+      .limit(limit)
+      .toArray();
+
+    return allAnnotations;
+  }
+
+  async delete(id: number): Promise<void> {
+    await this.storageService.deleteAnnotation(id);
+  }
+}

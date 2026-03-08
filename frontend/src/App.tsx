@@ -1,11 +1,10 @@
 import { useEffect } from "react";
-import { BrowserRouter } from "react-router-dom";
+import { BrowserRouter } from "react-router";
 import { Toaster } from "react-hot-toast";
 import toast from "react-hot-toast";
 import { AppRouter } from "./components/routing/AppRouter";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { useAuthStore } from "./store/authStore";
-import { OfflineBanner } from "./components/pwa/OfflineBanner";
 import { config } from "./config";
 import type {
   AnnotationSubmittedEvent,
@@ -47,7 +46,6 @@ function WebSocketIntegration() {
       "user_joined",
       (data: UserJoinedEvent) => {
         toast(`${data.username} joined (${data.active_users} online)`, {
-          icon: "👋",
           duration: 3000,
         });
       },
@@ -57,7 +55,6 @@ function WebSocketIntegration() {
       "user_left",
       (data: UserLeftEvent) => {
         toast(`${data.username} left (${data.active_users} online)`, {
-          icon: "👋",
           duration: 3000,
         });
       },
@@ -82,7 +79,6 @@ function App() {
 
   return (
     <BrowserRouter basename={basePath}>
-      <OfflineBanner />
       <WebSocketIntegration />
 
       <Toaster

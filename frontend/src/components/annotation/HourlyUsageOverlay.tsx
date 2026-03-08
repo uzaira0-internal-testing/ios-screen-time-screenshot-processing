@@ -139,12 +139,12 @@ export const HourlyUsageOverlay = ({
     return clsx(
       "w-full text-center text-[10px] font-medium border rounded-md focus:outline-none focus:ring-2 transition-all py-0.5",
       {
-        "bg-green-50 border-green-200 text-green-700": level === "none",
-        "bg-yellow-50 border-yellow-200 text-yellow-700": level === "minor",
-        "bg-red-50 border-red-200 text-red-700": level === "major",
-        "bg-white border-gray-200 text-gray-700 focus:ring-primary-500 focus:border-primary-500":
+        "bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-700 dark:text-green-400": level === "none",
+        "bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800 text-yellow-700 dark:text-yellow-400": level === "minor",
+        "bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400": level === "major",
+        "bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 focus:ring-primary-500 focus:border-primary-500":
           level === null,
-        "bg-gray-50 text-gray-400 cursor-not-allowed": readOnly,
+        "bg-slate-50 dark:bg-slate-800 text-slate-400 cursor-not-allowed": readOnly,
       },
     );
   };
@@ -156,7 +156,7 @@ export const HourlyUsageOverlay = ({
     <div className="w-full" ref={containerRef} data-testid="hourly-editor">
       {/* Graph Area with Overlay */}
       <div
-        className="relative bg-white rounded-lg overflow-hidden border border-gray-200"
+        className="relative bg-white dark:bg-slate-800 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700"
         style={{ height: graphHeight }}
       >
         {/* Background: Cropped screenshot */}
@@ -170,7 +170,7 @@ export const HourlyUsageOverlay = ({
         />
 
         {(!hasValidGrid || !canvasReady) && (
-          <div className="absolute inset-0 w-full h-full bg-gray-50 flex items-center justify-center text-gray-400 text-sm">
+          <div className="absolute inset-0 w-full h-full bg-slate-50 dark:bg-slate-700 flex items-center justify-center text-slate-400 text-sm">
             {hasValidGrid ? "Loading..." : "Select grid area to view overlay"}
           </div>
         )}
@@ -194,7 +194,7 @@ export const HourlyUsageOverlay = ({
                 {/* Bar - only render if value > 0 */}
                 {value > 0 ? (
                   <div
-                    className="w-4/5 bg-blue-500/70 transition-all duration-300 hover:bg-blue-500/80 rounded-t-md"
+                    className="w-4/5 bg-primary-500/70 transition-all duration-300 hover:bg-primary-500/80 rounded-t-md"
                     style={{
                       height: `${heightPercentage}%`,
                       minHeight: "2px",
@@ -218,7 +218,7 @@ export const HourlyUsageOverlay = ({
           return (
             <div key={i} className="flex flex-col items-center gap-1">
               {/* X-Axis Label */}
-              <div className="text-[10px] text-gray-500 font-semibold text-center">
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold text-center">
                 {i}h
               </div>
 
@@ -226,7 +226,7 @@ export const HourlyUsageOverlay = ({
                 type="button"
                 onClick={() => handleChange(i, 1)}
                 disabled={readOnly}
-                className="w-full h-5 flex items-center justify-center text-[10px] bg-gray-100 hover:bg-blue-50 hover:text-blue-600 rounded text-gray-600 disabled:opacity-50 transition-colors"
+                className="w-full h-5 flex items-center justify-center text-[10px] bg-slate-100 dark:bg-slate-700 hover:bg-primary-50 dark:hover:bg-primary-900/30 hover:text-primary-600 rounded text-slate-600 dark:text-slate-400 disabled:opacity-50 transition-colors"
               >
                 ▲
               </button>
@@ -245,7 +245,7 @@ export const HourlyUsageOverlay = ({
                 type="button"
                 onClick={() => handleChange(i, -1)}
                 disabled={readOnly}
-                className="w-full h-5 flex items-center justify-center text-[10px] bg-gray-100 hover:bg-blue-50 hover:text-blue-600 rounded text-gray-600 disabled:opacity-50 transition-colors"
+                className="w-full h-5 flex items-center justify-center text-[10px] bg-slate-100 dark:bg-slate-700 hover:bg-primary-50 dark:hover:bg-primary-900/30 hover:text-primary-600 rounded text-slate-600 dark:text-slate-400 disabled:opacity-50 transition-colors"
               >
                 ▼
               </button>

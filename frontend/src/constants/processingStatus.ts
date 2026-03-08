@@ -21,8 +21,8 @@ export const PROCESSING_STATUS_LABELS: Record<ProcessingStatus, string> = {
  * Colors for processing status badges
  */
 export const PROCESSING_STATUS_COLORS: Record<ProcessingStatus, string> = {
-  pending: 'text-blue-600 bg-blue-50',
+  pending: 'text-primary-600 bg-primary-50',
   completed: 'text-green-600 bg-green-50',
   failed: 'text-red-600 bg-red-50',
-  skipped: 'text-gray-600 bg-gray-100',
+  skipped: 'text-slate-600 bg-slate-100',
 };

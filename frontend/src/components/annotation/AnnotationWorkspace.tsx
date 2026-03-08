@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link } from "react-router";
 import { useAnnotation } from "@/hooks/useAnnotationWithDI";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useAutoSave } from "@/hooks/useAutoSave";
@@ -259,10 +259,10 @@ export const AnnotationWorkspace = ({
       <div className="flex items-center justify-center h-96">
         <div className="text-center max-w-md">
           <div className="text-6xl mb-4">All Done!</div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
             No Screenshots in Queue
           </h2>
-          <p className="text-gray-600 mb-6">
+          <p className="text-slate-600 dark:text-slate-400 mb-6">
             {groupId ? (
               <>No screenshots match the current filter for group <span className="font-semibold">{groupId}</span>.</>
             ) : (
@@ -271,16 +271,16 @@ export const AnnotationWorkspace = ({
           </p>
 
           {/* Filter controls */}
-          <div className="bg-gray-50 rounded-lg p-4 space-y-4 text-left">
+          <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4 space-y-4 text-left">
             <div>
-              <div className="text-xs text-gray-500 mb-2 font-medium">Processing Status</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 mb-2 font-medium">Processing Status</div>
               <ProcessingStatusFilter
                 value={(processingStatus as ProcessingStatus) || "all"}
                 onChange={handleProcessingStatusChange}
               />
             </div>
             <div>
-              <div className="text-xs text-gray-500 mb-2 font-medium">Verification Status</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 mb-2 font-medium">Verification Status</div>
               <VerificationFilter
                 value={verificationFilter}
                 onChange={setVerificationFilter}
@@ -290,7 +290,7 @@ export const AnnotationWorkspace = ({
 
           <button
             onClick={() => navigate("/")}
-            className="mt-6 px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+            className="mt-6 px-4 py-2 text-sm bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
           >
             Back to Groups
           </button>
@@ -304,7 +304,7 @@ export const AnnotationWorkspace = ({
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading screenshot...</p>
+          <p className="text-slate-600 dark:text-slate-400">Loading screenshot...</p>
         </div>
       </div>
     );
@@ -314,7 +314,7 @@ export const AnnotationWorkspace = ({
     <div className="flex gap-1 h-full" data-testid="annotation-workspace">
       {/* Left Column - Grid Selector */}
       <div className="flex-1">
-        <div className="bg-white h-full p-1 flex items-center justify-center relative">
+        <div className="bg-white dark:bg-slate-800 h-full p-1 flex items-center justify-center relative">
           <div className="w-full max-w-xl">
             <GridSelector
               imageUrl={imageUrl || ""}
@@ -332,27 +332,27 @@ export const AnnotationWorkspace = ({
 
       {/* Center Column - Cropped Graph + Hourly Bars */}
       <div className="flex-[2]">
-        <div className="bg-white h-full flex flex-col relative">
+        <div className="bg-white dark:bg-slate-800 h-full flex flex-col relative">
           {/* Screenshot metadata header */}
-          <div className="bg-gray-100 px-4 py-2 rounded-t text-sm flex-shrink-0 border-b border-gray-200 text-center space-y-1">
-            <div className="flex items-center justify-center gap-4 text-gray-700">
+          <div className="bg-slate-100 dark:bg-slate-700 px-4 py-2 rounded-t text-sm flex-shrink-0 border-b border-slate-200 dark:border-slate-600 text-center space-y-1">
+            <div className="flex items-center justify-center gap-4 text-slate-700 dark:text-slate-300">
               {screenshot.group_id && (
-                <span><span className="font-semibold text-gray-500">Group:</span> {screenshot.group_id}</span>
+                <span><span className="font-semibold text-slate-500">Group:</span> {screenshot.group_id}</span>
               )}
               {processingStatus && (
-                <span><span className="font-semibold text-gray-500">Subgroup:</span> <span className="capitalize">{processingStatus}</span></span>
+                <span><span className="font-semibold text-slate-500">Subgroup:</span> <span className="capitalize">{processingStatus}</span></span>
               )}
               {screenshot.participant_id && (
-                <span><span className="font-semibold text-gray-500">ID:</span> {screenshot.participant_id}</span>
+                <span><span className="font-semibold text-slate-500">ID:</span> {screenshot.participant_id}</span>
               )}
               {screenshot.screenshot_date && (
-                <span><span className="font-semibold text-gray-500">Date:</span> {screenshot.screenshot_date}</span>
+                <span><span className="font-semibold text-slate-500">Date:</span> {screenshot.screenshot_date}</span>
               )}
-              <span className="text-gray-400 font-mono">#{screenshot.id}</span>
+              <span className="text-slate-400 font-mono">#{screenshot.id}</span>
             </div>
             {screenshot.original_filepath && (
-              <div className="text-xs text-gray-600">
-                <span className="font-semibold text-gray-500">Source:</span> {screenshot.original_filepath}
+              <div className="text-xs text-slate-600 dark:text-slate-400">
+                <span className="font-semibold text-slate-500">Source:</span> {screenshot.original_filepath}
               </div>
             )}
           </div>
@@ -373,7 +373,7 @@ export const AnnotationWorkspace = ({
                 </span>
                 <Link
                   to={`/preprocessing?screenshot_id=${screenshot.id}&returnUrl=${encodeURIComponent(`/annotate/${screenshot.id}`)}`}
-                  className="text-blue-600 hover:text-blue-800 underline text-xs font-medium"
+                  className="text-primary-600 hover:text-primary-800 underline text-xs font-medium"
                 >
                   Fix in Preprocessing &rarr;
                 </Link>
@@ -411,10 +411,10 @@ export const AnnotationWorkspace = ({
 
       {/* Right Column - Info Panel */}
       <div className="flex-1">
-        <div className="bg-white p-2 h-full flex items-center justify-center">
+        <div className="bg-white dark:bg-slate-800 p-2 h-full flex items-center justify-center">
           <div className="w-full space-y-2 overflow-y-auto max-h-full px-1">
             {/* Screenshot Navigator */}
-            <div className="border-b border-gray-100 pb-2">
+            <div className="border-b border-slate-100 dark:border-slate-700 pb-2">
               <ScreenshotSelector
                 currentScreenshot={screenshot}
                 screenshotList={screenshotList}
@@ -432,16 +432,16 @@ export const AnnotationWorkspace = ({
             </div>
 
             {/* Filters */}
-            <div className="border-b border-gray-100 pb-2 space-y-2">
+            <div className="border-b border-slate-100 dark:border-slate-700 pb-2 space-y-2">
               <div>
-                <div className="text-xs text-gray-500 mb-1">Status</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Status</div>
                 <ProcessingStatusFilter
                   value={(processingStatus as ProcessingStatus) || "all"}
                   onChange={handleProcessingStatusChange}
                 />
               </div>
               <div>
-                <div className="text-xs text-gray-500 mb-1">Verified</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Verified</div>
                 <VerificationFilter
                   value={verificationFilter}
                   onChange={setVerificationFilter}
@@ -468,15 +468,15 @@ export const AnnotationWorkspace = ({
             />
 
             {/* View Mode Toggle */}
-            <div className="border-b border-gray-100 pb-2">
-              <div className="text-xs text-gray-500 mb-1">View</div>
+            <div className="border-b border-slate-100 dark:border-slate-700 pb-2">
+              <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">View</div>
               <div className="flex gap-1">
                 <button
                   onClick={() => setDisplayMode("overlay")}
                   className={`flex-1 px-2 py-1 text-xs rounded ${
                     displayMode === "overlay"
                       ? "bg-primary-600 text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600"
                   }`}
                 >
                   Overlay
@@ -486,7 +486,7 @@ export const AnnotationWorkspace = ({
                   className={`flex-1 px-2 py-1 text-xs rounded ${
                     displayMode === "separate"
                       ? "bg-primary-600 text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600"
                   }`}
                 >
                   Separate
@@ -496,7 +496,7 @@ export const AnnotationWorkspace = ({
 
             {/* Potential Duplicate Warning */}
             {screenshot?.potential_duplicate_of && (
-              <div className="border-b border-gray-100 pb-2">
+              <div className="border-b border-slate-100 dark:border-slate-700 pb-2">
                 <DuplicateWarning
                   duplicateId={screenshot.potential_duplicate_of}
                   onSkipThis={async () => {
@@ -514,21 +514,21 @@ export const AnnotationWorkspace = ({
 
             {/* Issues */}
             {processingIssues && processingIssues.length > 0 && (
-              <div className="border-b border-gray-100 pb-2">
+              <div className="border-b border-slate-100 dark:border-slate-700 pb-2">
                 <IssueDisplay issues={processingIssues} />
               </div>
             )}
 
             {/* Reprocessing Buttons */}
             <div
-              className={`border-b border-gray-100 pb-2 ${isVerifiedByMe ? "opacity-50" : ""}`}
+              className={`border-b border-slate-100 dark:border-slate-700 pb-2 ${isVerifiedByMe ? "opacity-50" : ""}`}
             >
-              <div className="text-xs text-gray-500 mb-1">Reprocess Grid</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Reprocess Grid</div>
 
               {/* Grid Optimization Spinner - centered */}
               <div className="flex flex-col items-center mb-2">
                 <div
-                  className="text-xs text-gray-400 mb-1 text-center cursor-help"
+                  className="text-xs text-slate-400 dark:text-slate-500 mb-1 text-center cursor-help"
                   title="Shifts grid boundaries by ±N pixels to match bar total with OCR total. Higher = slower but more likely to find exact match."
                 >
                   Grid Optimization Shift Range
@@ -537,7 +537,7 @@ export const AnnotationWorkspace = ({
                   <button
                     onClick={() => setMaxShift(Math.max(0, maxShift - 1))}
                     disabled={isVerifiedByMe || maxShift <= 0}
-                    className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="w-6 h-6 flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:text-slate-300 dark:hover:bg-slate-600 rounded disabled:opacity-30 disabled:cursor-not-allowed"
                     title="Decrease optimization range"
                   >
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -545,7 +545,7 @@ export const AnnotationWorkspace = ({
                     </svg>
                   </button>
                   <div
-                    className="flex items-center border rounded px-2 py-1 bg-white cursor-help"
+                    className="flex items-center border dark:border-slate-600 rounded px-2 py-1 bg-white dark:bg-slate-700 cursor-help"
                     title="Max pixels to shift grid boundaries in each direction"
                   >
                     <span className="text-xs font-mono w-8 text-center">±{maxShift}</span>
@@ -553,14 +553,14 @@ export const AnnotationWorkspace = ({
                   <button
                     onClick={() => setMaxShift(Math.min(10, maxShift + 1))}
                     disabled={isVerifiedByMe || maxShift >= 10}
-                    className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="w-6 h-6 flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:text-slate-300 dark:hover:bg-slate-600 rounded disabled:opacity-30 disabled:cursor-not-allowed"
                     title="Increase optimization range"
                   >
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
                     </svg>
                   </button>
-                  <span className="text-xs text-gray-400 ml-1">px</span>
+                  <span className="text-xs text-slate-400 ml-1">px</span>
                 </div>
               </div>
               <div className="flex gap-1">
@@ -606,8 +606,8 @@ export const AnnotationWorkspace = ({
                   }
                   className={`flex-1 py-2 px-2 text-xs border rounded flex items-center justify-center gap-1 ${
                     screenshot?.processing_method === "line_based"
-                      ? "bg-blue-100 text-blue-800 border-blue-300"
-                      : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                      ? "bg-primary-100 text-primary-800 border-primary-300"
+                      : "bg-primary-50 text-primary-700 border-primary-200 hover:bg-primary-100"
                   } disabled:opacity-50 disabled:cursor-not-allowed`}
                   title={
                     isVerifiedByMe
@@ -616,7 +616,7 @@ export const AnnotationWorkspace = ({
                   }
                 >
                   {reprocessingMethod === "line_based" ? (
-                    <div className="animate-spin h-3 w-3 border-2 border-blue-600 border-t-transparent rounded-full" />
+                    <div className="animate-spin h-3 w-3 border-2 border-primary-600 border-t-transparent rounded-full" />
                   ) : (
                     <svg
                       className="w-3 h-3"
@@ -635,7 +635,7 @@ export const AnnotationWorkspace = ({
                   Lines
                 </button>
               </div>
-              <div className="text-xs text-gray-400 mt-1 text-center">
+              <div className="text-xs text-slate-400 dark:text-slate-500 mt-1 text-center">
                 {isVerifiedByMe
                   ? "Verified (read-only)"
                   : screenshot?.processing_method
@@ -645,12 +645,12 @@ export const AnnotationWorkspace = ({
             </div>
 
             {/* Notes */}
-            <div className="border-b border-gray-100 pb-2">
-              <div className="text-xs text-gray-500 mb-1">Notes</div>
+            <div className="border-b border-slate-100 dark:border-slate-700 pb-2">
+              <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Notes</div>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none"
+                className="w-full px-2 py-1 border border-slate-300 dark:border-slate-600 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none dark:bg-slate-700 dark:text-slate-200"
                 placeholder="Optional notes..."
                 rows={2}
               />
@@ -678,8 +678,8 @@ export const AnnotationWorkspace = ({
                       isVerifiedByMe
                         ? "bg-green-600 text-white hover:bg-green-700"
                         : canVerify
-                          ? "bg-green-100 text-green-700 hover:bg-green-200 border border-green-300"
-                          : "bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed"
+                          ? "bg-green-100 text-green-700 hover:bg-green-200 border border-green-300 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30 dark:border-green-700"
+                          : "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed dark:bg-slate-700 dark:text-slate-500 dark:border-slate-600"
                     }`}
                   >
                     {isVerifiedByMe
@@ -693,7 +693,7 @@ export const AnnotationWorkspace = ({
 
               {/* Verifiers Info */}
               {allVerifierUsernames.length > 0 && (
-                <div className="text-xs text-center text-blue-700 bg-blue-50 rounded py-1">
+                <div className="text-xs text-center text-primary-700 bg-primary-50 rounded py-1">
                   Verified by: {allVerifierUsernames.join(", ")}
                 </div>
               )}
@@ -702,7 +702,7 @@ export const AnnotationWorkspace = ({
               <button
                 onClick={skip}
                 disabled={isLoading}
-                className="w-full py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 disabled:opacity-50"
+                className="w-full py-2 text-sm bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded hover:bg-slate-200 dark:hover:bg-slate-600 disabled:opacity-50"
                 title="Skip this screenshot"
               >
                 Skip (Esc)
@@ -715,7 +715,7 @@ export const AnnotationWorkspace = ({
                 timeSinceLastSave={timeSinceLastSave}
               />
 
-              <div className="text-xs text-gray-400 text-center space-y-1">
+              <div className="text-xs text-slate-400 dark:text-slate-500 text-center space-y-1">
                 <div>
                   <strong>←/→</strong> navigate | <strong>V</strong> verify |{" "}
                   <strong>Esc</strong> skip

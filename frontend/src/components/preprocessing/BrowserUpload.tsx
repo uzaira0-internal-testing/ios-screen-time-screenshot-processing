@@ -62,7 +62,7 @@ export const BrowserUpload = () => {
         />
         <button
           onClick={() => setUploadFiles([])}
-          className="px-4 py-2 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+          className="px-4 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-600 dark:text-slate-200"
         >
           Upload More
         </button>
@@ -90,14 +90,14 @@ export const BrowserUpload = () => {
               setUploadFiles([]);
             }
           }}
-          className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+          className="px-4 py-2 text-sm text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700 focus-ring"
         >
           Clear
         </button>
         <button
           onClick={startBrowserUpload}
           disabled={!canUpload}
-          className="px-6 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-6 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed focus-ring"
         >
           Upload {uploadFiles.length} File{uploadFiles.length !== 1 ? "s" : ""}
         </button>

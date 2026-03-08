@@ -4,10 +4,6 @@
  * - API proxying to backend
  * - Live reload via WebSocket
  * - On-demand bundling
- *
- * NOTE: PWA/Service Worker features from vite-plugin-pwa are not yet
- * implemented in this Bun-based setup. For offline functionality,
- * consider adding workbox-cli or a custom solution.
  */
 
 import { watch, rmSync, mkdirSync } from "fs";
@@ -119,7 +115,7 @@ async function generateHtml(): Promise<string> {
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>iOS Screenshot Processing</title>
     <link rel="stylesheet" href="${BASE_PATH}/dist/index.css" />
-    <script>window.__CONFIG__ = { basePath: "${BASE_PATH}" };</script>
+    <script>window.__CONFIG__ = { basePath: "${BASE_PATH}"${process.env.WASM_MODE ? "" : `, apiBaseUrl: "${BASE_PATH}/api/v1"`} };</script>
   </head>
   <body>
     <div id="root"></div>
@@ -145,10 +141,10 @@ async function generateHtml(): Promise<string> {
 </html>`;
 }
 
-// Build Tailwind CSS (v3)
+// Build Tailwind CSS (v4)
 async function buildCss() {
   const proc = Bun.spawn(
-    ["bunx", "tailwindcss", "-i", join(SRC_DIR, "index.css"), "-o", join(ROOT_DIR, ".bun-dev", "index.css")],
+    ["bunx", "@tailwindcss/cli", "-i", join(SRC_DIR, "index.css"), "-o", join(ROOT_DIR, ".bun-dev", "index.css")],
     {
       cwd: ROOT_DIR,
       stdout: "inherit",
@@ -282,7 +278,6 @@ async function startServer() {
     \x1b[36mLocal:\x1b[0m   http://localhost:${PORT}/
     \x1b[36mBackend:\x1b[0m ${BACKEND_URL}
 
-  \x1b[33mNote:\x1b[0m PWA/Service Worker features not yet implemented in Bun setup
   \x1b[33mPress Ctrl+C to stop\x1b[0m
 `);
 }

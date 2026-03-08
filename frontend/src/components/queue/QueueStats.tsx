@@ -21,27 +21,27 @@ export const QueueStats = ({ compact = false }: QueueStatsProps) => {
     return (
       <div className="space-y-1">
         <div className="flex justify-between text-xs">
-          <span className="text-gray-500">Total</span>
-          <span className="font-semibold text-gray-700">
+          <span className="text-slate-500">Total</span>
+          <span className="font-semibold text-slate-700">
             {queueStats.total_screenshots}
           </span>
         </div>
         <div className="flex justify-between text-xs">
-          <span className="text-gray-500">Pending</span>
-          <span className="font-semibold text-blue-600">
+          <span className="text-slate-500">Pending</span>
+          <span className="font-semibold text-primary-600">
             {queueStats.pending_screenshots}
           </span>
         </div>
         <div className="flex justify-between text-xs">
-          <span className="text-gray-500">Done</span>
+          <span className="text-slate-500">Done</span>
           <span className="font-semibold text-green-600">
             {queueStats.completed_screenshots}
           </span>
         </div>
         {queueStats.skipped > 0 && (
           <div className="flex justify-between text-xs">
-            <span className="text-gray-500">Skipped</span>
-            <span className="font-semibold text-gray-600">
+            <span className="text-slate-500">Skipped</span>
+            <span className="font-semibold text-slate-600">
               {queueStats.skipped}
             </span>
           </div>
@@ -55,12 +55,12 @@ export const QueueStats = ({ compact = false }: QueueStatsProps) => {
     {
       label: "Total Screenshots",
       value: queueStats.total_screenshots,
-      color: "text-gray-600",
+      color: "text-slate-600",
     },
     {
       label: "Pending",
       value: queueStats.pending_screenshots,
-      color: "text-blue-600",
+      color: "text-primary-600",
     },
     {
       label: "Preprocessed",
@@ -84,8 +84,8 @@ export const QueueStats = ({ compact = false }: QueueStatsProps) => {
     {
       label: "Pending",
       value: queueStats.pending ?? 0,
-      color: "text-blue-600",
-      bg: "bg-blue-50",
+      color: "text-primary-600",
+      bg: "bg-primary-50",
     },
     {
       label: "Failed",
@@ -96,16 +96,16 @@ export const QueueStats = ({ compact = false }: QueueStatsProps) => {
     {
       label: "Skipped",
       value: queueStats.skipped ?? 0,
-      color: "text-gray-600",
-      bg: "bg-gray-50",
+      color: "text-slate-600",
+      bg: "bg-slate-50",
     },
   ];
 
   const hasProcessingStats = processingStats.some((s) => s.value > 0);
 
   return (
-    <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md border border-slate-200 dark:border-slate-700 p-6">
+      <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
         Queue Statistics
       </h3>
 
@@ -113,19 +113,19 @@ export const QueueStats = ({ compact = false }: QueueStatsProps) => {
         {mainStats.map((stat) => (
           <div
             key={stat.label}
-            className="text-center p-3 bg-gray-50 rounded-lg"
+            className="text-center p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg"
           >
             <div className={`text-2xl font-bold ${stat.color}`}>
               {stat.value}
             </div>
-            <div className="text-xs text-gray-600 mt-1">{stat.label}</div>
+            <div className="text-xs text-slate-600 mt-1">{stat.label}</div>
           </div>
         ))}
       </div>
 
       {hasProcessingStats && (
         <>
-          <h4 className="text-sm font-semibold text-gray-700 mb-3 mt-4">
+          <h4 className="text-sm font-semibold text-slate-700 mb-3 mt-4">
             Processing Status
           </h4>
           <div className="space-y-2">
@@ -136,7 +136,7 @@ export const QueueStats = ({ compact = false }: QueueStatsProps) => {
                   key={stat.label}
                   className={`flex items-center justify-between p-2 ${stat.bg} rounded`}
                 >
-                  <span className="text-sm text-gray-700">{stat.label}</span>
+                  <span className="text-sm text-slate-700">{stat.label}</span>
                   <span className={`text-sm font-bold ${stat.color}`}>
                     {stat.value}
                   </span>

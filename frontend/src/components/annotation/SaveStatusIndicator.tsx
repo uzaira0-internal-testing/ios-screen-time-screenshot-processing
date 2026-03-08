@@ -13,16 +13,16 @@ export function SaveStatusIndicator({
     <div
       className={`text-xs text-center py-2 px-3 rounded-md transition-all duration-300 ${
         isSaving
-          ? "bg-blue-50 text-blue-700 border border-blue-200"
+          ? "bg-primary-50 text-primary-700 border border-primary-200 dark:bg-primary-900/20 dark:text-primary-400 dark:border-primary-700"
           : lastSaved
-            ? "bg-green-50 text-green-700 border border-green-200"
-            : "bg-gray-50 text-gray-500 border border-gray-200"
+            ? "bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-700"
+            : "bg-slate-50 text-slate-500 border border-slate-200 dark:bg-slate-700/50 dark:text-slate-400 dark:border-slate-600"
       }`}
       data-testid="auto-save-status"
     >
       {isSaving ? (
         <span className="flex items-center justify-center gap-2">
-          <div className="animate-spin h-3 w-3 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+          <div className="animate-spin h-3 w-3 border-2 border-primary-500 border-t-transparent rounded-full"></div>
           <span className="font-medium">Saving changes...</span>
         </span>
       ) : lastSaved ? (
@@ -45,7 +45,7 @@ export function SaveStatusIndicator({
       ) : (
         <span className="flex items-center justify-center gap-1">
           <svg
-            className="w-3 h-3 text-gray-400"
+            className="w-3 h-3 text-slate-400"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"

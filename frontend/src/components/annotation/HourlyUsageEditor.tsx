@@ -45,12 +45,12 @@ export const HourlyUsageEditor = ({
     return clsx(
       "w-full text-center text-sm font-medium border rounded-md focus:outline-none focus:ring-2 transition-all py-1",
       {
-        "bg-green-50 border-green-200 text-green-700": level === "none",
-        "bg-yellow-50 border-yellow-200 text-yellow-700": level === "minor",
-        "bg-red-50 border-red-200 text-red-700": level === "major",
-        "bg-white border-gray-200 text-gray-700 focus:ring-primary-500 focus:border-primary-500":
+        "bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-700 dark:text-green-400": level === "none",
+        "bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800 text-yellow-700 dark:text-yellow-400": level === "minor",
+        "bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400": level === "major",
+        "bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 focus:ring-primary-500 focus:border-primary-500":
           level === null,
-        "bg-gray-50 text-gray-400 cursor-not-allowed": readOnly,
+        "bg-slate-50 dark:bg-slate-800 text-slate-400 cursor-not-allowed": readOnly,
       },
     );
   };
@@ -61,7 +61,7 @@ export const HourlyUsageEditor = ({
     <div className="w-full" data-testid="hourly-editor">
       {/* Bar Graph - EXACTLY 24 columns */}
       <div
-        className="relative bg-white rounded-lg overflow-hidden border border-gray-200"
+        className="relative bg-white dark:bg-slate-800 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700"
         style={{ height: graphHeight }}
       >
         <div
@@ -77,11 +77,11 @@ export const HourlyUsageEditor = ({
             return (
               <div
                 key={i}
-                className="flex flex-col h-full justify-end items-center border-r border-gray-200 last:border-r-0"
+                className="flex flex-col h-full justify-end items-center border-r border-slate-200 dark:border-slate-700 last:border-r-0"
               >
                 {/* Bar */}
                 <div
-                  className="w-4/5 bg-blue-500 border-t border-blue-600/30 transition-all duration-300 rounded-t-md"
+                  className="w-4/5 bg-primary-500 border-t border-primary-600/30 transition-all duration-300 rounded-t-md"
                   style={{
                     height: `${heightPercentage}%`,
                     minHeight: value > 0 ? "2px" : "0",
@@ -104,7 +104,7 @@ export const HourlyUsageEditor = ({
           return (
             <div key={i} className="flex flex-col items-center gap-1">
               {/* X-Axis Label */}
-              <div className="text-[10px] text-gray-500 font-semibold text-center">
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold text-center">
                 {i}h
               </div>
 
@@ -112,7 +112,7 @@ export const HourlyUsageEditor = ({
                 type="button"
                 onClick={() => handleChange(i, 1)}
                 disabled={readOnly}
-                className="w-full h-5 flex items-center justify-center text-[10px] bg-gray-100 hover:bg-blue-50 hover:text-blue-600 rounded text-gray-600 disabled:opacity-50 transition-colors"
+                className="w-full h-5 flex items-center justify-center text-[10px] bg-slate-100 dark:bg-slate-700 hover:bg-primary-50 dark:hover:bg-primary-900/30 hover:text-primary-600 rounded text-slate-600 dark:text-slate-400 disabled:opacity-50 transition-colors"
               >
                 ▲
               </button>
@@ -131,7 +131,7 @@ export const HourlyUsageEditor = ({
                 type="button"
                 onClick={() => handleChange(i, -1)}
                 disabled={readOnly}
-                className="w-full h-5 flex items-center justify-center text-[10px] bg-gray-100 hover:bg-blue-50 hover:text-blue-600 rounded text-gray-600 disabled:opacity-50 transition-colors"
+                className="w-full h-5 flex items-center justify-center text-[10px] bg-slate-100 dark:bg-slate-700 hover:bg-primary-50 dark:hover:bg-primary-900/30 hover:text-primary-600 rounded text-slate-600 dark:text-slate-400 disabled:opacity-50 transition-colors"
               >
                 ▼
               </button>
