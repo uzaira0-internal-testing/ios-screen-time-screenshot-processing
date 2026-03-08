@@ -4,10 +4,6 @@ import App from "./App";
 import "./index.css";
 import { ServiceProvider } from "./core";
 
-// NOTE: PWA/Service Worker functionality removed - not supported by Bun bundler.
-// The build uses Bun.build() which doesn't support vite-plugin-pwa virtual modules.
-// To re-enable PWA, switch to Vite bundler or implement workbox-cli manually.
-
 const rootElement = document.getElementById("root");
 
 if (!rootElement) {
@@ -21,7 +17,3 @@ ReactDOM.createRoot(rootElement).render(
     </ServiceProvider>
   </React.StrictMode>,
 );
-
-// force rebuild 1768038003
-// rebuild 1768038419
-// rebuild 1768038914

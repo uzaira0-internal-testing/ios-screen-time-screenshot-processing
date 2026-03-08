@@ -5,7 +5,6 @@ import toast from "react-hot-toast";
 import { AppRouter } from "./components/routing/AppRouter";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { useAuthStore } from "./store/authStore";
-import { OfflineBanner } from "./components/pwa/OfflineBanner";
 import { config } from "./config";
 import type {
   AnnotationSubmittedEvent,
@@ -82,7 +81,6 @@ function App() {
 
   return (
     <BrowserRouter basename={basePath}>
-      <OfflineBanner />
       <WebSocketIntegration />
 
       <Toaster
