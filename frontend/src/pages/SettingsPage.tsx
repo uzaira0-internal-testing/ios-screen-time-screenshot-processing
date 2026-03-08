@@ -4,7 +4,6 @@ import { Link } from "react-router";
 import { config } from "@/config";
 import { environment } from "@/config/environment";
 import {
-  Monitor,
   Wifi,
   WifiOff,
   RefreshCw,
@@ -15,11 +14,12 @@ import {
   Globe,
   Loader2,
   X,
-  Sun,
-  Moon,
+  Monitor,
 } from "lucide-react";
 import { useSyncStore } from "@/core/implementations/wasm/sync";
-import { useThemeStore } from "@/store/themeStore";
+import { useThemeStore, THEME_OPTIONS } from "@/store/themeStore";
+import { Card } from "@/components/ui/Card";
+import { Toggle } from "@/components/ui/Toggle";
 
 function SyncSection() {
   const {
@@ -42,7 +42,7 @@ function SyncSection() {
   }, [refreshPendingCounts]);
 
   return (
-    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6">
+    <Card padding="lg">
       <div className="flex items-center gap-3 mb-4">
         <Server className="w-6 h-6 text-primary-700" />
         <div>
@@ -149,19 +149,13 @@ function SyncSection() {
           </div>
         )}
       </div>
-    </div>
+    </Card>
   );
 }
 
 export const SettingsPage: React.FC = () => {
   const isWasmMode = environment.mode === "wasm";
   const { mode: themeMode, setMode: setThemeMode } = useThemeStore();
-
-  const themeOptions = [
-    { value: "light" as const, label: "Light", icon: Sun },
-    { value: "dark" as const, label: "Dark", icon: Moon },
-    { value: "system" as const, label: "System", icon: Monitor },
-  ];
 
   return (
     <Layout>
@@ -174,16 +168,16 @@ export const SettingsPage: React.FC = () => {
         </div>
 
         {/* Theme */}
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6">
+        <Card padding="lg">
           <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">
             Theme
           </h2>
           <div className="flex gap-3">
-            {themeOptions.map(({ value, label, icon: Icon }) => (
+            {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
               <button
                 key={value}
                 onClick={() => setThemeMode(value)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors focus-ring ${
                   themeMode === value
                     ? "bg-primary-50 dark:bg-primary-900/30 border-primary-300 dark:border-primary-700 text-primary-700 dark:text-primary-400"
                     : "bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600"
@@ -194,10 +188,10 @@ export const SettingsPage: React.FC = () => {
               </button>
             ))}
           </div>
-        </div>
+        </Card>
 
         {/* Current Mode Info */}
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6">
+        <Card padding="lg">
           <div className="flex items-center gap-3 mb-4">
             {isWasmMode ? (
               <HardDrive className="w-8 h-8 text-primary-700" />
@@ -244,14 +238,14 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* Sync section (WASM mode only) */}
         {isWasmMode && <SyncSection />}
 
         {/* Server Mode Settings */}
         {!isWasmMode && (
-          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6">
+          <Card padding="lg">
             <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">
               Server Mode Settings
             </h2>
@@ -265,14 +259,7 @@ export const SettingsPage: React.FC = () => {
                     Show WebSocket notifications for team activity
                   </div>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    defaultChecked
-                  />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus-visible:outline-none peer-focus-visible:ring-4 peer-focus-visible:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-                </label>
+                <Toggle defaultChecked label="Real-time notifications" />
               </div>
 
               <div className="flex items-center justify-between py-3">
@@ -284,21 +271,14 @@ export const SettingsPage: React.FC = () => {
                     Automatically refresh when other users make changes
                   </div>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    defaultChecked
-                  />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus-visible:outline-none peer-focus-visible:ring-4 peer-focus-visible:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-                </label>
+                <Toggle defaultChecked label="Auto-refresh on updates" />
               </div>
             </div>
-          </div>
+          </Card>
         )}
 
         {/* About Section */}
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6">
+        <Card padding="lg">
           <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">About</h2>
           <div className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
             <p>
@@ -317,7 +297,7 @@ export const SettingsPage: React.FC = () => {
               </p>
             )}
           </div>
-        </div>
+        </Card>
 
         <div className="flex justify-center">
           <Link

@@ -1,4 +1,5 @@
 import { clsx } from "clsx";
+import { Card } from "./Card";
 
 interface SkeletonProps {
   className?: string;
@@ -37,9 +38,9 @@ export function Skeleton({ count = 1, ...props }: SkeletonProps) {
 
 export function SkeletonCard() {
   return (
-    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-5 shadow-sm space-y-3">
+    <Card className="space-y-3">
       <Skeleton height="1.25rem" width="60%" />
       <Skeleton height="0.875rem" count={3} />
-    </div>
+    </Card>
   );
 }

@@ -2,8 +2,8 @@ import { useState } from "react";
 import { Link, useSearchParams, useLocation } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { PROCESSING_STATUS_LABELS, type ProcessingStatus } from "@/constants/processingStatus";
-import { Menu, X, LogOut, Sun, Moon, Monitor } from "lucide-react";
-import { useThemeStore } from "@/store/themeStore";
+import { Menu, X, LogOut } from "lucide-react";
+import { useThemeStore, THEME_OPTIONS, THEME_CYCLE } from "@/store/themeStore";
 
 export const Header = () => {
   const { username, isAuthenticated, isAdmin, logout } = useAuth();
@@ -12,9 +12,7 @@ export const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { mode: themeMode, setMode: setThemeMode } = useThemeStore();
 
-  const themeIcons = { light: Sun, dark: Moon, system: Monitor };
-  const nextTheme = { light: "dark" as const, dark: "system" as const, system: "light" as const };
-  const ThemeIcon = themeIcons[themeMode];
+  const ThemeIcon = THEME_OPTIONS.find((o) => o.value === themeMode)!.icon;
 
   // Get current filter context from URL
   const groupId = searchParams.get("group");
@@ -103,7 +101,7 @@ export const Header = () => {
                   Welcome, <span className="font-medium">{username}</span>
                 </span>
                 <button
-                  onClick={() => setThemeMode(nextTheme[themeMode])}
+                  onClick={() => setThemeMode(THEME_CYCLE[themeMode])}
                   className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors focus-ring"
                   aria-label={`Theme: ${themeMode}. Click to switch.`}
                   title={`Theme: ${themeMode}`}

@@ -1,11 +1,27 @@
 import { create } from "zustand";
+import { Sun, Moon, Monitor } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
-type ThemeMode = "light" | "dark" | "system";
+export type ThemeMode = "light" | "dark" | "system";
 
 interface ThemeState {
   mode: ThemeMode;
   setMode: (mode: ThemeMode) => void;
 }
+
+/** Shared theme metadata — used by Header (cycle) and SettingsPage (selector) */
+export const THEME_OPTIONS: { value: ThemeMode; label: string; icon: LucideIcon }[] = [
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+  { value: "system", label: "System", icon: Monitor },
+];
+
+/** Cycle order for the Header toggle button */
+export const THEME_CYCLE: Record<ThemeMode, ThemeMode> = {
+  light: "dark",
+  dark: "system",
+  system: "light",
+};
 
 function applyTheme(mode: ThemeMode) {
   const isDark =
@@ -14,13 +30,15 @@ function applyTheme(mode: ThemeMode) {
   document.documentElement.classList.toggle("dark", isDark);
 }
 
-const stored = (typeof localStorage !== "undefined" && localStorage.getItem("theme")) as ThemeMode | null;
-const initial: ThemeMode = stored && ["light", "dark", "system"].includes(stored) ? stored : "system";
+const raw = typeof localStorage !== "undefined" ? localStorage.getItem("theme") : null;
+const initial: ThemeMode = raw && (["light", "dark", "system"] as string[]).includes(raw)
+  ? (raw as ThemeMode)
+  : "system";
 
-// Apply on load
+// Apply synchronously before React mounts to prevent theme flash
 applyTheme(initial);
 
-// Listen for system preference changes
+// Listen for OS preference changes when in "system" mode
 if (typeof window !== "undefined") {
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
     const current = useThemeStore.getState().mode;
