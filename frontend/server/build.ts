@@ -1,10 +1,7 @@
 /**
  * Bun production build script
  *
- * NOTE: PWA/Service Worker features from vite-plugin-pwa are not yet
- * implemented. For production PWA support, consider adding:
- * - workbox-cli for Service Worker generation
- * - Custom manifest.json generation
+ * Builds the app bundle, CSS, service worker, and generates index.html + manifest.
  */
 
 import { rm, mkdir, copyFile } from "fs/promises";
@@ -95,6 +92,26 @@ async function build() {
     console.log("  \x1b[32m✓\x1b[0m " + name + " (" + (output.size / 1024).toFixed(1) + " KB)");
   }
 
+  // Build service worker
+  console.log("\n\x1b[33m[build]\x1b[0m Building service worker...");
+  const swResult = await Bun.build({
+    entrypoints: [join(SRC_DIR, "service-worker.ts")],
+    outdir: DIST_DIR,
+    target: "browser",
+    format: "esm",
+    minify: true,
+    naming: "sw.js",
+  });
+
+  if (!swResult.success) {
+    console.error("\x1b[31m[build]\x1b[0m Service worker build failed:");
+    for (const log of swResult.logs) {
+      console.error(log);
+    }
+  } else {
+    console.log("  \x1b[32m✓\x1b[0m sw.js");
+  }
+
   // Build Tailwind CSS (v3)
   console.log("\n\x1b[33m[build]\x1b[0m Building CSS...");
   const cssProc = Bun.spawn(
@@ -141,12 +158,17 @@ async function build() {
     <title>iOS Screen Time Screenshot Processing</title>
     <link rel="stylesheet" href="./assets/index.css" />
     <link rel="manifest" href="./manifest.json" />
-    <meta name="theme-color" content="#3b82f6" />
+    <meta name="theme-color" content="#0F766E" />
   </head>
   <body>
     <div id="root"></div>
     <script src="./config.js"></script>
     <script type="module" src="./assets/${mainBundle}"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      }
+    </script>
   </body>
 </html>`;
 
@@ -158,7 +180,7 @@ async function build() {
     name: "iOS Screenshot Processing",
     short_name: "iOSScreens",
     description: "Process iPhone screen time and battery screenshots with OCR extraction",
-    theme_color: "#3b82f6",
+    theme_color: "#0F766E",
     background_color: "#ffffff",
     display: "standalone",
     start_url: "/",
@@ -176,7 +198,7 @@ async function build() {
   const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
   console.log("\n\x1b[32m[build]\x1b[0m Build completed in " + elapsed + "s");
   console.log("\x1b[32m[build]\x1b[0m Output: " + DIST_DIR);
-  console.log("\n\x1b[33m[build]\x1b[0m Note: Service Worker not included. For PWA offline support, add workbox-cli.");
+  console.log("\n\x1b[32m[build]\x1b[0m Service worker included at sw.js");
 }
 
 build();

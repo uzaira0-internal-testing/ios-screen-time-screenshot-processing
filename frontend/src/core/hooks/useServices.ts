@@ -6,6 +6,7 @@ import type {
   IAnnotationService,
   IConsensusService,
   IStorageService,
+  IProcessingService,
 } from "../interfaces";
 
 function useServiceContainer() {
@@ -40,11 +41,13 @@ export function useStorageService(): IStorageService {
   return container.resolve<IStorageService>(TOKENS.STORAGE_SERVICE);
 }
 
-// WASM-only services have been archived
-export function useProcessingService(): null {
-  return null;
-}
-
-export function usePrefetchService(): null {
+/**
+ * Returns the processing service if registered (WASM mode), or null (server mode).
+ */
+export function useProcessingService(): IProcessingService | null {
+  const container = useServiceContainer();
+  if (container.has(TOKENS.PROCESSING_SERVICE)) {
+    return container.resolve<IProcessingService>(TOKENS.PROCESSING_SERVICE);
+  }
   return null;
 }

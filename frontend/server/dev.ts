@@ -4,10 +4,6 @@
  * - API proxying to backend
  * - Live reload via WebSocket
  * - On-demand bundling
- *
- * NOTE: PWA/Service Worker features from vite-plugin-pwa are not yet
- * implemented in this Bun-based setup. For offline functionality,
- * consider adding workbox-cli or a custom solution.
  */
 
 import { watch, rmSync, mkdirSync } from "fs";
@@ -282,7 +278,6 @@ async function startServer() {
     \x1b[36mLocal:\x1b[0m   http://localhost:${PORT}/
     \x1b[36mBackend:\x1b[0m ${BACKEND_URL}
 
-  \x1b[33mNote:\x1b[0m PWA/Service Worker features not yet implemented in Bun setup
   \x1b[33mPress Ctrl+C to stop\x1b[0m
 `);
 }

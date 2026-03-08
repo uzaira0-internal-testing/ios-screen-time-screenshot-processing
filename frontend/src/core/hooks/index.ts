@@ -5,5 +5,4 @@ export {
   useConsensusService,
   useStorageService,
   useProcessingService,
-  usePrefetchService,
 } from "./useServices";

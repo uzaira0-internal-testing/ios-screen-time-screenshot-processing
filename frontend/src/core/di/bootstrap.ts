@@ -9,10 +9,23 @@ import { APIConsensusService } from "../implementations/server/APIConsensusServi
 import { APIStorageService } from "../implementations/server/APIStorageService";
 
 /**
- * Bootstrap services for server mode only.
- * WASM mode has been archived - this app runs in server mode exclusively.
+ * Bootstrap services based on application mode.
+ *
+ * - Server mode: API-based services (when apiBaseUrl is configured)
+ * - WASM mode: Local-first services (when apiBaseUrl is absent)
  */
 export function bootstrapServices(config: AppConfig): ServiceContainer {
+  if (config.mode === "wasm") {
+    // Lazy import to avoid loading WASM deps in server mode
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { bootstrapWasmServices } = require("./bootstrapWasm");
+    return bootstrapWasmServices(config);
+  }
+
+  return bootstrapServerServices(config);
+}
+
+function bootstrapServerServices(config: AppConfig): ServiceContainer {
   const container = new ServiceContainer();
   const apiBaseUrl = config.apiBaseUrl || "/api/v1";
 
