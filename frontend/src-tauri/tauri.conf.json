@@ -2,12 +2,10 @@
   "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-cli/schema.json",
   "productName": "iOS Screen Time",
   "version": "0.1.0",
-  "identifier": "com.ios-screen-time.app",
+  "identifier": "com.ios-screentime.desktop",
   "build": {
     "devUrl": "http://localhost:5173",
-    "frontendDist": "../dist",
-    "beforeDevCommand": "cd .. && npx vite --port 5173",
-    "beforeBuildCommand": "cd .. && npx vite build"
+    "frontendDist": "../dist"
   },
   "app": {
     "windows": [

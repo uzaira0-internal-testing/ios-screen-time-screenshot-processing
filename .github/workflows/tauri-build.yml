@@ -40,7 +40,7 @@ jobs:
           key: ${{ matrix.os }}-cargo-${{ hashFiles('frontend/src-tauri/Cargo.lock') }}
           restore-keys: ${{ matrix.os }}-cargo-
 
-      - name: Install Linux dependencies
+      - name: Install Linux deps
         if: matrix.os == 'ubuntu-22.04'
         run: |
           sudo apt-get update
@@ -57,9 +57,9 @@ jobs:
       - name: Install Tauri CLI
         run: npm install -g @tauri-apps/cli@^2
 
-      - name: Build Tauri app
+      - name: Build Tauri
         working-directory: frontend
-        run: npx tauri build
+        run: tauri build
         env:
           CI: true
 
