@@ -2,7 +2,7 @@
  * OPFS (Origin Private File System) Blob Storage
  *
  * Primary storage for image blobs. Falls back to IndexedDB blob table
- * if OPFS is unavailable (Safari < 15.2).
+ * if OPFS is unavailable (older browsers without OPFS support).
  *
  * Also provides utility functions for storage quota management,
  * image compression, and blob info retrieval.
@@ -54,7 +54,11 @@ async function getOpfsRoot(): Promise<FileSystemDirectoryHandle | null> {
     opfsRoot = await root.getDirectoryHandle("screenshots", { create: true });
     opfsAvailable = true;
     return opfsRoot;
-  } catch {
+  } catch (error) {
+    console.warn(
+      "[opfsBlobStorage] OPFS unavailable, falling back to IndexedDB:",
+      error instanceof Error ? error.message : error,
+    );
     opfsAvailable = false;
     return null;
   }
@@ -65,7 +69,14 @@ export async function storeImageBlob(id: number, blob: Blob): Promise<void> {
   if (root) {
     const fileHandle = await root.getFileHandle(`${id}.img`, { create: true });
     const writable = await fileHandle.createWritable();
-    await writable.write(blob);
+    try {
+      await writable.write(blob);
+    } catch (error) {
+      try { await writable.close(); } catch { /* prevent stream lock */ }
+      throw new Error(
+        `Failed to write image blob for screenshot ${id}: ${error instanceof Error ? error.message : error}`,
+      );
+    }
     await writable.close();
   } else {
     // IndexedDB fallback
@@ -80,7 +91,11 @@ export async function retrieveImageBlob(id: number): Promise<Blob | null> {
       const fileHandle = await root.getFileHandle(`${id}.img`);
       const file = await fileHandle.getFile();
       return file;
-    } catch {
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "NotFoundError") {
+        return null;
+      }
+      console.error(`[opfsBlobStorage] Error retrieving blob for screenshot ${id}:`, error);
       return null;
     }
   } else {
@@ -97,8 +112,10 @@ export async function deleteImageBlob(id: number): Promise<void> {
   if (root) {
     try {
       await root.removeEntry(`${id}.img`);
-    } catch {
-      // File may not exist
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "NotFoundError")) {
+        console.warn(`[opfsBlobStorage] Failed to delete blob for screenshot ${id}:`, error);
+      }
     }
   } else {
     await db.imageBlobs.delete(id);
@@ -157,7 +174,7 @@ export function revokeAllObjectURLs(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Utility functions (merged from blobStorage.ts)
+// Utility functions for storage quota, blob info, and image compression
 // ---------------------------------------------------------------------------
 
 export async function getImageBlobInfo(screenshotId: number): Promise<{
@@ -173,8 +190,8 @@ export async function getImageBlobInfo(screenshotId: number): Promise<{
   return {
     size: blob.size,
     type: blob.type,
-    // OPFS doesn't store uploadedAt metadata; use empty string as fallback
-    uploadedAt: new Date().toISOString(),
+    // OPFS doesn't store uploadedAt metadata; approximate with current time
+    uploadedAt: "",
   };
 }
 
@@ -182,14 +199,17 @@ export async function getTotalBlobSize(): Promise<number> {
   const root = await getOpfsRoot();
   if (root) {
     let total = 0;
-    // Iterate over OPFS directory entries
-    for await (const [, handle] of root as unknown as AsyncIterable<
-      [string, FileSystemHandle]
-    >) {
-      if (handle.kind === "file") {
-        const file = await (handle as FileSystemFileHandle).getFile();
-        total += file.size;
+    try {
+      for await (const [, handle] of root as unknown as AsyncIterable<
+        [string, FileSystemHandle]
+      >) {
+        if (handle.kind === "file") {
+          const file = await (handle as FileSystemFileHandle).getFile();
+          total += file.size;
+        }
       }
+    } catch (error) {
+      console.error("[opfsBlobStorage] Error calculating total blob size:", error);
     }
     return total;
   } else {
@@ -205,11 +225,12 @@ export async function checkStorageQuota(): Promise<{
   available: number;
 }> {
   if (!navigator.storage || !navigator.storage.estimate) {
+    console.warn("[opfsBlobStorage] Storage estimation API unavailable");
     return {
       usage: 0,
-      quota: 0,
+      quota: Infinity,
       percentUsed: 0,
-      available: 0,
+      available: Infinity,
     };
   }
 

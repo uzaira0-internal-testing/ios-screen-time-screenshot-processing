@@ -404,8 +404,10 @@ export class WASMScreenshotService implements IScreenshotService {
             );
           } catch (e) {
             console.warn(
-              `[WASMScreenshotService.processIfNeeded] Failed to parse saved grid position`,
+              `[WASMScreenshotService.processIfNeeded] Failed to parse saved grid position, clearing corrupted data:`,
+              savedGrid, e,
             );
+            localStorage.removeItem("lastGridPosition");
           }
         }
       }
@@ -472,6 +474,17 @@ export class WASMScreenshotService implements IScreenshotService {
         `[WASMScreenshotService.processIfNeeded] Failed for screenshot ${screenshot.id}:`,
         error,
       );
+      try {
+        await this.storageService.updateScreenshot(screenshot.id, {
+          processing_status: "failed",
+        });
+        return { ...screenshot, processing_status: "failed" };
+      } catch (updateError) {
+        console.error(
+          `[WASMScreenshotService.processIfNeeded] Failed to update status:`,
+          updateError,
+        );
+      }
     }
 
     return screenshot;
@@ -527,6 +540,10 @@ export class WASMScreenshotService implements IScreenshotService {
       const imageBlob = await this.storageService.getImageBlob(screenshot.id);
 
       if (!imageBlob) {
+        console.warn(`[WASMScreenshotService.autoProcess] No image blob for screenshot ${screenshot.id}`);
+        await this.storageService.updateScreenshot(screenshot.id, {
+          processing_status: "failed",
+        });
         return;
       }
 

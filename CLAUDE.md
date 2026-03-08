@@ -57,8 +57,8 @@ bun run test:e2e:debug                # Debug mode
 ### Docker
 
 ```bash
-# Development with hot reloading (frontend HMR + backend auto-reload)
-docker compose -f docker/docker-compose.dev.yml up -d
+# Development with hot reloading and production data
+docker compose --env-file docker/.env -f docker/docker-compose.dev.yml up -d
 
 # Production stack
 docker compose -f docker/docker-compose.yml up -d
@@ -105,7 +105,7 @@ docker/
 │   └── Dockerfile              # Python API container (Tesseract OCR, uvicorn)
 ├── frontend/
 │   ├── Dockerfile              # Production multi-stage (Node build → Nginx serve)
-│   ├── Dockerfile.dev          # Development with Vite HMR
+│   ├── Dockerfile.dev          # Development with Bun dev server + HMR
 │   └── Dockerfile.wasm         # WASM-only static build
 ├── nginx/
 │   ├── nginx.conf              # Production nginx with API proxy, security headers
@@ -116,9 +116,11 @@ docker/
 ```
 
 **Development hot reloading:**
-- Frontend: Vite HMR via volume mounts (`./frontend/src:/app/src`)
+- Frontend: Custom Bun dev server with HMR via volume mounts (`./frontend/src:/app/src`). Uses `window.__CONFIG__` for runtime BASE_PATH injection.
 - Backend: Uvicorn `--reload` with mounted source code
 - Celery: Worker restarts on code changes
+
+**Note:** `bun` is NOT available on the host — only inside the Docker frontend container. For host-side type-checking, use `cd frontend && npx tsc --noEmit`.
 
 ## Architecture
 
@@ -252,7 +254,21 @@ There are 5 distinct OCR use cases. Each has different requirements:
 │   ├── /{id}                GET     Screenshot by ID
 │   ├── /{id}/image          GET     Serve image file
 │   ├── /stats               GET     Queue statistics
-│   └── /upload              POST    Upload screenshot (X-API-Key auth, base64 JSON body)
+│   ├── /upload              POST    Upload screenshot (X-API-Key auth, base64 JSON body)
+│   ├── /upload/browser      POST    Browser-based upload (multipart form)
+│   ├── /groups              GET     List groups
+│   ├── /list                GET     Paginated screenshot list
+│   ├── /preprocessing-summary GET   Pipeline stage counts
+│   ├── /{id}/preprocessing  GET     Preprocessing details for screenshot
+│   ├── /{id}/preprocess     POST    Run preprocessing on single screenshot
+│   ├── /preprocess-batch    POST    Run preprocessing on batch
+│   ├── /preprocess-stage/*  POST    Run individual pipeline stages
+│   ├── /{id}/phi-regions    GET/PUT PHI region management
+│   ├── /{id}/apply-redaction POST   Apply PHI redaction
+│   ├── /{id}/manual-crop    POST    Manual crop adjustment
+│   ├── /{id}/original-image GET     Original (unprocessed) image
+│   ├── /{id}/stage-image    GET     Image at specific pipeline stage
+│   └── /export/csv          GET     Export data as CSV
 ├── /annotations/
 │   ├── /                    POST    Submit annotation
 │   └── /history             GET     User's annotation history
@@ -291,7 +307,7 @@ PADDLEOCR_URL=http://cnrc-rtx4090.ad.bcm.edu:8081
 ### Frontend (frontend/.env)
 
 ```bash
-# Server mode (set these)
+# Server mode (set these — used at build time, injected via window.__CONFIG__ at runtime)
 VITE_API_BASE_URL=http://localhost:8002/api/v1
 VITE_WS_URL=ws://localhost:8002/api/v1/ws
 
@@ -365,32 +381,13 @@ Zustand stores in `frontend/src/store/` with React context for DI container acce
 | `skipped` | Daily Total detected (skip annotation) |
 | `deleted` | Soft-deleted (can be restored) |
 
-## Technical Debt & Future Improvements
-
-The following items were identified during code reviews (see `docs/reviews/` folder) and should be addressed as time permits:
-
-### Completed
-
-| Item | Description |
-|------|-------------|
-| ~~Structured Logging~~ | Converted ~100 f-string log calls to structured `extra={}` format across 13 backend files |
-| ~~Remove duplicate hook~~ | Legacy `hooks/useAnnotation.ts` already removed (replaced by `useAnnotationWithDI.ts`) |
-| ~~Split large store~~ | `createAnnotationStore.ts` already split into 5 Zustand slices |
-| ~~Accessibility~~ | ARIA labels on grid canvas/PHI editor, improved disabled button contrast (WCAG AA) |
-| ~~Extract repository~~ | `ScreenshotRepository` already exists (568 lines) |
-| ~~Split processing service~~ | `preprocessing_service.py` split into `preprocessing/` package (device_and_crop, phi, pipeline) |
-
-### Priority: Medium
+## Technical Debt
 
 | Item | Effort | Description |
 |------|--------|-------------|
 | Extract more DB queries to repository | 8h | Routes still have ~58 direct DB queries — migrate to `ScreenshotRepository` |
 
-### Notes
-
-- **Schema Generation**: Run `bun run generate:api-types` after any backend schema changes
-- **Migrations**: Run `alembic upgrade head` after pulling new migrations
-- **Reviews**: See `docs/reviews/` for detailed architecture analysis
+See `docs/reviews/` for detailed architecture analysis and completed items.
 
 ## Type System (CRITICAL)
 
