@@ -70,7 +70,7 @@ export const CroppedGraphViewer = ({
   if (!gridCoords || gridCoords.upper_left.x === 0) {
     return (
       <div
-        className="bg-slate-50 rounded flex items-center justify-center text-slate-400 text-sm border border-dashed border-slate-300"
+        className="bg-slate-50 dark:bg-slate-800 rounded flex items-center justify-center text-slate-400 text-sm border border-dashed border-slate-300 dark:border-slate-600"
         style={{ height: 200 }}
       >
         Select grid corners to see cropped graph
@@ -81,7 +81,7 @@ export const CroppedGraphViewer = ({
   if (error) {
     return (
       <div
-        className="bg-slate-50 rounded flex items-center justify-center text-red-400 text-sm border border-dashed border-red-300"
+        className="bg-slate-50 dark:bg-slate-800 rounded flex items-center justify-center text-red-400 text-sm border border-dashed border-red-300 dark:border-red-600"
         style={{ height: 200 }}
       >
         Failed to load image

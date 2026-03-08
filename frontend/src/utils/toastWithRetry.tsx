@@ -22,7 +22,7 @@ export const toastErrorWithRetry = ({
       <div
         className={`${
           t.visible ? "animate-enter" : "animate-leave"
-        } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black/5`}
+        } max-w-md w-full bg-white dark:bg-slate-800 shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black/5 dark:ring-slate-700`}
       >
         <div className="flex-1 w-0 p-4">
           <div className="flex items-start">
@@ -42,12 +42,12 @@ export const toastErrorWithRetry = ({
               </svg>
             </div>
             <div className="ml-3 flex-1">
-              <p className="text-sm font-medium text-slate-900">Error</p>
-              <p className="mt-1 text-sm text-slate-500">{message}</p>
+              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Error</p>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{message}</p>
             </div>
           </div>
         </div>
-        <div className="flex border-l border-slate-200">
+        <div className="flex border-l border-slate-200 dark:border-slate-700">
           <button
             onClick={() => {
               toast.dismiss(t.id);

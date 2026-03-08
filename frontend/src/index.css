@@ -3,6 +3,8 @@ layer(base);
 
 @import 'tailwindcss';
 
+@custom-variant dark (&:is(.dark *));
+
 @theme {
   --color-primary-50: #f0fdfa;
   --color-primary-100: #ccfbf1;
@@ -61,6 +63,18 @@ layer(base);
     -moz-osx-font-smoothing: grayscale;
   }
 
+  .dark body {
+    @apply bg-slate-900 text-slate-100;
+  }
+
+  .dark *,
+  .dark ::after,
+  .dark ::before,
+  .dark ::backdrop,
+  .dark ::file-selector-button {
+    border-color: var(--color-slate-700, currentcolor);
+  }
+
   h1,
   h2,
   h3,
@@ -85,7 +99,7 @@ layer(base);
 }
 
 @utility card {
-  @apply bg-white border border-slate-200 rounded-lg p-5 shadow-xs;
+  @apply bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-5 shadow-xs;
 }
 
 @utility scrollbar-hide {
@@ -99,11 +113,11 @@ layer(base);
 
 @utility table-striped {
   & tbody tr:nth-child(even) {
-    @apply bg-slate-50;
+    @apply bg-slate-50 dark:bg-slate-800/50;
   }
 
   & tbody tr:hover {
-    @apply bg-slate-100;
+    @apply bg-slate-100 dark:bg-slate-700/50;
   }
 }
 

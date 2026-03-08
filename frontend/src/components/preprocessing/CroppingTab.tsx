@@ -75,11 +75,11 @@ function CroppingTabInner() {
         <td className="px-3 py-2">
           {result ? (
             result.was_cropped ? (
-              <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
+              <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
                 {result.manual ? "Manual" : "Yes"}
               </span>
             ) : (
-              <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600">
+              <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400">
                 No
               </span>
             )
@@ -90,7 +90,7 @@ function CroppingTabInner() {
         <td className="px-3 py-2">
           {result ? (
             result.was_patched ? (
-              <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700">
+              <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
                 Yes
               </span>
             ) : (
@@ -100,12 +100,12 @@ function CroppingTabInner() {
             <span className="text-slate-400">{"\u2014"}</span>
           )}
         </td>
-        <td className="px-3 py-2 text-xs text-slate-600">
+        <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">
           {result?.original_dimensions
             ? `${(result.original_dimensions as number[])[0]} x ${(result.original_dimensions as number[])[1]}`
             : "\u2014"}
         </td>
-        <td className="px-3 py-2 text-xs text-slate-600">
+        <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">
           {result?.cropped_dimensions
             ? `${(result.cropped_dimensions as number[])[0]} x ${(result.cropped_dimensions as number[])[1]}`
             : "\u2014"}
@@ -116,7 +116,7 @@ function CroppingTabInner() {
               setCropModalScreenshotId(s.id);
               setCropModalInitialCrop(getCropRectFromEvent(event));
             }}
-            className="px-2 py-1 text-xs text-primary-600 border border-primary-200 rounded hover:bg-primary-50"
+            className="px-2 py-1 text-xs text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-700 rounded hover:bg-primary-50 dark:hover:bg-primary-900/20"
             title="Adjust crop manually"
           >
             Edit Crop

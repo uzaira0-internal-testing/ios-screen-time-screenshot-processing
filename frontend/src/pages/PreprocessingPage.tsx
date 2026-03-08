@@ -123,21 +123,21 @@ export const PreprocessingPage = () => {
           {returnUrl && (
             <Link
               to={returnUrl}
-              className="px-3 py-1.5 text-sm text-slate-600 border border-slate-300 rounded-md hover:bg-slate-50"
+              className="px-3 py-1.5 text-sm text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700"
             >
               &larr; Back to Annotation
             </Link>
           )}
-          <h1 className="text-2xl font-bold text-slate-900">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
             Preprocessing Pipeline
           </h1>
         </div>
         <div className="flex items-center gap-3">
-          <label className="text-sm font-medium text-slate-700">Group:</label>
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Group:</label>
           <select
             value={selectedGroupId}
             onChange={(e) => setSelectedGroupId(e.target.value)}
-            className="text-sm border border-slate-300 rounded-md px-3 py-1.5"
+            className="text-sm border border-slate-300 dark:border-slate-600 rounded-md px-3 py-1.5 bg-white dark:bg-slate-700 dark:text-slate-100"
           >
             {groups.map((g) => (
               <option key={g.id} value={g.id}>
@@ -157,7 +157,7 @@ export const PreprocessingPage = () => {
 
           {/* Options - show preset/method controls for PHI stages */}
           {(activeStage === "phi_detection" || activeStage === "phi_redaction") && (
-            <div className="mt-3 flex flex-wrap items-center gap-4 p-3 bg-white rounded-lg border border-slate-200">
+            <div className="mt-3 flex flex-wrap items-center gap-4 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
               {activeStage === "phi_detection" && (
                 <>
                   <div className="flex items-center gap-2">
@@ -237,7 +237,7 @@ export const PreprocessingPage = () => {
           </div>
 
           {/* Stage content */}
-          <div className="mt-4 bg-white rounded-lg border border-slate-200">
+          <div className="mt-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <span className="inline-block w-6 h-6 border-2 border-slate-300 border-t-primary-600 rounded-full animate-spin" />
@@ -254,7 +254,7 @@ export const PreprocessingPage = () => {
           </div>
 
           {/* Footer info */}
-          <div className="mt-4 text-xs text-slate-400">
+          <div className="mt-4 text-xs text-slate-400 dark:text-slate-500">
             {screenshots.length} screenshot{screenshots.length !== 1 ? "s" : ""} in
             group
             {selectedGroupId && ` "${selectedGroupId}"`}

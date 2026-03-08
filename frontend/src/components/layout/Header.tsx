@@ -2,13 +2,19 @@ import { useState } from "react";
 import { Link, useSearchParams, useLocation } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { PROCESSING_STATUS_LABELS, type ProcessingStatus } from "@/constants/processingStatus";
-import { Menu, X, LogOut } from "lucide-react";
+import { Menu, X, LogOut, Sun, Moon, Monitor } from "lucide-react";
+import { useThemeStore } from "@/store/themeStore";
 
 export const Header = () => {
   const { username, isAuthenticated, isAdmin, logout } = useAuth();
   const [searchParams] = useSearchParams();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { mode: themeMode, setMode: setThemeMode } = useThemeStore();
+
+  const themeIcons = { light: Sun, dark: Moon, system: Monitor };
+  const nextTheme = { light: "dark" as const, dark: "system" as const, system: "light" as const };
+  const ThemeIcon = themeIcons[themeMode];
 
   // Get current filter context from URL
   const groupId = searchParams.get("group");
@@ -25,7 +31,7 @@ export const Header = () => {
   ];
 
   return (
-    <header className="bg-white shadow-sm border-b border-slate-200">
+    <header className="bg-white dark:bg-slate-800 shadow-sm border-b border-slate-200 dark:border-slate-700">
       <div className="px-4">
         <div className="flex justify-between items-center h-16">
           {/* Left: Logo and Nav */}
@@ -41,7 +47,7 @@ export const Header = () => {
                   <Link
                     key={link.to}
                     to={link.to}
-                    className="text-slate-600 hover:text-primary-700 hover:bg-primary-50 px-3 py-2 rounded-md text-sm font-medium transition-colors focus-ring"
+                    className="text-slate-600 dark:text-slate-300 hover:text-primary-700 dark:hover:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 px-3 py-2 rounded-md text-sm font-medium transition-colors focus-ring"
                   >
                     {link.label}
                   </Link>
@@ -52,13 +58,13 @@ export const Header = () => {
 
           {/* Center: Queue Context Indicator */}
           {isAnnotatePage && (groupId || participantId || processingStatus) && (
-            <div className="absolute left-1/2 transform -translate-x-1/2 hidden lg:flex items-center gap-2 px-3 py-1 bg-slate-100 rounded-md text-sm">
-              <span className="text-slate-500">Queue:</span>
+            <div className="absolute left-1/2 transform -translate-x-1/2 hidden lg:flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-slate-700 rounded-md text-sm">
+              <span className="text-slate-500 dark:text-slate-400">Queue:</span>
               {groupId && (
-                <span className="font-medium text-slate-700">{groupId}</span>
+                <span className="font-medium text-slate-700 dark:text-slate-200">{groupId}</span>
               )}
               {groupId && (participantId || processingStatus) && (
-                <span className="text-slate-400">/</span>
+                <span className="text-slate-400 dark:text-slate-500">/</span>
               )}
               {participantId && (
                 <span className="font-medium text-purple-600">
@@ -93,12 +99,20 @@ export const Header = () => {
           <div className="flex items-center space-x-4">
             {isAuthenticated && username ? (
               <>
-                <span className="text-sm text-slate-700 hidden sm:inline">
+                <span className="text-sm text-slate-700 dark:text-slate-300 hidden sm:inline">
                   Welcome, <span className="font-medium">{username}</span>
                 </span>
                 <button
+                  onClick={() => setThemeMode(nextTheme[themeMode])}
+                  className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors focus-ring"
+                  aria-label={`Theme: ${themeMode}. Click to switch.`}
+                  title={`Theme: ${themeMode}`}
+                >
+                  <ThemeIcon className="h-4 w-4" />
+                </button>
+                <button
                   onClick={logout}
-                  className="hidden md:inline-flex items-center gap-2 bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-2 rounded-md text-sm font-medium transition-colors focus-ring"
+                  className="hidden md:inline-flex items-center gap-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 px-4 py-2 rounded-md text-sm font-medium transition-colors focus-ring"
                   aria-label="Logout"
                 >
                   <LogOut className="h-4 w-4" />
@@ -107,7 +121,7 @@ export const Header = () => {
                 {/* Mobile hamburger */}
                 <button
                   onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                  className="md:hidden p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md focus-ring"
+                  className="md:hidden p-2 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md focus-ring"
                   aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
                   aria-expanded={mobileMenuOpen}
                 >
@@ -128,20 +142,20 @@ export const Header = () => {
 
       {/* Mobile Navigation */}
       {mobileMenuOpen && isAuthenticated && (
-        <nav className="md:hidden border-t border-slate-200 bg-white px-4 py-2 space-y-1">
+        <nav className="md:hidden border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 space-y-1">
           {navLinks.map((link) => (
             <Link
               key={link.to}
               to={link.to}
               onClick={() => setMobileMenuOpen(false)}
-              className="block text-slate-600 hover:text-primary-700 hover:bg-primary-50 px-3 py-2 rounded-md text-sm font-medium transition-colors focus-ring"
+              className="block text-slate-600 dark:text-slate-300 hover:text-primary-700 dark:hover:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 px-3 py-2 rounded-md text-sm font-medium transition-colors focus-ring"
             >
               {link.label}
             </Link>
           ))}
           <button
             onClick={() => { logout(); setMobileMenuOpen(false); }}
-            className="w-full text-left text-slate-600 hover:text-red-600 hover:bg-red-50 px-3 py-2 rounded-md text-sm font-medium transition-colors focus-ring flex items-center gap-2"
+            className="w-full text-left text-slate-600 dark:text-slate-300 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 px-3 py-2 rounded-md text-sm font-medium transition-colors focus-ring flex items-center gap-2"
           >
             <LogOut className="h-4 w-4" />
             Logout

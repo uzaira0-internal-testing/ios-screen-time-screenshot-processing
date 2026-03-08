@@ -85,8 +85,8 @@ export const ScreenshotSelector = ({
 
     // Green if verified by current user, yellow if not
     const colorClasses = isVerifiedByMe
-      ? "bg-green-100 text-green-700"
-      : "bg-yellow-100 text-yellow-700";
+      ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+      : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400";
 
     return (
       <span className={`ml-1 px-1.5 py-0.5 text-xs ${colorClasses} rounded font-medium`}>
@@ -118,8 +118,8 @@ export const ScreenshotSelector = ({
         disabled={!hasPrev || isLoading}
         className={`p-1.5 rounded transition-colors ${
           hasPrev && !isLoading
-            ? "bg-slate-100 hover:bg-slate-200 text-slate-700"
-            : "bg-slate-50 text-slate-300 cursor-not-allowed"
+            ? "bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-300"
+            : "bg-slate-50 text-slate-300 cursor-not-allowed dark:bg-slate-800 dark:text-slate-600"
         }`}
         title="Previous screenshot (Shift+Left)"
         data-testid="navigate-prev"
@@ -143,11 +143,11 @@ export const ScreenshotSelector = ({
       <div className="relative flex-1 min-w-0">
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="w-full px-2 py-1.5 text-left bg-white border border-slate-300 rounded hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 flex items-center gap-2"
+          className="w-full px-2 py-1.5 text-left bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded hover:border-slate-400 dark:hover:border-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500 flex items-center gap-2"
         >
           {currentScreenshot ? (
             <>
-              <span className="font-semibold text-slate-900 whitespace-nowrap">
+              <span className="font-semibold text-slate-900 dark:text-slate-100 whitespace-nowrap">
                 #{currentScreenshot.id}
               </span>
               <span className="text-xs text-slate-500 truncate">
@@ -163,8 +163,8 @@ export const ScreenshotSelector = ({
                   currentUsername !== null &&
                   verifierUsernames.includes(currentUsername);
                 const colorClasses = isVerifiedByMe
-                  ? "bg-green-100 text-green-700"
-                  : "bg-yellow-100 text-yellow-700";
+                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                  : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400";
                 return (
                   <span className={`px-1.5 py-0.5 text-[10px] ${colorClasses} rounded font-medium whitespace-nowrap`}>
                     {verifierCount}
@@ -195,16 +195,16 @@ export const ScreenshotSelector = ({
 
         {/* Dropdown Menu */}
         {isOpen && (
-          <div className="absolute z-50 mt-1 w-full bg-white border border-slate-300 rounded-lg shadow-lg max-h-80 overflow-hidden">
+          <div className="absolute z-50 mt-1 w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-80 overflow-hidden">
             {/* Search Input */}
-            <div className="p-2 border-b border-slate-200">
+            <div className="p-2 border-b border-slate-200 dark:border-slate-700">
               <input
                 ref={searchInputRef}
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search by ID or participant..."
-                className="w-full px-2 py-1 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
+                className="w-full px-2 py-1 text-sm border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
               />
             </div>
 
@@ -218,15 +218,15 @@ export const ScreenshotSelector = ({
                   <button
                     key={screenshot.id}
                     onClick={() => handleSelectScreenshot(screenshot.id)}
-                    className={`w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center justify-between ${
+                    className={`w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center justify-between ${
                       currentScreenshot?.id === screenshot.id
-                        ? "bg-primary-50"
+                        ? "bg-primary-50 dark:bg-primary-900/20"
                         : ""
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="font-medium whitespace-nowrap">#{screenshot.id}</span>
-                      <span className="text-xs text-slate-600 truncate">
+                      <span className="text-xs text-slate-600 dark:text-slate-400 truncate">
                         {screenshot.participant_id || ""}
                         {dateStr && ` · ${dateStr}`}
                         {filename && ` · ${filename}`}
@@ -257,8 +257,8 @@ export const ScreenshotSelector = ({
         disabled={!hasNext || isLoading}
         className={`p-1.5 rounded transition-colors ${
           hasNext && !isLoading
-            ? "bg-slate-100 hover:bg-slate-200 text-slate-700"
-            : "bg-slate-50 text-slate-300 cursor-not-allowed"
+            ? "bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-300"
+            : "bg-slate-50 text-slate-300 cursor-not-allowed dark:bg-slate-800 dark:text-slate-600"
         }`}
         title="Next screenshot (Shift+Right)"
         data-testid="navigate-next"

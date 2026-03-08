@@ -36,26 +36,26 @@ export function Modal({
         <Dialog.Content
           className={clsx(
             "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50",
-            "bg-white rounded-lg shadow-xl p-6 w-full",
+            "bg-white dark:bg-slate-800 rounded-lg shadow-xl p-6 w-full",
             "focus:outline-none",
             sizeClasses[size],
             className,
           )}
         >
           {title && (
-            <Dialog.Title className="text-lg font-semibold text-slate-900 mb-1">
+            <Dialog.Title className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-1">
               {title}
             </Dialog.Title>
           )}
           {description && (
-            <Dialog.Description className="text-sm text-slate-500 mb-4">
+            <Dialog.Description className="text-sm text-slate-500 dark:text-slate-400 mb-4">
               {description}
             </Dialog.Description>
           )}
           {children}
           <Dialog.Close asChild>
             <button
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 focus-ring rounded-sm"
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 focus-ring rounded-sm"
               aria-label="Close"
             >
               <X className="h-4 w-4" />

@@ -129,8 +129,8 @@ export const ConsensusPage = () => {
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Cross-Rater Consensus</h1>
-            <p className="text-slate-600 mt-1">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Cross-Rater Consensus</h1>
+            <p className="text-slate-600 dark:text-slate-400 mt-1">
               Compare verified screenshots across different annotators
             </p>
           </div>
@@ -150,13 +150,13 @@ export const ConsensusPage = () => {
         {/* Summary Stats */}
         {!selectedGroup && (
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-slate-900">{totals.total}</div>
-              <div className="text-sm text-slate-500">Total Screenshots</div>
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4 text-center">
+              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totals.total}</div>
+              <div className="text-sm text-slate-500 dark:text-slate-400">Total Screenshots</div>
             </div>
-            <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4 text-center">
               <div className="text-2xl font-bold text-primary-600">{totals.verified}</div>
-              <div className="text-sm text-slate-500">Verified</div>
+              <div className="text-sm text-slate-500 dark:text-slate-400">Verified</div>
             </div>
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
               <div className="text-2xl font-bold text-yellow-700">{totals.single}</div>
@@ -176,14 +176,14 @@ export const ConsensusPage = () => {
         {loading ? (
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
-            <p className="text-slate-500 mt-2">Loading verification data...</p>
+            <p className="text-slate-500 dark:text-slate-400 mt-2">Loading verification data...</p>
           </div>
         ) : selectedGroup && selectedTier ? (
           /* Screenshot List View */
-          <div className="bg-white border border-slate-200 rounded-lg">
-            <div className="p-4 border-b border-slate-200">
+          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-700">
               <div className="flex items-center gap-3">
-                <h2 className="text-lg font-semibold text-slate-900">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                   {groups.find(g => g.id === selectedGroup)?.name || selectedGroup}
                 </h2>
                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${TIER_CONFIG[selectedTier].bgColor} ${TIER_CONFIG[selectedTier].color}`}>
@@ -210,11 +210,11 @@ export const ConsensusPage = () => {
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleScreenshotClick(screenshot.id); }}
-                    className="p-4 hover:bg-slate-50 cursor-pointer flex items-center justify-between focus-ring"
+                    className="p-4 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer flex items-center justify-between focus-ring"
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-3">
-                        <span className="font-medium text-slate-900">
+                        <span className="font-medium text-slate-900 dark:text-slate-100">
                           #{screenshot.id}
                         </span>
                         {screenshot.participant_id && (
@@ -254,10 +254,10 @@ export const ConsensusPage = () => {
           </div>
         ) : groups.length === 0 ? (
           /* Empty State */
-          <div className="text-center py-12 bg-white border border-slate-200 rounded-lg">
+          <div className="text-center py-12 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
             <div className="text-4xl mb-4">-</div>
-            <h3 className="text-lg font-medium text-slate-900 mb-2">No Verified Screenshots</h3>
-            <p className="text-slate-600 max-w-md mx-auto">
+            <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">No Verified Screenshots</h3>
+            <p className="text-slate-600 dark:text-slate-400 max-w-md mx-auto">
               Screenshots will appear here once they have been verified by at least one annotator.
               Go to the Annotate tab to start verifying screenshots.
             </p>
@@ -268,12 +268,12 @@ export const ConsensusPage = () => {
             {groups.map((group) => (
               <div
                 key={group.id}
-                className="bg-white border border-slate-200 rounded-lg p-5 hover:shadow-md transition-all"
+                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-5 hover:shadow-md transition-all"
               >
                 {/* Group Header */}
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-semibold text-slate-900 truncate">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 truncate">
                       {group.name}
                     </h3>
                     <span
@@ -289,8 +289,8 @@ export const ConsensusPage = () => {
                 </div>
 
                 {/* Total Verified */}
-                <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-100">
-                  <span className="text-sm text-slate-600">Verified Screenshots</span>
+                <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-100 dark:border-slate-700">
+                  <span className="text-sm text-slate-600 dark:text-slate-400">Verified Screenshots</span>
                   <span className="text-lg font-bold text-primary-600">
                     {group.total_verified} / {group.total_screenshots}
                   </span>

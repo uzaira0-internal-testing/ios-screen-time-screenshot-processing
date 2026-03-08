@@ -162,7 +162,7 @@ export const HomePage = () => {
           data-testid="groups-section"
         >
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-semibold text-slate-900">
+            <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
               Study Groups
             </h2>
             <div className="flex items-center gap-3">
@@ -193,7 +193,7 @@ export const HomePage = () => {
               <Skeleton height="1.5rem" width="40%" />
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="border border-slate-200 rounded-lg p-5 space-y-3">
+                  <div key={i} className="border border-slate-200 dark:border-slate-700 rounded-lg p-5 space-y-3">
                     <Skeleton height="1.25rem" width="60%" />
                     <Skeleton height="0.875rem" count={3} />
                     <div className="grid grid-cols-2 gap-2">
@@ -206,23 +206,23 @@ export const HomePage = () => {
             </div>
           ) : groups.length === 0 ? (
             <div
-              className="text-center py-12 bg-slate-50 rounded-lg border-2 border-dashed border-slate-300"
+              className="text-center py-12 bg-slate-50 dark:bg-slate-800/50 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600"
               data-testid="empty-groups-state"
             >
-              <FolderOpen className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-slate-900 mb-2">
+              <FolderOpen className="h-12 w-12 text-slate-400 dark:text-slate-500 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
                 No Groups Yet
               </h3>
-              <p className="text-slate-600 max-w-md mx-auto">
+              <p className="text-slate-600 dark:text-slate-400 max-w-md mx-auto">
                 Groups are automatically created when screenshots are uploaded
                 via the API. Use the API endpoint to upload screenshots with a
                 group_id.
               </p>
-              <div className="mt-4 text-left max-w-lg mx-auto bg-slate-100 rounded p-4">
-                <p className="text-sm font-mono text-slate-700">
+              <div className="mt-4 text-left max-w-lg mx-auto bg-slate-100 dark:bg-slate-800 rounded p-4">
+                <p className="text-sm font-mono text-slate-700 dark:text-slate-300">
                   POST /api/screenshots/api-upload
                 </p>
-                <pre className="text-xs text-slate-600 mt-2 overflow-x-auto">
+                <pre className="text-xs text-slate-600 dark:text-slate-400 mt-2 overflow-x-auto">
                   {`{
   "screenshot": "<base64_image>",
   "participant_id": "P001",
@@ -237,19 +237,19 @@ export const HomePage = () => {
               {groups.map((group) => (
                 <div
                   key={group.id}
-                  className="bg-white border border-slate-200 rounded-lg p-5 hover:shadow-md transition-all"
+                  className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-5 hover:shadow-md transition-all"
                   data-testid="group-card"
                 >
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-semibold text-slate-900 truncate">
+                      <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 truncate">
                         {group.name}
                       </h3>
                       <span
                         className={`px-2 py-0.5 text-xs rounded-full ${
                           group.image_type === "battery"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-purple-100 text-purple-700"
+                            ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+                            : "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400"
                         }`}
                       >
                         {group.image_type === "battery"
@@ -258,7 +258,7 @@ export const HomePage = () => {
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500">
+                      <span className="text-xs text-slate-500 dark:text-slate-400">
                         {new Date(group.created_at).toLocaleDateString()}
                       </span>
                       {isAdmin && (
@@ -267,7 +267,7 @@ export const HomePage = () => {
                             e.stopPropagation();
                             setDeleteConfirm(group);
                           }}
-                          className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors focus-ring"
+                          className="p-1 text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors focus-ring"
                           aria-label={`Delete group ${group.name}`}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -282,13 +282,13 @@ export const HomePage = () => {
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleGroupClick(group.id); }}
-                    className="flex justify-between items-center mb-3 pb-2 border-b border-slate-100 cursor-pointer hover:bg-slate-50 rounded px-2 -mx-2 py-1 focus-ring"
+                    className="flex justify-between items-center mb-3 pb-2 border-b border-slate-100 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 rounded px-2 -mx-2 py-1 focus-ring"
                     data-testid="total-screenshots"
                   >
-                    <span className="text-sm text-slate-600">
+                    <span className="text-sm text-slate-600 dark:text-slate-400">
                       Total Screenshots
                     </span>
-                    <span className="text-lg font-bold text-slate-900">
+                    <span className="text-lg font-bold text-slate-900 dark:text-slate-100">
                       {group.screenshot_count}
                     </span>
                   </div>
@@ -313,14 +313,14 @@ export const HomePage = () => {
                         <div className={`text-lg font-bold ${text}`}>
                           {group[`processing_${status}` as keyof Group] as number}
                         </div>
-                        <div className="text-xs text-slate-500">{label}</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
                       </div>
                     ))}
                   </div>
                   {/* Progress bar */}
                   {group.screenshot_count > 0 && (
                     <div className="mt-3">
-                      <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                      <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
                         <div className="h-2 flex">
                           <div
                             className="bg-green-500 transition-all"
@@ -342,7 +342,7 @@ export const HomePage = () => {
                           ></div>
                         </div>
                       </div>
-                      <p className="text-xs text-slate-500 mt-1 text-right">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 text-right">
                         {Math.round(
                           ((group.processing_completed +
                             group.processing_skipped) /
@@ -359,8 +359,8 @@ export const HomePage = () => {
                     const tier = verificationTiers[group.id];
                     if (!tier || tier.total_verified === 0) return null;
                     return (
-                      <div className="mt-4 pt-3 border-t border-slate-200">
-                        <div className="text-xs text-slate-500 mb-2 font-medium">Verification Status</div>
+                      <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700">
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mb-2 font-medium">Verification Status</div>
                         <div className="grid grid-cols-3 gap-2 text-center">
                           {([
                             { key: "single_verified", label: "Once", bg: "bg-yellow-50", hoverBg: "hover:bg-yellow-100", text: "text-yellow-600" },
@@ -399,7 +399,7 @@ export const HomePage = () => {
         {/* Login prompt for unauthenticated users */}
         {!isAuthenticated && (
           <div className="text-center">
-            <p className="text-slate-600 mb-4">
+            <p className="text-slate-600 dark:text-slate-400 mb-4">
               Login to start annotating screenshots
             </p>
             <Link
@@ -420,7 +420,7 @@ export const HomePage = () => {
       >
         {deleteConfirm && (
           <>
-            <p className="text-slate-600 mb-4">
+            <p className="text-slate-600 dark:text-slate-400 mb-4">
               Are you sure you want to delete{" "}
               <span className="font-semibold">"{deleteConfirm.name}"</span>?
             </p>

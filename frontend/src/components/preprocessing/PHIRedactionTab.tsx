@@ -26,11 +26,11 @@ function PHIRedactionTabInner() {
         <td className="px-3 py-2">
           {result ? (
             result.redacted ? (
-              <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700">
+              <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
                 Yes
               </span>
             ) : (
-              <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600">
+              <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400">
                 No
               </span>
             )
@@ -41,13 +41,13 @@ function PHIRedactionTabInner() {
         <td className="px-3 py-2 font-mono text-xs">
           {result ? (result.regions_redacted as number) : "\u2014"}
         </td>
-        <td className="px-3 py-2 text-xs text-slate-600">
+        <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">
           {(result?.method as string) || "\u2014"}
         </td>
         <td className="px-3 py-2">
           <button
             onClick={() => setEditorScreenshotId(_s.id)}
-            className="px-2 py-1 text-xs text-orange-600 border border-orange-200 rounded hover:bg-orange-50"
+            className="px-2 py-1 text-xs text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-700 rounded hover:bg-orange-50 dark:hover:bg-orange-900/20"
             title="Review regions and apply redaction"
           >
             Review & Redact

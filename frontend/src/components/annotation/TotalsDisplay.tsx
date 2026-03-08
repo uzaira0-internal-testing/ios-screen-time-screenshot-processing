@@ -47,14 +47,14 @@ export function TotalsDisplay({
   const totalsMismatch = ocrMinutes !== null && ocrMinutes !== roundedTotalMinutes;
 
   const highlightClass = totalsMatch
-    ? "ring-2 ring-green-500 bg-green-50"
+    ? "ring-2 ring-green-500 bg-green-50 dark:bg-green-900/20"
     : totalsMismatch
-      ? "ring-2 ring-red-500 bg-red-50"
+      ? "ring-2 ring-red-500 bg-red-50 dark:bg-red-900/20"
       : "";
 
   return (
     <div
-      className={`border-b border-slate-100 pb-2 rounded-md p-2 ${highlightClass}`}
+      className={`border-b border-slate-100 dark:border-slate-700 pb-2 rounded-md p-2 ${highlightClass}`}
     >
       <div className="flex flex-col items-center text-center">
         {/* OCR Total */}
@@ -106,7 +106,7 @@ export function TotalsDisplay({
               </button>
             )}
           </div>
-          <div className="text-lg font-medium text-slate-700" data-testid="ocr-total">
+          <div className="text-lg font-medium text-slate-700 dark:text-slate-300" data-testid="ocr-total">
             {ocrTotal || "—"}
           </div>
         </div>

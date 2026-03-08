@@ -22,7 +22,7 @@ export const ActionButtons = ({
         <button
           onClick={onSkip}
           disabled={isLoading}
-          className="w-full px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 text-sm font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 text-sm font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Skip (Esc)
         </button>
@@ -34,7 +34,7 @@ export const ActionButtons = ({
             "w-full px-3 py-2 text-sm font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
             canSubmit
               ? "bg-primary-600 hover:bg-primary-700 text-white"
-              : "bg-slate-300 text-slate-500",
+              : "bg-slate-300 text-slate-500 dark:bg-slate-600 dark:text-slate-400",
           )}
         >
           Submit (Enter)

@@ -15,15 +15,15 @@ export const EventLogPanel = () => {
   if (!eventLog || !selectedScreenshotId) return null;
 
   return (
-    <div className="fixed inset-y-0 right-0 w-96 bg-white shadow-xl border-l border-slate-200 z-50 flex flex-col">
+    <div className="fixed inset-y-0 right-0 w-96 bg-white dark:bg-slate-800 shadow-xl border-l border-slate-200 dark:border-slate-700 z-50 flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50">
-        <h3 className="text-sm font-semibold text-slate-900">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50">
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
           Event Log - Screenshot #{selectedScreenshotId}
         </h3>
         <button
           onClick={clearEventLog}
-          className="text-slate-400 hover:text-slate-600 text-lg leading-none"
+          className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-lg leading-none"
           aria-label="Close event log"
         >
           &times;
@@ -31,7 +31,7 @@ export const EventLogPanel = () => {
       </div>
 
       {/* Stage status summary */}
-      <div className="px-4 py-2 border-b border-slate-100 bg-slate-50/50">
+      <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
         <div className="flex flex-wrap gap-2">
           {Object.entries(eventLog.stage_status).map(([stage, status]) => (
             <div key={stage} className="flex items-center gap-1">
@@ -74,22 +74,22 @@ export const EventLogPanel = () => {
                 key={event.event_id}
                 className={`rounded-lg border p-3 text-xs ${
                   isCurrent
-                    ? "border-primary-200 bg-primary-50/30"
+                    ? "border-primary-200 bg-primary-50/30 dark:border-primary-700 dark:bg-primary-900/20"
                     : isError
-                      ? "border-red-200 bg-red-50/30"
-                      : "border-slate-100 bg-white opacity-60"
+                      ? "border-red-200 bg-red-50/30 dark:border-red-700 dark:bg-red-900/20"
+                      : "border-slate-100 bg-white opacity-60 dark:border-slate-700 dark:bg-slate-800"
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-700">
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">
                       #{event.event_id}
                     </span>
                     <span
                       className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
                         event.source === "auto"
-                          ? "bg-primary-100 text-primary-600"
-                          : "bg-purple-100 text-purple-600"
+                          ? "bg-primary-100 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400"
+                          : "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
                       }`}
                     >
                       {event.source}
@@ -98,7 +98,7 @@ export const EventLogPanel = () => {
                       {STAGE_LABELS[event.stage] ?? event.stage}
                     </span>
                     {isCurrent && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-600">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400">
                         current
                       </span>
                     )}
@@ -113,13 +113,13 @@ export const EventLogPanel = () => {
                   {new Date(event.timestamp).toLocaleString()}
                 </div>
                 {/* Result summary */}
-                <div className="mt-1 text-slate-600">
+                <div className="mt-1 text-slate-600 dark:text-slate-400">
                   {isError ? (
                     <span className="text-red-600">
                       Error: {event.result.error as string}
                     </span>
                   ) : (
-                    <pre className="whitespace-pre-wrap break-all text-[10px] bg-slate-50 rounded p-1.5 max-h-24 overflow-y-auto">
+                    <pre className="whitespace-pre-wrap break-all text-[10px] bg-slate-50 dark:bg-slate-700/50 rounded p-1.5 max-h-24 overflow-y-auto">
                       {JSON.stringify(event.result, null, 1)}
                     </pre>
                   )}
@@ -136,7 +136,7 @@ export const EventLogPanel = () => {
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-2 border-t border-slate-100 text-xs text-slate-400">
+      <div className="px-4 py-2 border-t border-slate-100 dark:border-slate-700 text-xs text-slate-400">
         Base: {eventLog.base_file_path.split("/").pop()}
       </div>
     </div>

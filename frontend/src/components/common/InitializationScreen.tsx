@@ -18,19 +18,19 @@ export const InitializationScreen = ({
   error,
 }: InitializationScreenProps) => {
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center">
+    <div className="fixed inset-0 bg-gradient-to-br from-primary-50 to-primary-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
       <div className="max-w-md w-full mx-4">
         {/* Logo/Branding Area */}
         <div className="text-center mb-8">
           <Camera className="h-16 w-16 text-primary-600 mx-auto mb-4" />
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2">
             iOS Screen Time
           </h1>
-          <p className="text-slate-600">Preparing your workspace...</p>
+          <p className="text-slate-600 dark:text-slate-400">Preparing your workspace...</p>
         </div>
 
         {/* Progress Card */}
-        <div className="bg-white rounded-lg shadow-lg p-6">
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6">
           {error ? (
             // Error State
             <div className="text-center">
@@ -55,7 +55,7 @@ export const InitializationScreen = ({
 
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-slate-700">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                     Loading OCR Engine
                   </span>
                   <span className="text-sm font-semibold text-primary-600">
@@ -64,7 +64,7 @@ export const InitializationScreen = ({
                 </div>
 
                 {/* Progress Bar */}
-                <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+                <div className="w-full bg-slate-200 dark:bg-slate-600 rounded-full h-2.5 overflow-hidden">
                   <div
                     className="bg-gradient-to-r from-primary-500 to-primary-600 h-2.5 rounded-full transition-all duration-300 ease-out"
                     style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
@@ -78,11 +78,11 @@ export const InitializationScreen = ({
               </div>
 
               {/* Info Box */}
-              <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-primary-900 mb-2">
+              <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-primary-900 dark:text-primary-300 mb-2">
                   First-Time Setup
                 </h3>
-                <p className="text-xs text-primary-800 leading-relaxed">
+                <p className="text-xs text-primary-800 dark:text-primary-400 leading-relaxed">
                   We're loading the OCR engine and language data (about 5MB).
                   This only happens once and will be cached for future visits.
                   Future processing will be much faster!
@@ -91,7 +91,7 @@ export const InitializationScreen = ({
 
               {/* Stage Messages */}
               <div className="mt-4 text-center">
-                <p className="text-sm text-slate-600">
+                <p className="text-sm text-slate-600 dark:text-slate-400">
                   {progress < 30
                     ? 'Downloading Tesseract.js core...'
                     : progress < 70
@@ -107,10 +107,10 @@ export const InitializationScreen = ({
 
         {/* Footer */}
         <div className="text-center mt-6">
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
             Processing happens 100% in your browser
           </p>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
             No data is sent to any server
           </p>
         </div>

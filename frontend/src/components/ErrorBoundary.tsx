@@ -35,15 +35,15 @@ export class ErrorBoundary extends Component<Props, State> {
         <div className="flex items-center justify-center h-96">
           <div className="text-center max-w-md p-6">
             <AlertTriangle className="h-16 w-16 text-amber-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
               Something went wrong
             </h2>
-            <p className="text-slate-600 mb-4">
+            <p className="text-slate-600 dark:text-slate-400 mb-4">
               An unexpected error occurred while rendering this component.
             </p>
             {this.state.error && (
-              <details className="text-left bg-slate-50 p-4 rounded-md mb-4">
-                <summary className="cursor-pointer text-sm font-medium text-slate-700 mb-2">
+              <details className="text-left bg-slate-50 dark:bg-slate-800 p-4 rounded-md mb-4">
+                <summary className="cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Error Details
                 </summary>
                 <pre className="text-xs text-red-600 overflow-auto">

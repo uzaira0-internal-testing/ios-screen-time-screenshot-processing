@@ -12,10 +12,10 @@ export function AlignmentWarning({ alignmentScore }: AlignmentWarningProps) {
 
   return (
     <div
-      className={`border-b border-slate-100 pb-2 rounded-md p-2 ${
+      className={`border-b border-slate-100 dark:border-slate-700 pb-2 rounded-md p-2 ${
         isSevere
-          ? "ring-2 ring-red-500 bg-red-50"
-          : "ring-2 ring-yellow-500 bg-yellow-50"
+          ? "ring-2 ring-red-500 bg-red-50 dark:bg-red-900/20"
+          : "ring-2 ring-yellow-500 bg-yellow-50 dark:bg-yellow-900/20"
       }`}
     >
       <div className="flex items-center gap-2">
@@ -37,12 +37,12 @@ export function AlignmentWarning({ alignmentScore }: AlignmentWarningProps) {
         <div>
           <div
             className={`text-xs font-medium ${
-              isSevere ? "text-red-700" : "text-yellow-700"
+              isSevere ? "text-red-700 dark:text-red-400" : "text-yellow-700 dark:text-yellow-400"
             }`}
           >
             {isSevere ? "Poor Bar Alignment" : "Low Bar Alignment"}
           </div>
-          <div className="text-xs text-slate-600">
+          <div className="text-xs text-slate-600 dark:text-slate-400">
             Score: {(alignmentScore * 100).toFixed(0)}% — Bars may not match
             graph. Adjust grid position.
           </div>

@@ -46,7 +46,6 @@ function WebSocketIntegration() {
       "user_joined",
       (data: UserJoinedEvent) => {
         toast(`${data.username} joined (${data.active_users} online)`, {
-          icon: "👋",
           duration: 3000,
         });
       },
@@ -56,7 +55,6 @@ function WebSocketIntegration() {
       "user_left",
       (data: UserLeftEvent) => {
         toast(`${data.username} left (${data.active_users} online)`, {
-          icon: "👋",
           duration: 3000,
         });
       },

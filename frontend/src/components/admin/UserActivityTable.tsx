@@ -41,11 +41,11 @@ export const UserActivityTable = ({
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow overflow-hidden">
         <div className="p-6">
           <div className="animate-pulse space-y-4">
             {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-12 bg-slate-200 rounded"></div>
+              <div key={i} className="h-12 bg-slate-200 dark:bg-slate-700 rounded"></div>
             ))}
           </div>
         </div>
@@ -54,9 +54,9 @@ export const UserActivityTable = ({
   }
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
-      <div className="px-6 py-4 border-b border-slate-200">
-        <h3 className="text-lg font-semibold text-slate-900">User Activity</h3>
+    <div className="bg-white dark:bg-slate-800 rounded-lg shadow overflow-hidden">
+      <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">User Activity</h3>
       </div>
 
       <div className="overflow-x-auto">
@@ -64,36 +64,36 @@ export const UserActivityTable = ({
           className="min-w-full divide-y divide-slate-200"
           data-testid="user-table"
         >
-          <thead className="bg-slate-50">
+          <thead className="bg-slate-50 dark:bg-slate-700/50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 User
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 Role
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 Annotations
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 Avg Time
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 Status
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-slate-200">
+          <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
             {users.map((user) => (
-              <tr key={user.id} className="hover:bg-slate-50">
+              <tr key={user.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-slate-900">
+                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
                     {user.username}
                   </div>
-                  <div className="text-sm text-slate-500">{user.email ?? "-"}</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">{user.email ?? "-"}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span
@@ -106,10 +106,10 @@ export const UserActivityTable = ({
                     {user.role}
                   </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900 dark:text-slate-200">
                   {user.annotations_count}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900 dark:text-slate-200">
                   {Math.round(user.avg_time_spent_seconds)}s
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -151,7 +151,7 @@ export const UserActivityTable = ({
 
       {users.length === 0 && (
         <div className="text-center py-12">
-          <p className="text-slate-500">No users found</p>
+          <p className="text-slate-500 dark:text-slate-400">No users found</p>
         </div>
       )}
     </div>

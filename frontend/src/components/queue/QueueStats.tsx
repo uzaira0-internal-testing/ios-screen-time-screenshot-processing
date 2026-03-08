@@ -104,8 +104,8 @@ export const QueueStats = ({ compact = false }: QueueStatsProps) => {
   const hasProcessingStats = processingStats.some((s) => s.value > 0);
 
   return (
-    <div className="bg-white rounded-lg shadow-md border border-slate-200 p-6">
-      <h3 className="text-lg font-semibold text-slate-900 mb-4">
+    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md border border-slate-200 dark:border-slate-700 p-6">
+      <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
         Queue Statistics
       </h3>
 
@@ -113,7 +113,7 @@ export const QueueStats = ({ compact = false }: QueueStatsProps) => {
         {mainStats.map((stat) => (
           <div
             key={stat.label}
-            className="text-center p-3 bg-slate-50 rounded-lg"
+            className="text-center p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg"
           >
             <div className={`text-2xl font-bold ${stat.color}`}>
               {stat.value}

@@ -13,10 +13,10 @@ export function SaveStatusIndicator({
     <div
       className={`text-xs text-center py-2 px-3 rounded-md transition-all duration-300 ${
         isSaving
-          ? "bg-primary-50 text-primary-700 border border-primary-200"
+          ? "bg-primary-50 text-primary-700 border border-primary-200 dark:bg-primary-900/20 dark:text-primary-400 dark:border-primary-700"
           : lastSaved
-            ? "bg-green-50 text-green-700 border border-green-200"
-            : "bg-slate-50 text-slate-500 border border-slate-200"
+            ? "bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-700"
+            : "bg-slate-50 text-slate-500 border border-slate-200 dark:bg-slate-700/50 dark:text-slate-400 dark:border-slate-600"
       }`}
       data-testid="auto-save-status"
     >

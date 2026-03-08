@@ -25,11 +25,11 @@ function PHIDetectionTabInner() {
         <td className="px-3 py-2">
           {result ? (
             result.phi_detected ? (
-              <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
+              <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
                 Yes
               </span>
             ) : (
-              <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
+              <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
                 Clean
               </span>
             )
@@ -40,13 +40,13 @@ function PHIDetectionTabInner() {
         <td className="px-3 py-2 font-mono text-xs">
           {result ? (result.regions_count as number) : "\u2014"}
         </td>
-        <td className="px-3 py-2 text-xs text-slate-600">
+        <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">
           {(result?.preset as string) || "\u2014"}
         </td>
         <td className="px-3 py-2">
           <button
             onClick={() => setEditorScreenshotId(_s.id)}
-            className="px-2 py-1 text-xs text-primary-600 border border-primary-200 rounded hover:bg-primary-50"
+            className="px-2 py-1 text-xs text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-700 rounded hover:bg-primary-50 dark:hover:bg-primary-900/20"
             title="Edit PHI regions"
           >
             Edit Regions
