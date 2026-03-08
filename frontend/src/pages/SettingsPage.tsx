@@ -2,7 +2,6 @@ import React from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Link } from "react-router";
 import { config } from "@/config";
-import { environment } from "@/config/environment";
 import {
   Wifi,
   WifiOff,
@@ -154,7 +153,7 @@ function SyncSection() {
 }
 
 export const SettingsPage: React.FC = () => {
-  const isWasmMode = environment.mode === "wasm";
+  const isWasmMode = !config.hasApi;
   const { mode: themeMode, setMode: setThemeMode } = useThemeStore();
 
   return (

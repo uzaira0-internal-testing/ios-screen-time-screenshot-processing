@@ -139,7 +139,11 @@ export class WASMScreenshotService implements IScreenshotService {
     }
 
     // Use LRU-cached blob URLs to avoid leaking memory
-    return createObjectURL(screenshotId, imageBlob);
+    const url = await createObjectURL(screenshotId, imageBlob);
+    if (!url) {
+      throw new Error(`Failed to create object URL for screenshot ${screenshotId}`);
+    }
+    return url;
   }
 
   async getProcessingResult(screenshotId: number): Promise<ProcessingResult> {

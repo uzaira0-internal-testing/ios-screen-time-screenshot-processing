@@ -6,7 +6,9 @@
  * - WASM mode: when apiBaseUrl is absent (local-first, offline)
  */
 
-import { environment, type AppMode } from "@/config/environment";
+import { config } from "@/config";
+
+export type AppMode = "server" | "wasm";
 
 export type ProcessingMode = AppMode;
 
@@ -25,7 +27,7 @@ export interface AppConfig {
  * If apiBaseUrl is present → server mode, otherwise → wasm mode.
  */
 export function detectMode(): ProcessingMode {
-  return environment.apiBaseUrl ? "server" : "wasm";
+  return config.hasApi ? "server" : "wasm";
 }
 
 /**
@@ -47,7 +49,7 @@ export function createConfig(): AppConfig {
 
   return {
     mode: "server",
-    apiBaseUrl: environment.apiBaseUrl || undefined,
+    apiBaseUrl: config.apiBaseUrl,
     features: {
       offlineMode: false,
       autoProcessing: true,

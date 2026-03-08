@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router";
 import { Layout } from "@/components/layout/Layout";
+import { Modal } from "@/components/ui/Modal";
 import {
   api,
   ScreenshotComparison,
@@ -393,233 +394,226 @@ export const ConsensusComparisonPage = () => {
       </div>
 
       {/* Resolve Modal */}
-      {showResolveModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-slate-200 dark:border-slate-700">
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-                Resolve Dispute
-              </h2>
-              <p className="text-sm text-slate-500 mt-1">
-                Select or edit the correct values for each field
-              </p>
-            </div>
-
-            <div className="p-6 space-y-4">
-              {/* Title */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Title
-                </label>
-                <div className="space-y-2">
-                  {comparison.verifier_annotations.map((ann) => (
-                    <label
-                      key={ann.user_id}
-                      className="flex items-center gap-2"
-                    >
-                      <input
-                        type="radio"
-                        name="title"
-                        checked={
-                          resolutionValues.extracted_title ===
-                          (ann.extracted_title || "")
-                        }
-                        onChange={() =>
-                          setResolutionValues((prev) => ({
-                            ...prev,
-                            extracted_title: ann.extracted_title || "",
-                          }))
-                        }
-                        className="text-primary-600"
-                      />
-                      <span className="text-sm text-slate-600 dark:text-slate-400">
-                        {ann.username}:
-                      </span>
-                      <span className="text-sm">
-                        {ann.extracted_title || "(empty)"}
-                      </span>
-                    </label>
-                  ))}
+      <Modal
+        open={showResolveModal}
+        onOpenChange={setShowResolveModal}
+        title="Resolve Dispute"
+        description="Select or edit the correct values for each field"
+        size="lg"
+      >
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+          {/* Title */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+              Title
+            </label>
+            <div className="space-y-2">
+              {comparison.verifier_annotations.map((ann) => (
+                <label
+                  key={ann.user_id}
+                  className="flex items-center gap-2"
+                >
                   <input
-                    type="text"
-                    value={resolutionValues.extracted_title}
-                    onChange={(e) =>
+                    type="radio"
+                    name="title"
+                    checked={
+                      resolutionValues.extracted_title ===
+                      (ann.extracted_title || "")
+                    }
+                    onChange={() =>
                       setResolutionValues((prev) => ({
                         ...prev,
-                        extracted_title: e.target.value,
+                        extracted_title: ann.extracted_title || "",
                       }))
                     }
-                    className="mt-2 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm dark:bg-slate-700 dark:text-slate-200"
-                    placeholder="Or enter custom value..."
+                    className="text-primary-600"
                   />
-                </div>
-              </div>
-
-              {/* Total */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Total
+                  <span className="text-sm text-slate-600 dark:text-slate-400">
+                    {ann.username}:
+                  </span>
+                  <span className="text-sm">
+                    {ann.extracted_title || "(empty)"}
+                  </span>
                 </label>
-                <div className="space-y-2">
-                  {comparison.verifier_annotations.map((ann) => (
-                    <label
-                      key={ann.user_id}
-                      className="flex items-center gap-2"
-                    >
-                      <input
-                        type="radio"
-                        name="total"
-                        checked={
-                          resolutionValues.extracted_total ===
-                          (ann.extracted_total || "")
-                        }
-                        onChange={() =>
-                          setResolutionValues((prev) => ({
-                            ...prev,
-                            extracted_total: ann.extracted_total || "",
-                          }))
-                        }
-                        className="text-primary-600"
-                      />
-                      <span className="text-sm text-slate-600 dark:text-slate-400">
-                        {ann.username}:
-                      </span>
-                      <span className="text-sm">
-                        {ann.extracted_total || "(empty)"}
-                      </span>
-                    </label>
-                  ))}
-                  <input
-                    type="text"
-                    value={resolutionValues.extracted_total}
-                    onChange={(e) =>
-                      setResolutionValues((prev) => ({
-                        ...prev,
-                        extracted_total: e.target.value,
-                      }))
-                    }
-                    className="mt-2 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm dark:bg-slate-700 dark:text-slate-200"
-                    placeholder="Or enter custom value..."
-                  />
-                </div>
-              </div>
-
-              {/* Differing Hourly Values */}
-              {comparison.differences
-                .filter((d) => d.field.startsWith("hourly_"))
-                .map((diff) => {
-                  const hour = diff.field.replace("hourly_", "");
-                  return (
-                    <div key={diff.field}>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                        Hour {hour}
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        {comparison.verifier_annotations.map((ann) => {
-                          const value = ann.hourly_values[hour] ?? null;
-                          return (
-                            <button
-                              key={ann.user_id}
-                              onClick={() =>
-                                handleSelectValue(
-                                  diff.field,
-                                  String(ann.user_id),
-                                  value,
-                                )
-                              }
-                              className={`px-3 py-1 rounded border text-sm ${
-                                resolutionValues.hourly_values[hour] === value
-                                  ? "bg-primary-100 dark:bg-primary-900/30 border-primary-500 text-primary-700 dark:text-primary-400"
-                                  : "bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600"
-                              }`}
-                            >
-                              {ann.username}: {value ?? "null"}
-                            </button>
-                          );
-                        })}
-                        <input
-                          type="number"
-                          value={resolutionValues.hourly_values[hour] ?? ""}
-                          onChange={(e) =>
-                            setResolutionValues((prev) => ({
-                              ...prev,
-                              hourly_values: {
-                                ...prev.hourly_values,
-                                [hour]: parseFloat(e.target.value) || 0,
-                              },
-                            }))
-                          }
-                          className="w-20 px-2 py-1 border border-slate-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-slate-200"
-                          placeholder="Custom"
-                          min="0"
-                          max="60"
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-
-              {/* Resolution Notes */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Resolution Notes (optional)
-                </label>
-                <textarea
-                  value={resolutionValues.resolution_notes}
-                  onChange={(e) =>
-                    setResolutionValues((prev) => ({
-                      ...prev,
-                      resolution_notes: e.target.value,
-                    }))
-                  }
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm dark:bg-slate-700 dark:text-slate-200"
-                  rows={2}
-                  placeholder="Add any notes about how this dispute was resolved..."
-                />
-              </div>
-            </div>
-
-            <div className="p-6 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-3">
-              <button
-                onClick={() => setShowResolveModal(false)}
-                disabled={resolving}
-                className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleResolve}
-                disabled={resolving}
-                className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg disabled:opacity-50 flex items-center gap-2"
-              >
-                {resolving ? (
-                  <>
-                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                        fill="none"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
-                    Resolving...
-                  </>
-                ) : (
-                  "Resolve Dispute"
-                )}
-              </button>
+              ))}
+              <input
+                type="text"
+                value={resolutionValues.extracted_title}
+                onChange={(e) =>
+                  setResolutionValues((prev) => ({
+                    ...prev,
+                    extracted_title: e.target.value,
+                  }))
+                }
+                className="mt-2 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm dark:bg-slate-700 dark:text-slate-200"
+                placeholder="Or enter custom value..."
+              />
             </div>
           </div>
+
+          {/* Total */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+              Total
+            </label>
+            <div className="space-y-2">
+              {comparison.verifier_annotations.map((ann) => (
+                <label
+                  key={ann.user_id}
+                  className="flex items-center gap-2"
+                >
+                  <input
+                    type="radio"
+                    name="total"
+                    checked={
+                      resolutionValues.extracted_total ===
+                      (ann.extracted_total || "")
+                    }
+                    onChange={() =>
+                      setResolutionValues((prev) => ({
+                        ...prev,
+                        extracted_total: ann.extracted_total || "",
+                      }))
+                    }
+                    className="text-primary-600"
+                  />
+                  <span className="text-sm text-slate-600 dark:text-slate-400">
+                    {ann.username}:
+                  </span>
+                  <span className="text-sm">
+                    {ann.extracted_total || "(empty)"}
+                  </span>
+                </label>
+              ))}
+              <input
+                type="text"
+                value={resolutionValues.extracted_total}
+                onChange={(e) =>
+                  setResolutionValues((prev) => ({
+                    ...prev,
+                    extracted_total: e.target.value,
+                  }))
+                }
+                className="mt-2 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm dark:bg-slate-700 dark:text-slate-200"
+                placeholder="Or enter custom value..."
+              />
+            </div>
+          </div>
+
+          {/* Differing Hourly Values */}
+          {comparison.differences
+            .filter((d) => d.field.startsWith("hourly_"))
+            .map((diff) => {
+              const hour = diff.field.replace("hourly_", "");
+              return (
+                <div key={diff.field}>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                    Hour {hour}
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {comparison.verifier_annotations.map((ann) => {
+                      const value = ann.hourly_values[hour] ?? null;
+                      return (
+                        <button
+                          key={ann.user_id}
+                          onClick={() =>
+                            handleSelectValue(
+                              diff.field,
+                              String(ann.user_id),
+                              value,
+                            )
+                          }
+                          className={`px-3 py-1 rounded border text-sm ${
+                            resolutionValues.hourly_values[hour] === value
+                              ? "bg-primary-100 dark:bg-primary-900/30 border-primary-500 text-primary-700 dark:text-primary-400"
+                              : "bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600"
+                          }`}
+                        >
+                          {ann.username}: {value ?? "null"}
+                        </button>
+                      );
+                    })}
+                    <input
+                      type="number"
+                      value={resolutionValues.hourly_values[hour] ?? ""}
+                      onChange={(e) =>
+                        setResolutionValues((prev) => ({
+                          ...prev,
+                          hourly_values: {
+                            ...prev.hourly_values,
+                            [hour]: parseFloat(e.target.value) || 0,
+                          },
+                        }))
+                      }
+                      className="w-20 px-2 py-1 border border-slate-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-slate-200"
+                      placeholder="Custom"
+                      min="0"
+                      max="60"
+                    />
+                  </div>
+                </div>
+              );
+            })}
+
+          {/* Resolution Notes */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+              Resolution Notes (optional)
+            </label>
+            <textarea
+              value={resolutionValues.resolution_notes}
+              onChange={(e) =>
+                setResolutionValues((prev) => ({
+                  ...prev,
+                  resolution_notes: e.target.value,
+                }))
+              }
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm dark:bg-slate-700 dark:text-slate-200"
+              rows={2}
+              placeholder="Add any notes about how this dispute was resolved..."
+            />
+          </div>
         </div>
-      )}
+
+        <div className="pt-4 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-3 mt-4">
+          <button
+            onClick={() => setShowResolveModal(false)}
+            disabled={resolving}
+            className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleResolve}
+            disabled={resolving}
+            className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg disabled:opacity-50 flex items-center gap-2"
+          >
+            {resolving ? (
+              <>
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    fill="none"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                Resolving...
+              </>
+            ) : (
+              "Resolve Dispute"
+            )}
+          </button>
+        </div>
+      </Modal>
     </Layout>
   );
 };

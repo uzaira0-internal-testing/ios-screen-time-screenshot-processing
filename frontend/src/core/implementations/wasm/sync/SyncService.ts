@@ -1,6 +1,6 @@
 import { db } from "../storage/database";
 import type { SyncStatus } from "../storage/database/ScreenshotDB";
-import { retrieveImageBlob } from "../storage/blobStorage";
+import { retrieveImageBlob } from "../storage/opfsBlobStorage";
 
 export interface SyncConfig {
   serverUrl: string;

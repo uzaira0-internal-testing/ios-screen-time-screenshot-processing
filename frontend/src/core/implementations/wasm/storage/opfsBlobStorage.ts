@@ -3,6 +3,9 @@
  *
  * Primary storage for image blobs. Falls back to IndexedDB blob table
  * if OPFS is unavailable (Safari < 15.2).
+ *
+ * Also provides utility functions for storage quota management,
+ * image compression, and blob info retrieval.
  */
 
 import { db } from "./database";
@@ -10,8 +13,37 @@ import { db } from "./database";
 let opfsRoot: FileSystemDirectoryHandle | null = null;
 let opfsAvailable: boolean | null = null;
 
-const urlCache = new Map<number, string>();
+// LRU cache for object URLs with automatic eviction
 const MAX_CACHE_SIZE = 50;
+const urlCache = new Map<number, string>();
+const cacheAccessOrder: number[] = [];
+
+/**
+ * Evict oldest entries from cache if over limit
+ */
+function evictOldEntries(): void {
+  while (cacheAccessOrder.length > MAX_CACHE_SIZE) {
+    const oldestId = cacheAccessOrder.shift();
+    if (oldestId !== undefined) {
+      const url = urlCache.get(oldestId);
+      if (url) {
+        URL.revokeObjectURL(url);
+        urlCache.delete(oldestId);
+      }
+    }
+  }
+}
+
+/**
+ * Update LRU access order
+ */
+function touchCache(id: number): void {
+  const index = cacheAccessOrder.indexOf(id);
+  if (index > -1) {
+    cacheAccessOrder.splice(index, 1);
+  }
+  cacheAccessOrder.push(id);
+}
 
 async function getOpfsRoot(): Promise<FileSystemDirectoryHandle | null> {
   if (opfsAvailable === false) return null;
@@ -73,22 +105,34 @@ export async function deleteImageBlob(id: number): Promise<void> {
   }
 }
 
-export function createObjectURL(id: number, blob: Blob): string {
+/**
+ * Create an object URL for a screenshot image.
+ *
+ * If a blob is provided, it is used directly. Otherwise the blob is
+ * retrieved from storage. Returns null when no blob can be found.
+ */
+export async function createObjectURL(
+  id: number,
+  blob?: Blob,
+): Promise<string | null> {
   const cached = urlCache.get(id);
-  if (cached) return cached;
-
-  // Evict oldest if cache full
-  if (urlCache.size >= MAX_CACHE_SIZE) {
-    const firstKey = urlCache.keys().next().value;
-    if (firstKey !== undefined) {
-      const firstUrl = urlCache.get(firstKey);
-      if (firstUrl) URL.revokeObjectURL(firstUrl);
-      urlCache.delete(firstKey);
-    }
+  if (cached) {
+    touchCache(id);
+    return cached;
   }
 
-  const url = URL.createObjectURL(blob);
+  const resolvedBlob = blob ?? (await retrieveImageBlob(id));
+  if (!resolvedBlob) {
+    return null;
+  }
+
+  const url = URL.createObjectURL(resolvedBlob);
   urlCache.set(id, url);
+  touchCache(id);
+
+  // Evict old entries if cache is too large
+  evictOldEntries();
+
   return url;
 }
 
@@ -97,6 +141,10 @@ export function revokeObjectURL(id: number): void {
   if (url) {
     URL.revokeObjectURL(url);
     urlCache.delete(id);
+    const index = cacheAccessOrder.indexOf(id);
+    if (index > -1) {
+      cacheAccessOrder.splice(index, 1);
+    }
   }
 }
 
@@ -105,4 +153,142 @@ export function revokeAllObjectURLs(): void {
     URL.revokeObjectURL(url);
   }
   urlCache.clear();
+  cacheAccessOrder.length = 0;
+}
+
+// ---------------------------------------------------------------------------
+// Utility functions (merged from blobStorage.ts)
+// ---------------------------------------------------------------------------
+
+export async function getImageBlobInfo(screenshotId: number): Promise<{
+  size: number;
+  type: string;
+  uploadedAt: string;
+} | null> {
+  const blob = await retrieveImageBlob(screenshotId);
+  if (!blob) {
+    return null;
+  }
+
+  return {
+    size: blob.size,
+    type: blob.type,
+    // OPFS doesn't store uploadedAt metadata; use empty string as fallback
+    uploadedAt: new Date().toISOString(),
+  };
+}
+
+export async function getTotalBlobSize(): Promise<number> {
+  const root = await getOpfsRoot();
+  if (root) {
+    let total = 0;
+    // Iterate over OPFS directory entries
+    for await (const [, handle] of root as unknown as AsyncIterable<
+      [string, FileSystemHandle]
+    >) {
+      if (handle.kind === "file") {
+        const file = await (handle as FileSystemFileHandle).getFile();
+        total += file.size;
+      }
+    }
+    return total;
+  } else {
+    const allBlobs = await db.imageBlobs.toArray();
+    return allBlobs.reduce((total, record) => total + record.blob.size, 0);
+  }
+}
+
+export async function checkStorageQuota(): Promise<{
+  usage: number;
+  quota: number;
+  percentUsed: number;
+  available: number;
+}> {
+  if (!navigator.storage || !navigator.storage.estimate) {
+    return {
+      usage: 0,
+      quota: 0,
+      percentUsed: 0,
+      available: 0,
+    };
+  }
+
+  const estimate = await navigator.storage.estimate();
+  const usage = estimate.usage || 0;
+  const quota = estimate.quota || 0;
+  const percentUsed = quota > 0 ? (usage / quota) * 100 : 0;
+  const available = quota - usage;
+
+  return {
+    usage,
+    quota,
+    percentUsed,
+    available,
+  };
+}
+
+export async function canStoreBlob(blob: Blob): Promise<boolean> {
+  const quota = await checkStorageQuota();
+  const blobSize = blob.size;
+
+  const SAFETY_MARGIN = 10 * 1024 * 1024;
+
+  return quota.available > blobSize + SAFETY_MARGIN;
+}
+
+export async function compressImage(
+  blob: Blob,
+  maxWidth = 1920,
+  quality = 0.9,
+): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx) {
+      reject(new Error("Could not get canvas context"));
+      return;
+    }
+
+    // Track the temporary blob URL so we can revoke it when done
+    const tempUrl = URL.createObjectURL(blob);
+
+    img.onload = () => {
+      // Revoke the temporary URL now that the image has loaded
+      URL.revokeObjectURL(tempUrl);
+
+      let width = img.width;
+      let height = img.height;
+
+      if (width > maxWidth) {
+        height = (height * maxWidth) / width;
+        width = maxWidth;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (compressedBlob) => {
+          if (compressedBlob) {
+            resolve(compressedBlob);
+          } else {
+            reject(new Error("Failed to compress image"));
+          }
+        },
+        "image/jpeg",
+        quality,
+      );
+    };
+
+    img.onerror = () => {
+      // Revoke the temporary URL on error as well
+      URL.revokeObjectURL(tempUrl);
+      reject(new Error("Failed to load image for compression"));
+    };
+
+    img.src = tempUrl;
+  });
 }
