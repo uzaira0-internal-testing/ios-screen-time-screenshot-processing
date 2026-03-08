@@ -1,78 +1,132 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Inter:wght@300;400;500;600;700&display=swap')
+layer(base);
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
 
-body {
-  margin: 0;
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@theme {
+  --color-primary-50: #f0fdfa;
+  --color-primary-100: #ccfbf1;
+  --color-primary-200: #99f6e4;
+  --color-primary-300: #5eead4;
+  --color-primary-400: #2dd4bf;
+  --color-primary-500: #14b8a6;
+  --color-primary-600: #0d9488;
+  --color-primary-700: #0f766e;
+  --color-primary-800: #115e59;
+  --color-primary-900: #134e4a;
+  --color-primary-950: #042f2e;
+  --color-primary: #0f766e;
+
+  --color-accent-50: #eef2ff;
+  --color-accent-100: #e0e7ff;
+  --color-accent-200: #c7d2fe;
+  --color-accent-300: #a5b4fc;
+  --color-accent-400: #818cf8;
+  --color-accent-500: #6366f1;
+  --color-accent-600: #4f46e5;
+  --color-accent-700: #4338ca;
+  --color-accent-800: #3730a3;
+  --color-accent-900: #312e81;
+  --color-accent-950: #1e1b4b;
+  --color-accent: #4f46e5;
+
+  --font-heading: 'DM Sans', system-ui, sans-serif;
+  --font-body: Inter, system-ui, sans-serif;
 }
 
-h1, h2, h3, h4, h5, h6 {
-  font-family: 'DM Sans', system-ui, sans-serif;
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+
+  body {
+    margin: 0;
+    font-family:
+      'Inter',
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: 'DM Sans', system-ui, sans-serif;
+  }
+
+  code {
+    font-family:
+      source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+@utility focus-ring {
+  @apply focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2;
 }
 
-* {
-  box-sizing: border-box;
+@utility card {
+  @apply bg-white border border-slate-200 rounded-lg p-5 shadow-xs;
 }
 
-@layer components {
-  .focus-ring {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2;
-  }
-
-  .card {
-    @apply bg-white border border-slate-200 rounded-lg p-5 shadow-sm;
-  }
-
-  .badge {
-    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium;
-  }
-
-  .badge-success {
-    @apply badge bg-emerald-50 text-emerald-700 border border-emerald-200;
-  }
-
-  .badge-warning {
-    @apply badge bg-amber-50 text-amber-700 border border-amber-200;
-  }
-
-  .badge-danger {
-    @apply badge bg-red-50 text-red-700 border border-red-200;
-  }
-
-  .badge-info {
-    @apply badge bg-sky-50 text-sky-700 border border-sky-200;
-  }
-
-  .badge-neutral {
-    @apply badge bg-slate-100 text-slate-700 border border-slate-200;
-  }
+@utility badge {
+  @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium;
 }
 
-@layer utilities {
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
+@utility badge-success {
+  @apply badge bg-emerald-50 text-emerald-700 border border-emerald-200;
+}
 
-  .scrollbar-hide::-webkit-scrollbar {
+@utility badge-warning {
+  @apply badge bg-amber-50 text-amber-700 border border-amber-200;
+}
+
+@utility badge-danger {
+  @apply badge bg-red-50 text-red-700 border border-red-200;
+}
+
+@utility badge-info {
+  @apply badge bg-sky-50 text-sky-700 border border-sky-200;
+}
+
+@utility badge-neutral {
+  @apply badge bg-slate-100 text-slate-700 border border-slate-200;
+}
+
+@utility scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
     display: none;
   }
+}
 
-  .table-striped tbody tr:nth-child(even) {
+@utility table-striped {
+  & tbody tr:nth-child(even) {
     @apply bg-slate-50;
   }
 
-  .table-striped tbody tr:hover {
+  & tbody tr:hover {
     @apply bg-slate-100;
   }
 }

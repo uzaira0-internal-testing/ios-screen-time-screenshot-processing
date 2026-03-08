@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router";
 import { Layout } from "@/components/layout/Layout";
 import { api, GroupVerificationSummary, ScreenshotTierItem } from "@/services/apiClient";
 import toast from "react-hot-toast";

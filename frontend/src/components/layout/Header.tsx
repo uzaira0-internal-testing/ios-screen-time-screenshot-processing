@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useSearchParams, useLocation } from "react-router-dom";
+import { Link, useSearchParams, useLocation } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { PROCESSING_STATUS_LABELS, type ProcessingStatus } from "@/constants/processingStatus";
 import { Menu, X, LogOut } from "lucide-react";

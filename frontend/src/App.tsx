@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { BrowserRouter } from "react-router-dom";
+import { BrowserRouter } from "react-router";
 import { Toaster } from "react-hot-toast";
 import toast from "react-hot-toast";
 import { AppRouter } from "./components/routing/AppRouter";

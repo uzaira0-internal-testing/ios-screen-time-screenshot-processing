@@ -141,10 +141,10 @@ async function generateHtml(): Promise<string> {
 </html>`;
 }
 
-// Build Tailwind CSS (v3)
+// Build Tailwind CSS (v4)
 async function buildCss() {
   const proc = Bun.spawn(
-    ["bunx", "tailwindcss", "-i", join(SRC_DIR, "index.css"), "-o", join(ROOT_DIR, ".bun-dev", "index.css")],
+    ["bunx", "@tailwindcss/cli", "-i", join(SRC_DIR, "index.css"), "-o", join(ROOT_DIR, ".bun-dev", "index.css")],
     {
       cwd: ROOT_DIR,
       stdout: "inherit",

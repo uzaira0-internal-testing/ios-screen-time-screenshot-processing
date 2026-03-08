@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useAuthStore } from "@/store/authStore";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { api } from "@/services/apiClient";
 import toast from "react-hot-toast";
 import { config } from "@/config";

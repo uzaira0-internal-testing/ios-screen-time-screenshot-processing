@@ -112,12 +112,12 @@ async function build() {
     console.log("  \x1b[32m✓\x1b[0m sw.js");
   }
 
-  // Build Tailwind CSS (v3)
+  // Build Tailwind CSS (v4)
   console.log("\n\x1b[33m[build]\x1b[0m Building CSS...");
   const cssProc = Bun.spawn(
     [
       "bunx",
-      "tailwindcss",
+      "@tailwindcss/cli",
       "-i",
       join(SRC_DIR, "index.css"),
       "-o",

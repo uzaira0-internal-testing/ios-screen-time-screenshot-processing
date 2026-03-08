@@ -1,4 +1,4 @@
-import { useSearchParams, useParams } from "react-router-dom";
+import { useSearchParams, useParams } from "react-router";
 import { Layout } from "@/components/layout/Layout";
 import { AnnotationWorkspace } from "@/components/annotation/AnnotationWorkspace";
 import { ErrorBoundary } from "@/components/ErrorBoundary";

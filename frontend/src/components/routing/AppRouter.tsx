@@ -5,7 +5,7 @@
  */
 
 import React from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router";
 
 // Pages
 import { HomePage } from "@/pages/HomePage";
