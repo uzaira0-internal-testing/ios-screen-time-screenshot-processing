@@ -14,7 +14,7 @@ import {
   storeImageBlob,
   retrieveImageBlob,
   deleteImageBlob,
-} from "./blobStorage";
+} from "./opfsBlobStorage";
 
 // Constants for WASM mode
 const LOCAL_USER_ID = 1;
