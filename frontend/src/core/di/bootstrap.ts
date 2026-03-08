@@ -15,6 +15,12 @@ import { APIStorageService } from "../implementations/server/APIStorageService";
  * - WASM mode: Local-first services (when apiBaseUrl is absent)
  */
 export function bootstrapServices(config: AppConfig): ServiceContainer {
+  if (config.mode === "tauri") {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { bootstrapTauriServices } = require("./bootstrapTauri");
+    return bootstrapTauriServices(config);
+  }
+
   if (config.mode === "wasm") {
     // TODO: Convert to dynamic import() for proper code-splitting once
     // ServiceProvider supports async initialization

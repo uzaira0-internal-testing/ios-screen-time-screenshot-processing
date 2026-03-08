@@ -16,6 +16,7 @@ playwright/.auth/
 *.png
 *.jpg
 *.jpeg
+!src-tauri/icons/**
 
 # Environment files
 .env

@@ -53,7 +53,7 @@ export {
 export { ServiceContainer, TOKENS, bootstrapServices } from "./di";
 export type { ServiceToken } from "./di";
 
-export type { ProcessingMode, AppConfig } from "./config";
+export type { AppMode, AppConfig } from "./config";
 export { detectMode, createConfig } from "./config";
 
 export {

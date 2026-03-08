@@ -153,7 +153,8 @@ function SyncSection() {
 }
 
 export const SettingsPage: React.FC = () => {
-  const isWasmMode = !config.hasApi;
+  const isLocalMode = config.isLocalMode;
+  const modeLabel = config.isTauri ? "Desktop" : "Local (WASM)";
   const { mode: themeMode, setMode: setThemeMode } = useThemeStore();
 
   return (
@@ -192,17 +193,17 @@ export const SettingsPage: React.FC = () => {
         {/* Current Mode Info */}
         <Card padding="lg">
           <div className="flex items-center gap-3 mb-4">
-            {isWasmMode ? (
+            {isLocalMode ? (
               <HardDrive className="w-8 h-8 text-primary-700 dark:text-primary-400" />
             ) : (
               <Monitor className="w-8 h-8 text-primary-700 dark:text-primary-400" />
             )}
             <div>
               <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-                {isWasmMode ? "Local (WASM) Mode" : "Server Mode"}
+                {isLocalMode ? `${modeLabel} Mode` : "Server Mode"}
               </h2>
               <p className="text-sm text-slate-600 dark:text-slate-400">
-                {isWasmMode
+                {isLocalMode
                   ? "Processing locally in the browser"
                   : "Using backend server for processing"}
               </p>
@@ -213,13 +214,13 @@ export const SettingsPage: React.FC = () => {
             <div className="bg-slate-50 dark:bg-slate-700/50 p-3 rounded">
               <div className="font-medium text-slate-700 dark:text-slate-300">Data Storage</div>
               <div className="text-slate-600 dark:text-slate-400 mt-1">
-                {isWasmMode ? "IndexedDB + OPFS" : "Server Database"}
+                {isLocalMode ? "IndexedDB + OPFS" : "Server Database"}
               </div>
             </div>
             <div className="bg-slate-50 dark:bg-slate-700/50 p-3 rounded">
               <div className="font-medium text-slate-700 dark:text-slate-300">Processing</div>
               <div className="text-slate-600 dark:text-slate-400 mt-1">
-                {isWasmMode
+                {isLocalMode
                   ? "Tesseract.js (Web Worker)"
                   : "Backend (Python + Tesseract)"}
               </div>
@@ -227,7 +228,7 @@ export const SettingsPage: React.FC = () => {
             <div className="bg-slate-50 dark:bg-slate-700/50 p-3 rounded">
               <div className="font-medium text-slate-700 dark:text-slate-300">Network Required</div>
               <div className="text-slate-600 dark:text-slate-400 mt-1">
-                {isWasmMode ? (
+                {isLocalMode ? (
                   <span className="flex items-center gap-1">
                     <Globe className="w-3.5 h-3.5" /> No (Offline Capable)
                   </span>
@@ -240,10 +241,10 @@ export const SettingsPage: React.FC = () => {
         </Card>
 
         {/* Sync section (WASM mode only) */}
-        {isWasmMode && <SyncSection />}
+        {isLocalMode && <SyncSection />}
 
         {/* Server Mode Settings */}
-        {!isWasmMode && (
+        {!isLocalMode && (
           <Card padding="lg">
             <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">
               Server Mode Settings
@@ -285,7 +286,7 @@ export const SettingsPage: React.FC = () => {
             </p>
             <p>
               <strong>Build:</strong>{" "}
-              {isWasmMode ? "WASM (Local-First)" : "Server (Collaborative)"}
+              {isLocalMode ? `${modeLabel} (Local-First)` : "Server (Collaborative)"}
             </p>
             <p>
               <strong>Browser:</strong> {navigator.userAgent.split(" ").pop()}

@@ -2,6 +2,7 @@ import { useState, useEffect, FormEvent } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/services/apiClient";
+import { config } from "@/config";
 import toast from "react-hot-toast";
 
 export const LoginForm = () => {
@@ -9,12 +10,13 @@ export const LoginForm = () => {
   const [password, setPassword] = useState("");
   const [passwordRequired, setPasswordRequired] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isCheckingPassword, setIsCheckingPassword] = useState(true);
+  const [isCheckingPassword, setIsCheckingPassword] = useState(!config.isLocalMode);
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  // Check if password is required on mount
+  // Check if password is required on mount (server mode only)
   useEffect(() => {
+    if (config.isLocalMode) return;
     api.auth
       .isPasswordRequired()
       .then((required) => {
@@ -32,9 +34,15 @@ export const LoginForm = () => {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    if (!username.trim()) {
+    if (config.isLocalMode) {
+      const name = username.trim() || "User";
+      login(1, name, undefined, "admin");
+      toast.success(`Welcome, ${name}!`);
+      navigate("/");
       return;
     }
+
+    if (!username.trim()) return;
 
     if (passwordRequired && !password) {
       toast.error("Password is required");
@@ -43,13 +51,10 @@ export const LoginForm = () => {
 
     setIsLoading(true);
     try {
-      // Call login API to get user ID and role
       const user = await api.auth.login(
         username.trim(),
         passwordRequired ? password : undefined,
       );
-      // Store username, site password (if required), and user info
-      // The site password will be sent via X-Site-Password header on subsequent requests
       login(
         user.id,
         user.username,
@@ -66,7 +71,15 @@ export const LoginForm = () => {
     }
   };
 
-  const isFormValid = username.trim() && (!passwordRequired || password);
+  const isFormValid = config.isLocalMode
+    ? true
+    : username.trim() && (!passwordRequired || password);
+
+  const subtitle = config.isLocalMode
+    ? `${config.isTauri ? "Desktop Mode" : "Local Mode"} — Enter a username to get started`
+    : passwordRequired
+      ? "Enter your credentials to continue"
+      : "Enter your username to continue";
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 py-12 px-4 sm:px-6 lg:px-8">
@@ -76,9 +89,7 @@ export const LoginForm = () => {
             iOS Screen Time
           </h2>
           <p className="mt-2 text-center text-sm text-slate-600 dark:text-slate-400">
-            {passwordRequired
-              ? "Enter your credentials to continue"
-              : "Enter your username to continue"}
+            {subtitle}
           </p>
         </div>
 
@@ -98,11 +109,11 @@ export const LoginForm = () => {
                   name="username"
                   type="text"
                   autoComplete="username"
-                  required
+                  required={!config.isLocalMode}
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="appearance-none rounded-md relative block w-full px-3 py-2 border border-slate-300 dark:border-slate-600 placeholder-slate-500 text-slate-900 dark:text-slate-100 dark:bg-slate-800 focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
-                  placeholder="Username"
+                  placeholder={config.isLocalMode ? "Username (optional)" : "Username"}
                 />
               </div>
 
@@ -132,7 +143,7 @@ export const LoginForm = () => {
                 disabled={!isFormValid || isLoading}
                 className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? "Logging in..." : "Continue"}
+                {isLoading ? "Logging in..." : config.isLocalMode ? "Get Started" : "Continue"}
               </button>
             </div>
           </form>

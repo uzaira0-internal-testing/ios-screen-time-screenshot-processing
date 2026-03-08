@@ -2,14 +2,17 @@
 declare global {
   interface Window {
     __CONFIG__?: { basePath?: string; apiBaseUrl?: string };
+    __TAURI_INTERNALS__?: unknown;
   }
 }
 
-// Check if we're in development mode
-// In production builds, Bun replaces process.env.NODE_ENV with "production"
+// Check if we're in development mode.
+// Bun's bundler replaces import.meta.env.MODE at build time.
+// Falls back to checking process.env for SSR/test environments.
 const isDev =
-  typeof process !== "undefined" &&
-  process.env?.NODE_ENV !== "production";
+  import.meta.env?.MODE === "development" ||
+  (typeof process !== "undefined" &&
+    process.env?.NODE_ENV === "development");
 
 export const config = {
   get basePath(): string {
@@ -34,5 +37,13 @@ export const config = {
   },
   get isProd(): boolean {
     return !isDev;
+  },
+  /** Whether running inside a Tauri desktop shell */
+  get isTauri(): boolean {
+    return !!window.__TAURI_INTERNALS__;
+  },
+  /** Whether running in a local-only mode (no backend server) */
+  get isLocalMode(): boolean {
+    return this.isTauri || !this.hasApi;
   },
 };
