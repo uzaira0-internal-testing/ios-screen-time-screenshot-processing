@@ -29,7 +29,7 @@ export const LoadingSpinner = ({
         aria-hidden="true"
       />
       {label && (
-        <span className="text-sm text-gray-600" aria-label={label}>
+        <span className="text-sm text-slate-600" aria-label={label}>
           {label}
         </span>
       )}

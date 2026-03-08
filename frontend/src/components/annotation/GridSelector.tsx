@@ -482,11 +482,11 @@ export const GridSelector = ({
   return (
     <div className="space-y-2" ref={containerRef} data-testid="grid-selector">
       {/* Controls row - Title field (centered) + Reset Grid */}
-      <div className="flex items-center bg-gray-100 px-3 py-2 rounded border border-gray-200 gap-3">
+      <div className="flex items-center bg-slate-100 px-3 py-2 rounded border border-slate-200 gap-3">
         {/* Title field - for screen_time, centered */}
         {imageType === "screen_time" && (
           <div className="flex items-center gap-2 flex-1 justify-center">
-            <span className="text-xs font-semibold text-gray-500 whitespace-nowrap">
+            <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">
               App/Title
               {!extractedTitle && <span className="text-orange-500 ml-1">⚠</span>}
             </span>
@@ -496,10 +496,10 @@ export const GridSelector = ({
               onChange={(e) => onTitleChange?.(e.target.value)}
               placeholder="Enter app name..."
               disabled={disabled}
-              className={`w-52 px-3 py-1.5 text-sm font-medium text-center border-2 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors ${
+              className={`w-52 px-3 py-1.5 text-sm font-medium text-center border-2 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed transition-colors ${
                 !extractedTitle
                   ? "border-orange-400 bg-orange-50"
-                  : "border-gray-300 bg-white hover:border-gray-400"
+                  : "border-slate-300 bg-white hover:border-slate-400"
               }`}
             />
           </div>
@@ -519,7 +519,7 @@ export const GridSelector = ({
       </div>
 
       {/* Canvas */}
-      <div className="bg-gray-800 rounded-lg">
+      <div className="bg-slate-800 rounded-lg">
         <canvas
           ref={canvasRef}
           aria-label="Screenshot with grid selection overlay. Use mouse to drag and resize the grid region."
@@ -535,7 +535,7 @@ export const GridSelector = ({
       {/* Status indicator */}
       <div className="text-xs text-center">
         {!hasSelection && (
-          <span className="text-gray-500">Click and drag to select grid</span>
+          <span className="text-slate-500">Click and drag to select grid</span>
         )}
         {hasSelection && (
           <span className="text-blue-600 font-medium">

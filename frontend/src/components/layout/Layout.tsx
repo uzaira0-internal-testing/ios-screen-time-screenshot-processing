@@ -9,7 +9,7 @@ interface LayoutProps {
 
 export const Layout = ({ children, noScroll = false }: LayoutProps) => {
   return (
-    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
+    <div className="h-screen bg-slate-50 flex flex-col overflow-hidden">
       <Header />
       <main
         className={`flex-1 ${noScroll ? "overflow-hidden" : "overflow-auto"}`}

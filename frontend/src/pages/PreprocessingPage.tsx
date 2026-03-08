@@ -123,21 +123,21 @@ export const PreprocessingPage = () => {
           {returnUrl && (
             <Link
               to={returnUrl}
-              className="px-3 py-1.5 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+              className="px-3 py-1.5 text-sm text-slate-600 border border-slate-300 rounded-md hover:bg-slate-50"
             >
               &larr; Back to Annotation
             </Link>
           )}
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-slate-900">
             Preprocessing Pipeline
           </h1>
         </div>
         <div className="flex items-center gap-3">
-          <label className="text-sm font-medium text-gray-700">Group:</label>
+          <label className="text-sm font-medium text-slate-700">Group:</label>
           <select
             value={selectedGroupId}
             onChange={(e) => setSelectedGroupId(e.target.value)}
-            className="text-sm border border-gray-300 rounded-md px-3 py-1.5"
+            className="text-sm border border-slate-300 rounded-md px-3 py-1.5"
           >
             {groups.map((g) => (
               <option key={g.id} value={g.id}>
@@ -157,17 +157,17 @@ export const PreprocessingPage = () => {
 
           {/* Options - show preset/method controls for PHI stages */}
           {(activeStage === "phi_detection" || activeStage === "phi_redaction") && (
-            <div className="mt-3 flex flex-wrap items-center gap-4 p-3 bg-white rounded-lg border border-gray-200">
+            <div className="mt-3 flex flex-wrap items-center gap-4 p-3 bg-white rounded-lg border border-slate-200">
               {activeStage === "phi_detection" && (
                 <>
                   <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-700">
+                    <label className="text-sm font-medium text-slate-700">
                       Preset:
                     </label>
                     <select
                       value={phiPreset}
                       onChange={(e) => setPhiPreset(e.target.value)}
-                      className="text-sm border border-gray-300 rounded-md px-2 py-1"
+                      className="text-sm border border-slate-300 rounded-md px-2 py-1"
                     >
                       <option value="screen_time">Screen Time</option>
                       <option value="fast">Fast</option>
@@ -176,13 +176,13 @@ export const PreprocessingPage = () => {
                       <option value="thorough">Thorough</option>
                     </select>
                   </div>
-                  <div className="flex items-center gap-2 border-l border-gray-300 pl-4">
-                    <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 cursor-pointer">
+                  <div className="flex items-center gap-2 border-l border-slate-300 pl-4">
+                    <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={llmEnabled}
                         onChange={(e) => setLlmEnabled(e.target.checked)}
-                        className="rounded border-gray-300"
+                        className="rounded border-slate-300"
                       />
                       LLM-Assisted
                     </label>
@@ -190,37 +190,37 @@ export const PreprocessingPage = () => {
                   {llmEnabled && (
                     <>
                       <div className="flex items-center gap-2">
-                        <label className="text-sm text-gray-600">Endpoint:</label>
+                        <label className="text-sm text-slate-600">Endpoint:</label>
                         <input
                           type="text"
                           value={llmEndpoint}
                           onChange={(e) => setLlmEndpoint(e.target.value)}
-                          className="text-sm border border-gray-300 rounded-md px-2 py-1 w-56"
+                          className="text-sm border border-slate-300 rounded-md px-2 py-1 w-56"
                         />
                       </div>
                       <div className="flex items-center gap-2">
-                        <label className="text-sm text-gray-600">Model:</label>
+                        <label className="text-sm text-slate-600">Model:</label>
                         <input
                           type="text"
                           value={llmModel}
                           onChange={(e) => setLlmModel(e.target.value)}
-                          className="text-sm border border-gray-300 rounded-md px-2 py-1 w-36"
+                          className="text-sm border border-slate-300 rounded-md px-2 py-1 w-36"
                         />
                       </div>
-                      <span className="text-xs text-gray-400">Runs LLM alongside Presidio for higher accuracy</span>
+                      <span className="text-xs text-slate-400">Runs LLM alongside Presidio for higher accuracy</span>
                     </>
                   )}
                 </>
               )}
               {activeStage === "phi_redaction" && (
                 <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium text-gray-700">
+                  <label className="text-sm font-medium text-slate-700">
                     Method:
                   </label>
                   <select
                     value={redactionMethod}
                     onChange={(e) => setRedactionMethod(e.target.value)}
-                    className="text-sm border border-gray-300 rounded-md px-2 py-1"
+                    className="text-sm border border-slate-300 rounded-md px-2 py-1"
                   >
                     <option value="redbox">Red Box</option>
                     <option value="blackbox">Black Box</option>
@@ -237,11 +237,11 @@ export const PreprocessingPage = () => {
           </div>
 
           {/* Stage content */}
-          <div className="mt-4 bg-white rounded-lg border border-gray-200">
+          <div className="mt-4 bg-white rounded-lg border border-slate-200">
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
-                <span className="inline-block w-6 h-6 border-2 border-gray-300 border-t-primary-600 rounded-full animate-spin" />
-                <span className="ml-2 text-gray-500">Loading screenshots...</span>
+                <span className="inline-block w-6 h-6 border-2 border-slate-300 border-t-primary-600 rounded-full animate-spin" />
+                <span className="ml-2 text-slate-500">Loading screenshots...</span>
               </div>
             ) : (
               <>
@@ -254,7 +254,7 @@ export const PreprocessingPage = () => {
           </div>
 
           {/* Footer info */}
-          <div className="mt-4 text-xs text-gray-400">
+          <div className="mt-4 text-xs text-slate-400">
             {screenshots.length} screenshot{screenshots.length !== 1 ? "s" : ""} in
             group
             {selectedGroupId && ` "${selectedGroupId}"`}

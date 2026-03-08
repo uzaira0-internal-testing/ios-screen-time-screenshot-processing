@@ -14,8 +14,8 @@ export const PreprocessingSummary = ({
   const pr = preprocessing.phi_redaction;
 
   return (
-    <div className="border-b border-gray-100 pb-2">
-      <div className="text-xs text-gray-500 mb-1">Preprocessing</div>
+    <div className="border-b border-slate-100 pb-2">
+      <div className="text-xs text-slate-500 mb-1">Preprocessing</div>
       <div className="flex flex-wrap gap-1.5">
         {dd && (
           <span
@@ -24,7 +24,7 @@ export const PreprocessingSummary = ({
                 ? "bg-blue-100 text-blue-700"
                 : dd.device_category === "iphone"
                   ? "bg-green-100 text-green-700"
-                  : "bg-gray-100 text-gray-600"
+                  : "bg-slate-100 text-slate-600"
             }`}
             title={`Device: ${dd.device_model || dd.device_category} (${Math.round(dd.confidence * 100)}%)`}
           >

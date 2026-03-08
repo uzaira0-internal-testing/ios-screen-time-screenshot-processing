@@ -122,7 +122,7 @@ export const ProcessingStatusBadge = ({
       case "completed":
         return "bg-green-100 text-green-800 border-green-300";
       case "skipped":
-        return "bg-gray-100 text-gray-800 border-gray-300";
+        return "bg-slate-100 text-slate-800 border-slate-300";
       case "failed":
         return "bg-red-100 text-red-800 border-red-300";
       case "pending":

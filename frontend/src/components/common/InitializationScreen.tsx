@@ -6,6 +6,7 @@
  */
 
 import { LoadingSpinner } from './LoadingSpinner';
+import { Camera, AlertTriangle } from 'lucide-react';
 
 interface InitializationScreenProps {
   progress: number; // 0-100
@@ -21,11 +22,11 @@ export const InitializationScreen = ({
       <div className="max-w-md w-full mx-4">
         {/* Logo/Branding Area */}
         <div className="text-center mb-8">
-          <div className="text-6xl mb-4">📸</div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <Camera className="h-16 w-16 text-primary-600 mx-auto mb-4" />
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">
             iOS Screen Time
           </h1>
-          <p className="text-gray-600">Preparing your workspace...</p>
+          <p className="text-slate-600">Preparing your workspace...</p>
         </div>
 
         {/* Progress Card */}
@@ -33,11 +34,11 @@ export const InitializationScreen = ({
           {error ? (
             // Error State
             <div className="text-center">
-              <div className="text-4xl mb-4">⚠️</div>
+              <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
               <h2 className="text-xl font-semibold text-red-600 mb-2">
                 Initialization Failed
               </h2>
-              <p className="text-sm text-gray-600 mb-4">{error}</p>
+              <p className="text-sm text-slate-600 mb-4">{error}</p>
               <button
                 onClick={() => window.location.reload()}
                 className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
@@ -54,7 +55,7 @@ export const InitializationScreen = ({
 
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700">
+                  <span className="text-sm font-medium text-slate-700">
                     Loading OCR Engine
                   </span>
                   <span className="text-sm font-semibold text-primary-600">
@@ -63,7 +64,7 @@ export const InitializationScreen = ({
                 </div>
 
                 {/* Progress Bar */}
-                <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
                   <div
                     className="bg-gradient-to-r from-primary-500 to-primary-600 h-2.5 rounded-full transition-all duration-300 ease-out"
                     style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
@@ -90,7 +91,7 @@ export const InitializationScreen = ({
 
               {/* Stage Messages */}
               <div className="mt-4 text-center">
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-slate-600">
                   {progress < 30
                     ? 'Downloading Tesseract.js core...'
                     : progress < 70
@@ -106,10 +107,10 @@ export const InitializationScreen = ({
 
         {/* Footer */}
         <div className="text-center mt-6">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-slate-600">
             Processing happens 100% in your browser
           </p>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-slate-500 mt-1">
             No data is sent to any server
           </p>
         </div>

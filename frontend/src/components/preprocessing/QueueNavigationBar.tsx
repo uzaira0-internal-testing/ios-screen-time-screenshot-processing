@@ -17,10 +17,10 @@ export const QueueNavigationBar = ({ currentScreenshot }: QueueNavigationBarProp
   const isLast = queueIndex >= total - 1;
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 border-b border-gray-200 shrink-0">
+    <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 border-b border-slate-200 shrink-0">
       <button
         onClick={exitQueue}
-        className="px-3 py-1.5 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-100"
+        className="px-3 py-1.5 text-sm text-slate-600 border border-slate-300 rounded-md hover:bg-slate-100"
       >
         &larr; Back to Table
       </button>
@@ -29,18 +29,18 @@ export const QueueNavigationBar = ({ currentScreenshot }: QueueNavigationBarProp
         <button
           onClick={queuePrev}
           disabled={isFirst}
-          className="px-2 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="px-2 py-1 text-sm border border-slate-300 rounded-md hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
           aria-label="Previous screenshot"
         >
           &larr;
         </button>
-        <span className="px-3 py-1 text-sm font-medium text-gray-700 min-w-[80px] text-center">
+        <span className="px-3 py-1 text-sm font-medium text-slate-700 min-w-[80px] text-center">
           {queueIndex + 1} / {total}
         </span>
         <button
           onClick={queueNext}
           disabled={isLast}
-          className="px-2 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="px-2 py-1 text-sm border border-slate-300 rounded-md hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
           aria-label="Next screenshot"
         >
           &rarr;
@@ -48,7 +48,7 @@ export const QueueNavigationBar = ({ currentScreenshot }: QueueNavigationBarProp
       </div>
 
       {currentScreenshot && (
-        <div className="flex items-center gap-3 ml-4 text-sm text-gray-500">
+        <div className="flex items-center gap-3 ml-4 text-sm text-slate-500">
           <span className="font-mono">#{currentScreenshot.id}</span>
           {currentScreenshot.participant_id && (
             <span>{currentScreenshot.participant_id}</span>
@@ -59,7 +59,7 @@ export const QueueNavigationBar = ({ currentScreenshot }: QueueNavigationBarProp
         </div>
       )}
 
-      <div className="ml-auto text-xs text-gray-400">
+      <div className="ml-auto text-xs text-slate-400">
         &larr; &rarr; navigate &middot; Shift+D clear auto-PHI &middot; Ctrl+Enter save &amp; next &middot; Esc exit
       </div>
     </div>

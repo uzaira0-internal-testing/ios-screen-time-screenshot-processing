@@ -39,13 +39,13 @@ export const PreprocessingOptions = ({
   disabled,
 }: PreprocessingOptionsProps) => {
   return (
-    <div className="flex flex-wrap items-center gap-4 p-4 bg-gray-50 rounded-lg">
+    <div className="flex flex-wrap items-center gap-4 p-4 bg-slate-50 rounded-lg">
       <div className="flex items-center gap-2">
-        <label className="text-sm font-medium text-gray-700">Preset:</label>
+        <label className="text-sm font-medium text-slate-700">Preset:</label>
         <select
           value={preset}
           onChange={(e) => onPresetChange(e.target.value)}
-          className="text-sm border border-gray-300 rounded-md px-2 py-1"
+          className="text-sm border border-slate-300 rounded-md px-2 py-1"
           disabled={disabled}
         >
           {PRESETS.map((p) => (
@@ -57,11 +57,11 @@ export const PreprocessingOptions = ({
       </div>
 
       <div className="flex items-center gap-2">
-        <label className="text-sm font-medium text-gray-700">Method:</label>
+        <label className="text-sm font-medium text-slate-700">Method:</label>
         <select
           value={method}
           onChange={(e) => onMethodChange(e.target.value)}
-          className="text-sm border border-gray-300 rounded-md px-2 py-1"
+          className="text-sm border border-slate-300 rounded-md px-2 py-1"
           disabled={disabled}
         >
           {METHODS.map((m) => (
@@ -77,10 +77,10 @@ export const PreprocessingOptions = ({
           type="checkbox"
           checked={phiEnabled}
           onChange={(e) => onPhiEnabledChange(e.target.checked)}
-          className="rounded border-gray-300"
+          className="rounded border-slate-300"
           disabled={disabled}
         />
-        <span className="text-gray-700">PHI Detection</span>
+        <span className="text-slate-700">PHI Detection</span>
       </label>
 
       <label className="flex items-center gap-1.5 text-sm cursor-pointer">
@@ -88,10 +88,10 @@ export const PreprocessingOptions = ({
           type="checkbox"
           checked={runOcrAfter}
           onChange={(e) => onRunOcrAfterChange(e.target.checked)}
-          className="rounded border-gray-300"
+          className="rounded border-slate-300"
           disabled={disabled}
         />
-        <span className="text-gray-700">Run OCR After</span>
+        <span className="text-slate-700">Run OCR After</span>
       </label>
 
       <button

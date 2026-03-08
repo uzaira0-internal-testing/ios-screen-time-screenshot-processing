@@ -4,11 +4,11 @@ import type { FilterMode } from "@/store/preprocessingStore";
 import type { Screenshot } from "@/types";
 
 const FILTER_DEFS: { id: FilterMode; label: string; color: string }[] = [
-  { id: "all", label: "All", color: "text-gray-700 bg-gray-100" },
+  { id: "all", label: "All", color: "text-slate-700 bg-slate-100" },
   { id: "needs_review", label: "Needs Review", color: "text-yellow-700 bg-yellow-50" },
   { id: "invalidated", label: "Invalidated", color: "text-orange-700 bg-orange-50" },
   { id: "completed", label: "Completed", color: "text-green-700 bg-green-50" },
-  { id: "pending", label: "Pending", color: "text-gray-500 bg-gray-50" },
+  { id: "pending", label: "Pending", color: "text-slate-500 bg-slate-50" },
 ];
 
 export const StageSummaryBar = () => {
@@ -60,7 +60,7 @@ export const StageSummaryBar = () => {
   const prevStageLabel = stageIdx > 0 ? STAGE_LABELS[STAGE_ORDER[stageIdx - 1]!] : null;
 
   return (
-    <div className="flex flex-wrap items-center gap-2 p-3 bg-gray-50 rounded-lg" role="toolbar" aria-label="Preprocessing stage controls">
+    <div className="flex flex-wrap items-center gap-2 p-3 bg-slate-50 rounded-lg" role="toolbar" aria-label="Preprocessing stage controls">
       {/* Filter toggles */}
       <div className="flex items-center gap-1">
         {FILTER_DEFS.map((f) => {
@@ -73,7 +73,7 @@ export const StageSummaryBar = () => {
               className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
                 filter === f.id
                   ? `${f.color} ring-1 ring-current`
-                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                  : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
               }`}
             >
               {f.label} ({count})
@@ -85,16 +85,16 @@ export const StageSummaryBar = () => {
       {/* Progress bar when running */}
       {isRunningStage && stageProgress && (
         <div className="flex items-center gap-2 ml-2">
-          <div className="w-32 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+          <div className="w-32 h-1.5 bg-slate-200 rounded-full overflow-hidden">
             <div
               className="h-full bg-primary-600 rounded-full transition-all"
               style={{ width: `${(stageProgress.completed / stageProgress.total) * 100}%` }}
             />
           </div>
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-slate-500">
             {stageProgress.completed}/{stageProgress.total}
           </span>
-          <span className="inline-block w-3 h-3 border-2 border-gray-300 border-t-primary-600 rounded-full animate-spin" />
+          <span className="inline-block w-3 h-3 border-2 border-slate-300 border-t-primary-600 rounded-full animate-spin" />
         </div>
       )}
 
@@ -134,7 +134,7 @@ export const StageSummaryBar = () => {
       <button
         onClick={() => runStage(activeStage)}
         disabled={isRunningStage || eligible === 0}
-        className={`${eligible === 0 && counts.completed > 0 ? "" : "ml-auto "}px-4 py-1.5 bg-primary-600 text-white text-sm font-medium rounded-md hover:bg-primary-700 disabled:bg-gray-400 disabled:text-gray-200 disabled:cursor-not-allowed transition-colors`}
+        className={`${eligible === 0 && counts.completed > 0 ? "" : "ml-auto "}px-4 py-1.5 bg-primary-600 text-white text-sm font-medium rounded-md hover:bg-primary-700 disabled:bg-slate-400 disabled:text-slate-200 disabled:cursor-not-allowed transition-colors`}
       >
         {isRunningStage
           ? "Running..."

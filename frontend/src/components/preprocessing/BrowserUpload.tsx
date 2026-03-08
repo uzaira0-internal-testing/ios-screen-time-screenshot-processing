@@ -62,7 +62,7 @@ export const BrowserUpload = () => {
         />
         <button
           onClick={() => setUploadFiles([])}
-          className="px-4 py-2 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+          className="px-4 py-2 text-sm bg-white border border-slate-300 rounded-md hover:bg-slate-50"
         >
           Upload More
         </button>
@@ -90,7 +90,7 @@ export const BrowserUpload = () => {
               setUploadFiles([]);
             }
           }}
-          className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+          className="px-4 py-2 text-sm text-slate-600 border border-slate-300 rounded-md hover:bg-slate-50"
         >
           Clear
         </button>

@@ -30,7 +30,7 @@ export const ProcessingStatusFilter = ({
           className={`px-2 py-1 text-xs rounded transition-colors ${
             value === option.value
               ? "bg-primary-600 text-white"
-              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
           }`}
         >
           {option.label}

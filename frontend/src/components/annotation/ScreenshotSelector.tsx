@@ -104,9 +104,9 @@ export const ScreenshotSelector = ({
       case "pending":
         return "text-blue-600";
       case "skipped":
-        return "text-gray-500";
+        return "text-slate-500";
       default:
-        return "text-gray-600";
+        return "text-slate-600";
     }
   };
 
@@ -118,8 +118,8 @@ export const ScreenshotSelector = ({
         disabled={!hasPrev || isLoading}
         className={`p-1.5 rounded transition-colors ${
           hasPrev && !isLoading
-            ? "bg-gray-100 hover:bg-gray-200 text-gray-700"
-            : "bg-gray-50 text-gray-300 cursor-not-allowed"
+            ? "bg-slate-100 hover:bg-slate-200 text-slate-700"
+            : "bg-slate-50 text-slate-300 cursor-not-allowed"
         }`}
         title="Previous screenshot (Shift+Left)"
         data-testid="navigate-prev"
@@ -143,14 +143,14 @@ export const ScreenshotSelector = ({
       <div className="relative flex-1 min-w-0">
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="w-full px-2 py-1.5 text-left bg-white border border-gray-300 rounded hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 flex items-center gap-2"
+          className="w-full px-2 py-1.5 text-left bg-white border border-slate-300 rounded hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 flex items-center gap-2"
         >
           {currentScreenshot ? (
             <>
-              <span className="font-semibold text-gray-900 whitespace-nowrap">
+              <span className="font-semibold text-slate-900 whitespace-nowrap">
                 #{currentScreenshot.id}
               </span>
-              <span className="text-xs text-gray-500 truncate">
+              <span className="text-xs text-slate-500 truncate">
                 {currentScreenshot.participant_id || ""}
                 {currentScreenshot.screenshot_date && ` · ${currentScreenshot.screenshot_date}`}
               </span>
@@ -171,15 +171,15 @@ export const ScreenshotSelector = ({
                   </span>
                 );
               })()}
-              <span className="text-xs text-gray-400 whitespace-nowrap ml-auto" data-testid="navigation-info">
+              <span className="text-xs text-slate-400 whitespace-nowrap ml-auto" data-testid="navigation-info">
                 {currentIndex}/{totalInFilter}
               </span>
             </>
           ) : (
-            <span className="text-gray-400 flex-1">Select...</span>
+            <span className="text-slate-400 flex-1">Select...</span>
           )}
           <svg
-            className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
+            className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -195,16 +195,16 @@ export const ScreenshotSelector = ({
 
         {/* Dropdown Menu */}
         {isOpen && (
-          <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-80 overflow-hidden">
+          <div className="absolute z-50 mt-1 w-full bg-white border border-slate-300 rounded-lg shadow-lg max-h-80 overflow-hidden">
             {/* Search Input */}
-            <div className="p-2 border-b border-gray-200">
+            <div className="p-2 border-b border-slate-200">
               <input
                 ref={searchInputRef}
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search by ID or participant..."
-                className="w-full px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
+                className="w-full px-2 py-1 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
               />
             </div>
 
@@ -218,7 +218,7 @@ export const ScreenshotSelector = ({
                   <button
                     key={screenshot.id}
                     onClick={() => handleSelectScreenshot(screenshot.id)}
-                    className={`w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center justify-between ${
+                    className={`w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center justify-between ${
                       currentScreenshot?.id === screenshot.id
                         ? "bg-primary-50"
                         : ""
@@ -226,7 +226,7 @@ export const ScreenshotSelector = ({
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="font-medium whitespace-nowrap">#{screenshot.id}</span>
-                      <span className="text-xs text-gray-600 truncate">
+                      <span className="text-xs text-slate-600 truncate">
                         {screenshot.participant_id || ""}
                         {dateStr && ` · ${dateStr}`}
                         {filename && ` · ${filename}`}
@@ -242,7 +242,7 @@ export const ScreenshotSelector = ({
                 );
               })}
               {screenshotList?.items.length === 0 && (
-                <div className="px-3 py-4 text-center text-gray-500 text-sm">
+                <div className="px-3 py-4 text-center text-slate-500 text-sm">
                   No screenshots found
                 </div>
               )}
@@ -257,8 +257,8 @@ export const ScreenshotSelector = ({
         disabled={!hasNext || isLoading}
         className={`p-1.5 rounded transition-colors ${
           hasNext && !isLoading
-            ? "bg-gray-100 hover:bg-gray-200 text-gray-700"
-            : "bg-gray-50 text-gray-300 cursor-not-allowed"
+            ? "bg-slate-100 hover:bg-slate-200 text-slate-700"
+            : "bg-slate-50 text-slate-300 cursor-not-allowed"
         }`}
         title="Next screenshot (Shift+Right)"
         data-testid="navigate-next"

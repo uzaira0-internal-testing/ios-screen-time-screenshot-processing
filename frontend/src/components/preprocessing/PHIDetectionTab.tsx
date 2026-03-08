@@ -34,13 +34,13 @@ function PHIDetectionTabInner() {
               </span>
             )
           ) : (
-            <span className="text-gray-400">{"\u2014"}</span>
+            <span className="text-slate-400">{"\u2014"}</span>
           )}
         </td>
         <td className="px-3 py-2 font-mono text-xs">
           {result ? (result.regions_count as number) : "\u2014"}
         </td>
-        <td className="px-3 py-2 text-xs text-gray-600">
+        <td className="px-3 py-2 text-xs text-slate-600">
           {(result?.preset as string) || "\u2014"}
         </td>
         <td className="px-3 py-2">

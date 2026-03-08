@@ -66,7 +66,7 @@ export const ProcessingProgress = ({
         <div className="flex items-center justify-between mb-6">
           <h2
             id="processing-title"
-            className="text-2xl font-bold text-gray-900 flex items-center gap-3"
+            className="text-2xl font-bold text-slate-900 flex items-center gap-3"
           >
             <LoadingSpinner size="medium" />
             Processing
@@ -74,7 +74,7 @@ export const ProcessingProgress = ({
           {onCancel && (
             <button
               onClick={onCancel}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              className="text-slate-400 hover:text-slate-600 transition-colors"
               aria-label="Cancel processing"
             >
               <svg
@@ -97,7 +97,7 @@ export const ProcessingProgress = ({
         {/* Current Stage */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700">
+            <span className="text-sm font-medium text-slate-700">
               {stageLabel}
             </span>
             <span className="text-sm font-semibold text-primary-600">
@@ -106,7 +106,7 @@ export const ProcessingProgress = ({
           </div>
 
           {/* Progress Bar */}
-          <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+          <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
             <div
               className="bg-gradient-to-r from-primary-500 to-primary-600 h-3 rounded-full transition-all duration-300 ease-out"
               style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
@@ -121,14 +121,14 @@ export const ProcessingProgress = ({
         {/* Stage Message */}
         <p
           id="processing-description"
-          className="text-sm text-gray-600 mb-3 min-h-[2.5rem]"
+          className="text-sm text-slate-600 mb-3 min-h-[2.5rem]"
         >
           {displayMessage}
         </p>
 
         {/* Time Estimate */}
         {showTimeEstimate && (
-          <p className="text-xs text-gray-500 italic">
+          <p className="text-xs text-slate-500 italic">
             About {estimatedSeconds} second{estimatedSeconds !== 1 ? 's' : ''}{' '}
             remaining...
           </p>

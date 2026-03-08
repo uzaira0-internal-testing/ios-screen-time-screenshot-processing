@@ -17,16 +17,16 @@ function renderResultColumns(_s: Screenshot, event: PreprocessingEventData | nul
                 ? "bg-blue-100 text-blue-700"
                 : result.device_category === "iphone"
                   ? "bg-green-100 text-green-700"
-                  : "bg-gray-100 text-gray-600"
+                  : "bg-slate-100 text-slate-600"
             }`}
           >
             {result.device_category as string}
           </span>
         ) : (
-          <span className="text-gray-400">{"\u2014"}</span>
+          <span className="text-slate-400">{"\u2014"}</span>
         )}
       </td>
-      <td className="px-3 py-2 text-gray-600 text-xs">
+      <td className="px-3 py-2 text-slate-600 text-xs">
         {(result?.device_model as string) || "\u2014"}
       </td>
       <td className="px-3 py-2">
@@ -46,7 +46,7 @@ function renderResultColumns(_s: Screenshot, event: PreprocessingEventData | nul
           "\u2014"
         )}
       </td>
-      <td className="px-3 py-2 text-gray-600 text-xs">
+      <td className="px-3 py-2 text-slate-600 text-xs">
         {(result?.orientation as string) || "\u2014"}
       </td>
     </>

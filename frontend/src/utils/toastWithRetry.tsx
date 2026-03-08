@@ -42,12 +42,12 @@ export const toastErrorWithRetry = ({
               </svg>
             </div>
             <div className="ml-3 flex-1">
-              <p className="text-sm font-medium text-gray-900">Error</p>
-              <p className="mt-1 text-sm text-gray-500">{message}</p>
+              <p className="text-sm font-medium text-slate-900">Error</p>
+              <p className="mt-1 text-sm text-slate-500">{message}</p>
             </div>
           </div>
         </div>
-        <div className="flex border-l border-gray-200">
+        <div className="flex border-l border-slate-200">
           <button
             onClick={() => {
               toast.dismiss(t.id);

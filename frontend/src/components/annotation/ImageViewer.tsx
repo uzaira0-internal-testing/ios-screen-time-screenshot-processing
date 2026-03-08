@@ -11,19 +11,19 @@ export const ImageViewer = ({ screenshotId, alt = 'Screenshot' }: ImageViewerPro
   const imageUrl = useScreenshotImage(screenshotId);
 
   return (
-    <div className="bg-gray-800 rounded-lg overflow-hidden">
+    <div className="bg-slate-800 rounded-lg overflow-hidden">
       {!imageUrl ? (
         <div className="flex items-center justify-center h-96 text-white">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-            <p className="text-sm text-gray-400">Loading image...</p>
+            <p className="text-sm text-slate-400">Loading image...</p>
           </div>
         </div>
       ) : error ? (
         <div className="flex items-center justify-center h-96 text-white">
           <div className="text-center">
             <p className="text-lg font-medium">Failed to load image</p>
-            <p className="text-sm text-gray-400 mt-2">Please try refreshing the page</p>
+            <p className="text-sm text-slate-400 mt-2">Please try refreshing the page</p>
           </div>
         </div>
       ) : (

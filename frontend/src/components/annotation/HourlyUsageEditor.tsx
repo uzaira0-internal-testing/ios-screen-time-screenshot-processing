@@ -48,9 +48,9 @@ export const HourlyUsageEditor = ({
         "bg-green-50 border-green-200 text-green-700": level === "none",
         "bg-yellow-50 border-yellow-200 text-yellow-700": level === "minor",
         "bg-red-50 border-red-200 text-red-700": level === "major",
-        "bg-white border-gray-200 text-gray-700 focus:ring-primary-500 focus:border-primary-500":
+        "bg-white border-slate-200 text-slate-700 focus:ring-primary-500 focus:border-primary-500":
           level === null,
-        "bg-gray-50 text-gray-400 cursor-not-allowed": readOnly,
+        "bg-slate-50 text-slate-400 cursor-not-allowed": readOnly,
       },
     );
   };
@@ -61,7 +61,7 @@ export const HourlyUsageEditor = ({
     <div className="w-full" data-testid="hourly-editor">
       {/* Bar Graph - EXACTLY 24 columns */}
       <div
-        className="relative bg-white rounded-lg overflow-hidden border border-gray-200"
+        className="relative bg-white rounded-lg overflow-hidden border border-slate-200"
         style={{ height: graphHeight }}
       >
         <div
@@ -77,7 +77,7 @@ export const HourlyUsageEditor = ({
             return (
               <div
                 key={i}
-                className="flex flex-col h-full justify-end items-center border-r border-gray-200 last:border-r-0"
+                className="flex flex-col h-full justify-end items-center border-r border-slate-200 last:border-r-0"
               >
                 {/* Bar */}
                 <div
@@ -104,7 +104,7 @@ export const HourlyUsageEditor = ({
           return (
             <div key={i} className="flex flex-col items-center gap-1">
               {/* X-Axis Label */}
-              <div className="text-[10px] text-gray-500 font-semibold text-center">
+              <div className="text-[10px] text-slate-500 font-semibold text-center">
                 {i}h
               </div>
 
@@ -112,7 +112,7 @@ export const HourlyUsageEditor = ({
                 type="button"
                 onClick={() => handleChange(i, 1)}
                 disabled={readOnly}
-                className="w-full h-5 flex items-center justify-center text-[10px] bg-gray-100 hover:bg-blue-50 hover:text-blue-600 rounded text-gray-600 disabled:opacity-50 transition-colors"
+                className="w-full h-5 flex items-center justify-center text-[10px] bg-slate-100 hover:bg-blue-50 hover:text-blue-600 rounded text-slate-600 disabled:opacity-50 transition-colors"
               >
                 ▲
               </button>
@@ -131,7 +131,7 @@ export const HourlyUsageEditor = ({
                 type="button"
                 onClick={() => handleChange(i, -1)}
                 disabled={readOnly}
-                className="w-full h-5 flex items-center justify-center text-[10px] bg-gray-100 hover:bg-blue-50 hover:text-blue-600 rounded text-gray-600 disabled:opacity-50 transition-colors"
+                className="w-full h-5 flex items-center justify-center text-[10px] bg-slate-100 hover:bg-blue-50 hover:text-blue-600 rounded text-slate-600 disabled:opacity-50 transition-colors"
               >
                 ▼
               </button>

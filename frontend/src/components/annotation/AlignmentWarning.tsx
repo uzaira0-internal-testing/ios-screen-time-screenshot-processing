@@ -12,7 +12,7 @@ export function AlignmentWarning({ alignmentScore }: AlignmentWarningProps) {
 
   return (
     <div
-      className={`border-b border-gray-100 pb-2 rounded-md p-2 ${
+      className={`border-b border-slate-100 pb-2 rounded-md p-2 ${
         isSevere
           ? "ring-2 ring-red-500 bg-red-50"
           : "ring-2 ring-yellow-500 bg-yellow-50"
@@ -42,7 +42,7 @@ export function AlignmentWarning({ alignmentScore }: AlignmentWarningProps) {
           >
             {isSevere ? "Poor Bar Alignment" : "Low Bar Alignment"}
           </div>
-          <div className="text-xs text-gray-600">
+          <div className="text-xs text-slate-600">
             Score: {(alignmentScore * 100).toFixed(0)}% — Bars may not match
             graph. Adjust grid position.
           </div>

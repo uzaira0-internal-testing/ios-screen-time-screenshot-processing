@@ -152,7 +152,7 @@ export const ConsensusComparisonPage = () => {
     return (
       <Layout>
         <div className="text-center py-12">
-          <h2 className="text-xl font-semibold text-gray-900">
+          <h2 className="text-xl font-semibold text-slate-900">
             Screenshot not found
           </h2>
           <button
@@ -181,7 +181,7 @@ export const ConsensusComparisonPage = () => {
           <div>
             <button
               onClick={handleBack}
-              className="text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-2"
+              className="text-slate-500 hover:text-slate-700 flex items-center gap-1 mb-2"
             >
               <svg
                 className="w-4 h-4"
@@ -198,7 +198,7 @@ export const ConsensusComparisonPage = () => {
               </svg>
               Back
             </button>
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-2xl font-bold text-slate-900">
               Screenshot #{comparison.screenshot_id}
             </h1>
             <div className="flex items-center gap-3 mt-2">
@@ -215,7 +215,7 @@ export const ConsensusComparisonPage = () => {
                 </span>
               )}
               {comparison.screenshot_date && (
-                <span className="text-gray-500">
+                <span className="text-slate-500">
                   {new Date(comparison.screenshot_date).toLocaleDateString()}
                 </span>
               )}
@@ -261,24 +261,24 @@ export const ConsensusComparisonPage = () => {
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Screenshot Image */}
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          <div className="bg-white border border-slate-200 rounded-lg p-4">
+            <h2 className="text-lg font-semibold text-slate-900 mb-4">
               Screenshot
             </h2>
             <img
               src={`${API_BASE_URL}/screenshots/${comparison.screenshot_id}/image`}
               alt={`Screenshot ${comparison.screenshot_id}`}
-              className="w-full rounded-lg border border-gray-200"
+              className="w-full rounded-lg border border-slate-200"
             />
           </div>
 
           {/* Comparison Table */}
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <div className="p-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">
+          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <div className="p-4 border-b border-slate-200">
+              <h2 className="text-lg font-semibold text-slate-900">
                 Verifier Comparison
               </h2>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-slate-500 mt-1">
                 {comparison.verifier_annotations.length} verifier
                 {comparison.verifier_annotations.length !== 1 ? "s" : ""}
                 {comparison.differences.length > 0 && (
@@ -292,31 +292,31 @@ export const ConsensusComparisonPage = () => {
 
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50">
+                <thead className="bg-slate-50">
                   <tr>
-                    <th className="px-4 py-3 text-left font-medium text-gray-700">
+                    <th className="px-4 py-3 text-left font-medium text-slate-700">
                       Field
                     </th>
                     {comparison.verifier_annotations.map((ann) => (
                       <th
                         key={ann.user_id}
-                        className="px-4 py-3 text-left font-medium text-gray-700"
+                        className="px-4 py-3 text-left font-medium text-slate-700"
                       >
                         {ann.username}
                       </th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-slate-100">
                   {/* Title Row */}
                   <tr
                     className={fieldHasDifference("title") ? "bg-red-50" : ""}
                   >
-                    <td className="px-4 py-2 font-medium text-gray-900">
+                    <td className="px-4 py-2 font-medium text-slate-900">
                       Title
                     </td>
                     {comparison.verifier_annotations.map((ann) => (
-                      <td key={ann.user_id} className="px-4 py-2 text-gray-700">
+                      <td key={ann.user_id} className="px-4 py-2 text-slate-700">
                         {ann.extracted_title || "-"}
                       </td>
                     ))}
@@ -326,11 +326,11 @@ export const ConsensusComparisonPage = () => {
                   <tr
                     className={fieldHasDifference("total") ? "bg-red-50" : ""}
                   >
-                    <td className="px-4 py-2 font-medium text-gray-900">
+                    <td className="px-4 py-2 font-medium text-slate-900">
                       Total
                     </td>
                     {comparison.verifier_annotations.map((ann) => (
-                      <td key={ann.user_id} className="px-4 py-2 text-gray-700">
+                      <td key={ann.user_id} className="px-4 py-2 text-slate-700">
                         {ann.extracted_total || "-"}
                       </td>
                     ))}
@@ -344,13 +344,13 @@ export const ConsensusComparisonPage = () => {
                         fieldHasDifference(`hourly_${hour}`) ? "bg-red-50" : ""
                       }
                     >
-                      <td className="px-4 py-2 font-medium text-gray-900">
+                      <td className="px-4 py-2 font-medium text-slate-900">
                         Hour {hour}
                       </td>
                       {comparison.verifier_annotations.map((ann) => (
                         <td
                           key={ann.user_id}
-                          className="px-4 py-2 text-gray-700"
+                          className="px-4 py-2 text-slate-700"
                         >
                           {ann.hourly_values[hour] !== undefined
                             ? ann.hourly_values[hour]
@@ -396,11 +396,11 @@ export const ConsensusComparisonPage = () => {
       {showResolveModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">
+            <div className="p-6 border-b border-slate-200">
+              <h2 className="text-xl font-semibold text-slate-900">
                 Resolve Dispute
               </h2>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-slate-500 mt-1">
                 Select or edit the correct values for each field
               </p>
             </div>
@@ -408,7 +408,7 @@ export const ConsensusComparisonPage = () => {
             <div className="p-6 space-y-4">
               {/* Title */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
                   Title
                 </label>
                 <div className="space-y-2">
@@ -432,7 +432,7 @@ export const ConsensusComparisonPage = () => {
                         }
                         className="text-primary-600"
                       />
-                      <span className="text-sm text-gray-600">
+                      <span className="text-sm text-slate-600">
                         {ann.username}:
                       </span>
                       <span className="text-sm">
@@ -449,7 +449,7 @@ export const ConsensusComparisonPage = () => {
                         extracted_title: e.target.value,
                       }))
                     }
-                    className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    className="mt-2 w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
                     placeholder="Or enter custom value..."
                   />
                 </div>
@@ -457,7 +457,7 @@ export const ConsensusComparisonPage = () => {
 
               {/* Total */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
                   Total
                 </label>
                 <div className="space-y-2">
@@ -481,7 +481,7 @@ export const ConsensusComparisonPage = () => {
                         }
                         className="text-primary-600"
                       />
-                      <span className="text-sm text-gray-600">
+                      <span className="text-sm text-slate-600">
                         {ann.username}:
                       </span>
                       <span className="text-sm">
@@ -498,7 +498,7 @@ export const ConsensusComparisonPage = () => {
                         extracted_total: e.target.value,
                       }))
                     }
-                    className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    className="mt-2 w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
                     placeholder="Or enter custom value..."
                   />
                 </div>
@@ -511,7 +511,7 @@ export const ConsensusComparisonPage = () => {
                   const hour = diff.field.replace("hourly_", "");
                   return (
                     <div key={diff.field}>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-slate-700 mb-1">
                         Hour {hour}
                       </label>
                       <div className="flex flex-wrap gap-2">
@@ -530,7 +530,7 @@ export const ConsensusComparisonPage = () => {
                               className={`px-3 py-1 rounded border text-sm ${
                                 resolutionValues.hourly_values[hour] === value
                                   ? "bg-primary-100 border-primary-500 text-primary-700"
-                                  : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                                  : "bg-white border-slate-300 text-slate-700 hover:bg-slate-50"
                               }`}
                             >
                               {ann.username}: {value ?? "null"}
@@ -549,7 +549,7 @@ export const ConsensusComparisonPage = () => {
                               },
                             }))
                           }
-                          className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
+                          className="w-20 px-2 py-1 border border-slate-300 rounded text-sm"
                           placeholder="Custom"
                           min="0"
                           max="60"
@@ -561,7 +561,7 @@ export const ConsensusComparisonPage = () => {
 
               {/* Resolution Notes */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
                   Resolution Notes (optional)
                 </label>
                 <textarea
@@ -572,18 +572,18 @@ export const ConsensusComparisonPage = () => {
                       resolution_notes: e.target.value,
                     }))
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
                   rows={2}
                   placeholder="Add any notes about how this dispute was resolved..."
                 />
               </div>
             </div>
 
-            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
               <button
                 onClick={() => setShowResolveModal(false)}
                 disabled={resolving}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                className="px-4 py-2 text-slate-600 hover:text-slate-800"
               >
                 Cancel
               </button>

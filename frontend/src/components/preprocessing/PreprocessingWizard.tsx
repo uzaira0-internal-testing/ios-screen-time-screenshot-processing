@@ -23,7 +23,7 @@ export const PreprocessingWizard = () => {
   const getStageStatus = usePreprocessingStore((s) => s.getStageStatus);
 
   return (
-    <div className="flex border-b border-gray-200 bg-white">
+    <div className="flex border-b border-slate-200 bg-white">
       {STAGES.map((stage, idx) => {
         const isActive = activeStage === stage;
         const counts = summary
@@ -38,7 +38,7 @@ export const PreprocessingWizard = () => {
             className={`flex-1 relative px-4 py-3 text-left transition-colors ${
               isActive
                 ? "bg-white border-b-2 border-primary-600"
-                : "bg-gray-50 hover:bg-gray-100 border-b-2 border-transparent"
+                : "bg-slate-50 hover:bg-slate-100 border-b-2 border-transparent"
             }`}
           >
             <div className="flex items-center gap-2 mb-1">
@@ -48,7 +48,7 @@ export const PreprocessingWizard = () => {
                     ? "bg-primary-600 text-white"
                     : counts.completed === total && total > 0
                       ? "bg-green-500 text-white"
-                      : "bg-gray-300 text-gray-600"
+                      : "bg-slate-300 text-slate-600"
                 }`}
               >
                 {counts.completed === total && total > 0
@@ -57,7 +57,7 @@ export const PreprocessingWizard = () => {
               </span>
               <span
                 className={`text-sm font-medium ${
-                  isActive ? "text-primary-700" : "text-gray-700"
+                  isActive ? "text-primary-700" : "text-slate-700"
                 }`}
               >
                 {STAGE_LABELS[stage]}
@@ -75,7 +75,7 @@ export const PreprocessingWizard = () => {
                 </span>
               )}
               {counts.pending > 0 && (
-                <span className="text-gray-400">
+                <span className="text-slate-400">
                   {counts.pending} pending
                 </span>
               )}
@@ -97,7 +97,7 @@ export const PreprocessingWizard = () => {
             </div>
             {/* Connector line between steps */}
             {idx < STAGES.length - 1 && (
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-0 h-0 border-t-[6px] border-t-transparent border-b-[6px] border-b-transparent border-l-[6px] border-l-gray-200 translate-x-[6px] z-10" />
+              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-0 h-0 border-t-[6px] border-t-transparent border-b-[6px] border-b-transparent border-l-[6px] border-l-slate-200 translate-x-[6px] z-10" />
             )}
           </button>
         );

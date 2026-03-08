@@ -15,15 +15,15 @@ export const EventLogPanel = () => {
   if (!eventLog || !selectedScreenshotId) return null;
 
   return (
-    <div className="fixed inset-y-0 right-0 w-96 bg-white shadow-xl border-l border-gray-200 z-50 flex flex-col">
+    <div className="fixed inset-y-0 right-0 w-96 bg-white shadow-xl border-l border-slate-200 z-50 flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
-        <h3 className="text-sm font-semibold text-gray-900">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50">
+        <h3 className="text-sm font-semibold text-slate-900">
           Event Log - Screenshot #{selectedScreenshotId}
         </h3>
         <button
           onClick={clearEventLog}
-          className="text-gray-400 hover:text-gray-600 text-lg leading-none"
+          className="text-slate-400 hover:text-slate-600 text-lg leading-none"
           aria-label="Close event log"
         >
           &times;
@@ -31,11 +31,11 @@ export const EventLogPanel = () => {
       </div>
 
       {/* Stage status summary */}
-      <div className="px-4 py-2 border-b border-gray-100 bg-gray-50/50">
+      <div className="px-4 py-2 border-b border-slate-100 bg-slate-50/50">
         <div className="flex flex-wrap gap-2">
           {Object.entries(eventLog.stage_status).map(([stage, status]) => (
             <div key={stage} className="flex items-center gap-1">
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-slate-500">
                 {STAGE_LABELS[stage] ?? stage}:
               </span>
               <span
@@ -48,7 +48,7 @@ export const EventLogPanel = () => {
                         ? "text-red-500"
                         : status === "running"
                           ? "text-blue-500"
-                          : "text-gray-400"
+                          : "text-slate-400"
                 }`}
               >
                 {status}
@@ -61,7 +61,7 @@ export const EventLogPanel = () => {
       {/* Events list */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {eventLog.events.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-8">
+          <p className="text-sm text-slate-400 text-center py-8">
             No events recorded yet
           </p>
         ) : (
@@ -77,12 +77,12 @@ export const EventLogPanel = () => {
                     ? "border-primary-200 bg-primary-50/30"
                     : isError
                       ? "border-red-200 bg-red-50/30"
-                      : "border-gray-100 bg-white opacity-60"
+                      : "border-slate-100 bg-white opacity-60"
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-gray-700">
+                    <span className="font-semibold text-slate-700">
                       #{event.event_id}
                     </span>
                     <span
@@ -94,7 +94,7 @@ export const EventLogPanel = () => {
                     >
                       {event.source}
                     </span>
-                    <span className="text-gray-500">
+                    <span className="text-slate-500">
                       {STAGE_LABELS[event.stage] ?? event.stage}
                     </span>
                     {isCurrent && (
@@ -104,28 +104,28 @@ export const EventLogPanel = () => {
                     )}
                   </div>
                   {event.supersedes && (
-                    <span className="text-gray-400">
+                    <span className="text-slate-400">
                       replaces #{event.supersedes}
                     </span>
                   )}
                 </div>
-                <div className="text-gray-400 mb-1">
+                <div className="text-slate-400 mb-1">
                   {new Date(event.timestamp).toLocaleString()}
                 </div>
                 {/* Result summary */}
-                <div className="mt-1 text-gray-600">
+                <div className="mt-1 text-slate-600">
                   {isError ? (
                     <span className="text-red-600">
                       Error: {event.result.error as string}
                     </span>
                   ) : (
-                    <pre className="whitespace-pre-wrap break-all text-[10px] bg-gray-50 rounded p-1.5 max-h-24 overflow-y-auto">
+                    <pre className="whitespace-pre-wrap break-all text-[10px] bg-slate-50 rounded p-1.5 max-h-24 overflow-y-auto">
                       {JSON.stringify(event.result, null, 1)}
                     </pre>
                   )}
                 </div>
                 {event.output_file && (
-                  <div className="mt-1 text-gray-400 truncate" title={event.output_file}>
+                  <div className="mt-1 text-slate-400 truncate" title={event.output_file}>
                     Output: {event.output_file.split("/").pop()}
                   </div>
                 )}
@@ -136,7 +136,7 @@ export const EventLogPanel = () => {
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-2 border-t border-gray-100 text-xs text-gray-400">
+      <div className="px-4 py-2 border-t border-slate-100 text-xs text-slate-400">
         Base: {eventLog.base_file_path.split("/").pop()}
       </div>
     </div>

@@ -13,13 +13,13 @@ export const UploadProgressBar = ({ completed, total, errors }: UploadProgressBa
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between text-sm">
-        <span className="text-gray-600">
+        <span className="text-slate-600">
           Uploading{totalBatches > 1 ? ` batch ${currentBatch}/${totalBatches}` : ""}
           {" "}({completed}/{total})
         </span>
-        <span className="font-medium text-gray-700">{pct}%</span>
+        <span className="font-medium text-slate-700">{pct}%</span>
       </div>
-      <div className="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden">
+      <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
         <div
           className="h-full bg-blue-500 rounded-full transition-all duration-300"
           style={{ width: `${pct}%` }}

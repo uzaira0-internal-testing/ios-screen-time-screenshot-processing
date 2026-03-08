@@ -29,7 +29,7 @@ export const PreprocessingTabBar = ({
   counts,
 }: PreprocessingTabBarProps) => {
   return (
-    <div className="flex border-b border-gray-200">
+    <div className="flex border-b border-slate-200">
       {TABS.map((tab) => (
         <button
           key={tab.id}
@@ -37,13 +37,13 @@ export const PreprocessingTabBar = ({
           className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
             activeTab === tab.id
               ? "border-primary-600 text-primary-600"
-              : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
           }`}
         >
           <span>{tab.icon}</span>
           <span>{tab.label}</span>
           {counts?.[tab.id] != null && (
-            <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">
+            <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-slate-100 text-slate-600">
               {counts[tab.id]}
             </span>
           )}

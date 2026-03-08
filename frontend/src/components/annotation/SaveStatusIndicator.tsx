@@ -16,7 +16,7 @@ export function SaveStatusIndicator({
           ? "bg-blue-50 text-blue-700 border border-blue-200"
           : lastSaved
             ? "bg-green-50 text-green-700 border border-green-200"
-            : "bg-gray-50 text-gray-500 border border-gray-200"
+            : "bg-slate-50 text-slate-500 border border-slate-200"
       }`}
       data-testid="auto-save-status"
     >
@@ -45,7 +45,7 @@ export function SaveStatusIndicator({
       ) : (
         <span className="flex items-center justify-center gap-1">
           <svg
-            className="w-3 h-3 text-gray-400"
+            className="w-3 h-3 text-slate-400"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"

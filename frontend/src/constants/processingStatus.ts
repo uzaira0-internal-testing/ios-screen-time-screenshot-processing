@@ -24,5 +24,5 @@ export const PROCESSING_STATUS_COLORS: Record<ProcessingStatus, string> = {
   pending: 'text-blue-600 bg-blue-50',
   completed: 'text-green-600 bg-green-50',
   failed: 'text-red-600 bg-red-50',
-  skipped: 'text-gray-600 bg-gray-100',
+  skipped: 'text-slate-600 bg-slate-100',
 };

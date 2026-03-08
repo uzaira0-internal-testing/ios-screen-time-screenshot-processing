@@ -30,18 +30,18 @@ function PHIRedactionTabInner() {
                 Yes
               </span>
             ) : (
-              <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+              <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600">
                 No
               </span>
             )
           ) : (
-            <span className="text-gray-400">{"\u2014"}</span>
+            <span className="text-slate-400">{"\u2014"}</span>
           )}
         </td>
         <td className="px-3 py-2 font-mono text-xs">
           {result ? (result.regions_redacted as number) : "\u2014"}
         </td>
-        <td className="px-3 py-2 text-xs text-gray-600">
+        <td className="px-3 py-2 text-xs text-slate-600">
           {(result?.method as string) || "\u2014"}
         </td>
         <td className="px-3 py-2">
