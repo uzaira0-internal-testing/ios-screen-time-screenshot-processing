@@ -62,9 +62,6 @@ export const CropAdjustModal = ({
     setImage(null);
     const img = new Image();
     img.crossOrigin = "anonymous";
-    api.preprocessing.getOriginalImageUrl(screenshotId).then((url) => {
-      img.src = url;
-    }).catch(() => setImageError(true));
     img.onload = () => {
       setImage(img);
       if (initialCrop) {
@@ -74,6 +71,9 @@ export const CropAdjustModal = ({
       }
     };
     img.onerror = () => setImageError(true);
+    api.preprocessing.getOriginalImageUrl(screenshotId).then((url) => {
+      img.src = url;
+    }).catch(() => setImageError(true));
   }, [isOpen, inline, screenshotId, initialCrop]);
 
   // Calculate scale to fit canvas — use most of the viewport

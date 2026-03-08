@@ -272,11 +272,14 @@ export const PHIRegionEditor = ({
       const h = Math.abs(drawCurrent.y - drawStart.y);
 
       if (w >= 5 && h >= 5) {
-        setRegions((prev) => [
-          ...prev,
-          { x, y, w, h, label: "OTHER", source: "manual", confidence: 1.0, text: "" },
-        ]);
-        setSelectedIndex(regions.length);
+        setRegions((prev) => {
+          const updated = [
+            ...prev,
+            { x, y, w, h, label: "OTHER", source: "manual", confidence: 1.0, text: "" },
+          ];
+          setSelectedIndex(updated.length - 1);
+          return updated;
+        });
       }
     }
     setDrawStart(null);

@@ -56,6 +56,22 @@ export const PreprocessingQueueView = () => {
     loadSummary();
   };
 
+  // Hooks must be called unconditionally — compute all derived values here
+  const initialCrop = useMemo(
+    () => currentScreenshot ? getCropRectFromEvent(getCurrentEvent(currentScreenshot, "cropping")) : undefined,
+    [currentScreenshot],
+  );
+
+  const recentCrops = useMemo(
+    () => currentScreenshot ? getRecentCropConfigs(screenshots, currentScreenshot.id) : [],
+    [screenshots, currentScreenshot],
+  );
+
+  const recentPHIConfigs = useMemo(
+    () => currentScreenshot ? getRecentPHIConfigs(screenshots, currentScreenshot.id) : [],
+    [screenshots, currentScreenshot],
+  );
+
   if (!currentScreenshot) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-gray-400">
@@ -82,14 +98,6 @@ export const PreprocessingQueueView = () => {
   }
 
   if (activeStage === "cropping") {
-    const initialCrop = getCropRectFromEvent(
-      getCurrentEvent(currentScreenshot, "cropping"),
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    const recentCrops = useMemo(
-      () => getRecentCropConfigs(screenshots, currentScreenshot.id),
-      [screenshots, currentScreenshot.id],
-    );
     return (
       <div className="flex flex-col h-[calc(100vh-8rem)]">
         <QueueNavigationBar currentScreenshot={currentScreenshot} />
@@ -114,11 +122,6 @@ export const PreprocessingQueueView = () => {
   }
 
   if (activeStage === "phi_detection") {
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    const recentPHIConfigs = useMemo(
-      () => getRecentPHIConfigs(screenshots, currentScreenshot.id),
-      [screenshots, currentScreenshot.id],
-    );
     return (
       <div className="flex flex-col h-[calc(100vh-8rem)]">
         <QueueNavigationBar currentScreenshot={currentScreenshot} />

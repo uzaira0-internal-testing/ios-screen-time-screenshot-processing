@@ -447,3 +447,35 @@ cd frontend && bun run generate:api-types
 ```
 
 **If you find yourself defining a TypeScript interface that mirrors a backend model, STOP. Use the generated types.**
+
+## Claude Code Automations
+
+This project has Claude Code automations configured in `.claude/`, `.mcp.json`, and `.claude/settings.json`.
+
+### MCP Servers (`.mcp.json`)
+
+| Server | Purpose |
+|--------|---------|
+| **context7** | Live documentation lookup for React, FastAPI, SQLAlchemy, Zustand, Playwright, and other libraries. Use `resolve-library-id` then `query-docs` to get current API docs. |
+| **Playwright** | Browser automation and testing. Use for visual verification of the running app during development. |
+
+### Hooks (`.claude/settings.json`)
+
+| Hook | Event | What it does |
+|------|-------|--------------|
+| **Auto-format Python** | PostToolUse (Edit/Write) | Runs `ruff format` and `ruff check --fix` on any edited `.py` files |
+| **Block .env edits** | PreToolUse (Edit/Write) | Prevents accidental edits to `.env` files containing secrets. Edit `.env.example` instead and tell user to update `.env` manually. |
+
+### Skills (`.claude/skills/`)
+
+| Skill | Invocation | Purpose |
+|-------|------------|---------|
+| `/generate-api-types` | User-only | Regenerate frontend TypeScript types from backend OpenAPI spec. Run after any Pydantic schema or API route changes. |
+| `/backup-restore` | User-only | Database backup and restore operations. Lists, creates, and restores PostgreSQL backups. |
+
+### Subagents (`.claude/agents/`)
+
+| Agent | When to use |
+|-------|-------------|
+| **security-reviewer** | After modifying upload endpoints, PHI handling, auth middleware, or any code processing user input. Checks for HIPAA compliance, injection risks, and data exposure. |
+| **api-contract-verifier** | After modifying Pydantic schemas or API routes. Detects type drift between backend schemas and frontend TypeScript types. Recommends running `/generate-api-types` if stale. |

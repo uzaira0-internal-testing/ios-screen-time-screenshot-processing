@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { usePreprocessingStore } from "@/store/preprocessingStore";
 import type { FilterMode } from "@/store/preprocessingStore";
 import type { Screenshot } from "@/types";
@@ -24,19 +24,8 @@ export const StageSummaryBar = () => {
   const runStage = usePreprocessingStore((s) => s.runStage);
   const resetStage = usePreprocessingStore((s) => s.resetStage);
 
-  const loadSummary = usePreprocessingStore((s) => s.loadSummary);
-  const loadScreenshots = usePreprocessingStore((s) => s.loadScreenshots);
   const enterQueue = usePreprocessingStore((s) => s.enterQueue);
   const getScreenshotsForStage = usePreprocessingStore((s) => s.getScreenshotsForStage);
-
-  // Auto-refresh counts every 5 seconds so progress is always visible
-  useEffect(() => {
-    const interval = setInterval(() => {
-      loadSummary();
-      loadScreenshots();
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [loadSummary, loadScreenshots]);
 
   const counts = summary ? summary[activeStage] : getStageStatus(activeStage);
   const total = summary?.total ?? screenshots.length;

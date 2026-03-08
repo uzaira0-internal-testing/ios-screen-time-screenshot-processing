@@ -75,6 +75,7 @@ interface PreprocessingState {
   _pollCount: number;
   _queuedCount: number;
   _completedBaseline: number;
+  _pollStage: Stage;
 
   // Upload state (Phase 2)
   uploadFiles: UploadFileItem[];
@@ -165,6 +166,7 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
   _pollCount: 0,
   _queuedCount: 0,
   _completedBaseline: 0,
+  _pollStage: "device_detection",
 
   // Upload state
   uploadFiles: [],
@@ -261,6 +263,7 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
             _pollCount: 0,
             _queuedCount: stageSummary.running,
             _completedBaseline: stageSummary.completed,
+            _pollStage: activeStage,
           });
           get().startPolling();
         }
@@ -277,7 +280,7 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
     // Capture how many are already completed before this batch starts
     const summary = get().summary;
     const baseline = summary ? summary[stage]?.completed ?? 0 : 0;
-    set({ isRunningStage: true, stageProgress: null, _pollCount: 0, _queuedCount: 0, _completedBaseline: baseline });
+    set({ isRunningStage: true, stageProgress: null, _pollCount: 0, _queuedCount: 0, _completedBaseline: baseline, _pollStage: stage });
     try {
       const options: Parameters<typeof api.preprocessing.runStage>[1] = {
         group_id: selectedGroupId || undefined,
@@ -407,7 +410,7 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
     if (errors.length === 0) {
       toast.success(`Uploaded ${totalCompleted} screenshot(s)`);
       // Clear upload state and switch to pipeline mode to show uploaded screenshots
-      set({ uploadFiles: [], pageMode: "pipeline" });
+      set({ uploadFiles: [], uploadProgress: null, pageMode: "pipeline" });
     } else {
       toast.error(`Upload completed with ${errors.length} error(s)`);
     }
@@ -457,7 +460,7 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
       await get().loadScreenshots();
       const summary = get().summary;
       if (summary) {
-        const stage = get().activeStage;
+        const stage = get()._pollStage;
         const stageSummary = summary[stage];
         const pollCount = get()._pollCount;
         const queuedCount = get()._queuedCount;
