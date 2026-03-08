@@ -200,6 +200,9 @@ __pycache__/*
 .claude/
 .playwright-mcp/
 
+# Git worktrees
+.worktrees/
+
 # npm lock file (project uses bun)
 frontend/package-lock.json
 
