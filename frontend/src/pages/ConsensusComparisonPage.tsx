@@ -168,9 +168,9 @@ export const ConsensusComparisonPage = () => {
 
   const hours = getAllHours(comparison.verifier_annotations);
   const tierColors = {
-    single_verified: "bg-yellow-100 text-yellow-800",
-    agreed: "bg-green-100 text-green-800",
-    disputed: "bg-red-100 text-red-800",
+    single_verified: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400",
+    agreed: "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400",
+    disputed: "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400",
   };
 
   return (
@@ -234,14 +234,14 @@ export const ConsensusComparisonPage = () => {
 
         {/* Resolution Status Banner */}
         {comparison.is_resolved && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <h3 className="font-semibold text-green-800">Dispute Resolved</h3>
+              <h3 className="font-semibold text-green-800 dark:text-green-300">Dispute Resolved</h3>
             </div>
-            <div className="text-sm text-green-700 space-y-1">
+            <div className="text-sm text-green-700 dark:text-green-400 space-y-1">
               {comparison.resolved_by_username && (
                 <p>Resolved by: <span className="font-medium">{comparison.resolved_by_username}</span></p>
               )}
@@ -249,10 +249,10 @@ export const ConsensusComparisonPage = () => {
                 <p>Resolved at: {new Date(comparison.resolved_at).toLocaleString()}</p>
               )}
               {comparison.resolved_title && (
-                <p>Resolved title: <span className="font-mono bg-green-100 px-1 rounded">{comparison.resolved_title}</span></p>
+                <p>Resolved title: <span className="font-mono bg-green-100 dark:bg-green-900/30 px-1 rounded">{comparison.resolved_title}</span></p>
               )}
               {comparison.resolved_total && (
-                <p>Resolved total: <span className="font-mono bg-green-100 px-1 rounded">{comparison.resolved_total}</span></p>
+                <p>Resolved total: <span className="font-mono bg-green-100 dark:bg-green-900/30 px-1 rounded">{comparison.resolved_total}</span></p>
               )}
             </div>
           </div>
@@ -310,7 +310,7 @@ export const ConsensusComparisonPage = () => {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                   {/* Title Row */}
                   <tr
-                    className={fieldHasDifference("title") ? "bg-red-50" : ""}
+                    className={fieldHasDifference("title") ? "bg-red-50 dark:bg-red-900/20" : ""}
                   >
                     <td className="px-4 py-2 font-medium text-slate-900 dark:text-slate-200">
                       Title
@@ -324,7 +324,7 @@ export const ConsensusComparisonPage = () => {
 
                   {/* Total Row */}
                   <tr
-                    className={fieldHasDifference("total") ? "bg-red-50" : ""}
+                    className={fieldHasDifference("total") ? "bg-red-50 dark:bg-red-900/20" : ""}
                   >
                     <td className="px-4 py-2 font-medium text-slate-900 dark:text-slate-200">
                       Total
@@ -341,7 +341,7 @@ export const ConsensusComparisonPage = () => {
                     <tr
                       key={hour}
                       className={
-                        fieldHasDifference(`hourly_${hour}`) ? "bg-red-50" : ""
+                        fieldHasDifference(`hourly_${hour}`) ? "bg-red-50 dark:bg-red-900/20" : ""
                       }
                     >
                       <td className="px-4 py-2 font-medium text-slate-900 dark:text-slate-200">
@@ -350,7 +350,7 @@ export const ConsensusComparisonPage = () => {
                       {comparison.verifier_annotations.map((ann) => (
                         <td
                           key={ann.user_id}
-                          className="px-4 py-2 text-slate-700"
+                          className="px-4 py-2 text-slate-700 dark:text-slate-300"
                         >
                           {ann.hourly_values[hour] !== undefined
                             ? ann.hourly_values[hour]
@@ -367,13 +367,13 @@ export const ConsensusComparisonPage = () => {
 
         {/* Differences Summary */}
         {comparison.differences.length > 0 && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <h3 className="font-semibold text-red-800 mb-2">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+            <h3 className="font-semibold text-red-800 dark:text-red-300 mb-2">
               Differences Found
             </h3>
             <ul className="space-y-1">
               {comparison.differences.map((diff, i) => (
-                <li key={i} className="text-sm text-red-700">
+                <li key={i} className="text-sm text-red-700 dark:text-red-400">
                   <span className="font-medium">
                     {diff.field.replace("hourly_", "Hour ")}:
                   </span>{" "}

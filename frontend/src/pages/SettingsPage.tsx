@@ -44,7 +44,7 @@ function SyncSection() {
   return (
     <Card padding="lg">
       <div className="flex items-center gap-3 mb-4">
-        <Server className="w-6 h-6 text-primary-700" />
+        <Server className="w-6 h-6 text-primary-700 dark:text-primary-400" />
         <div>
           <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
             Sync to Server
@@ -55,11 +55,11 @@ function SyncSection() {
         </div>
         <div className="ml-auto flex items-center gap-2">
           {isOnline ? (
-            <span className="flex items-center gap-1 text-sm text-green-700">
+            <span className="flex items-center gap-1 text-sm text-green-700 dark:text-green-400">
               <Wifi className="w-4 h-4" /> Online
             </span>
           ) : (
-            <span className="flex items-center gap-1 text-sm text-slate-500">
+            <span className="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
               <WifiOff className="w-4 h-4" /> Offline
             </span>
           )}
@@ -130,7 +130,7 @@ function SyncSection() {
         {errors.length > 0 && (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3">
             <div className="flex items-center justify-between mb-1">
-              <span className="flex items-center gap-1 text-sm font-medium text-red-800">
+              <span className="flex items-center gap-1 text-sm font-medium text-red-800 dark:text-red-300">
                 <AlertTriangle className="w-4 h-4" /> Sync Errors
               </span>
               <button
@@ -141,7 +141,7 @@ function SyncSection() {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <ul className="text-sm text-red-700 space-y-1">
+            <ul className="text-sm text-red-700 dark:text-red-300 space-y-1">
               {errors.map((err, i) => (
                 <li key={i}>{err.message}</li>
               ))}
@@ -194,9 +194,9 @@ export const SettingsPage: React.FC = () => {
         <Card padding="lg">
           <div className="flex items-center gap-3 mb-4">
             {isWasmMode ? (
-              <HardDrive className="w-8 h-8 text-primary-700" />
+              <HardDrive className="w-8 h-8 text-primary-700 dark:text-primary-400" />
             ) : (
-              <Monitor className="w-8 h-8 text-primary-700" />
+              <Monitor className="w-8 h-8 text-primary-700 dark:text-primary-400" />
             )}
             <div>
               <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">

@@ -161,13 +161,13 @@ export const PreprocessingPage = () => {
               {activeStage === "phi_detection" && (
                 <>
                   <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-slate-700">
+                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
                       Preset:
                     </label>
                     <select
                       value={phiPreset}
                       onChange={(e) => setPhiPreset(e.target.value)}
-                      className="text-sm border border-slate-300 rounded-md px-2 py-1"
+                      className="text-sm border border-slate-300 dark:border-slate-600 rounded-md px-2 py-1 dark:bg-slate-700 dark:text-slate-100"
                     >
                       <option value="screen_time">Screen Time</option>
                       <option value="fast">Fast</option>
@@ -176,13 +176,13 @@ export const PreprocessingPage = () => {
                       <option value="thorough">Thorough</option>
                     </select>
                   </div>
-                  <div className="flex items-center gap-2 border-l border-slate-300 pl-4">
-                    <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 cursor-pointer">
+                  <div className="flex items-center gap-2 border-l border-slate-300 dark:border-slate-600 pl-4">
+                    <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={llmEnabled}
                         onChange={(e) => setLlmEnabled(e.target.checked)}
-                        className="rounded border-slate-300"
+                        className="rounded border-slate-300 dark:border-slate-600"
                       />
                       LLM-Assisted
                     </label>
@@ -190,21 +190,21 @@ export const PreprocessingPage = () => {
                   {llmEnabled && (
                     <>
                       <div className="flex items-center gap-2">
-                        <label className="text-sm text-slate-600">Endpoint:</label>
+                        <label className="text-sm text-slate-600 dark:text-slate-300">Endpoint:</label>
                         <input
                           type="text"
                           value={llmEndpoint}
                           onChange={(e) => setLlmEndpoint(e.target.value)}
-                          className="text-sm border border-slate-300 rounded-md px-2 py-1 w-56"
+                          className="text-sm border border-slate-300 dark:border-slate-600 rounded-md px-2 py-1 w-56 dark:bg-slate-700 dark:text-slate-100"
                         />
                       </div>
                       <div className="flex items-center gap-2">
-                        <label className="text-sm text-slate-600">Model:</label>
+                        <label className="text-sm text-slate-600 dark:text-slate-300">Model:</label>
                         <input
                           type="text"
                           value={llmModel}
                           onChange={(e) => setLlmModel(e.target.value)}
-                          className="text-sm border border-slate-300 rounded-md px-2 py-1 w-36"
+                          className="text-sm border border-slate-300 dark:border-slate-600 rounded-md px-2 py-1 w-36 dark:bg-slate-700 dark:text-slate-100"
                         />
                       </div>
                       <span className="text-xs text-slate-400">Runs LLM alongside Presidio for higher accuracy</span>
@@ -214,13 +214,13 @@ export const PreprocessingPage = () => {
               )}
               {activeStage === "phi_redaction" && (
                 <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium text-slate-700">
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
                     Method:
                   </label>
                   <select
                     value={redactionMethod}
                     onChange={(e) => setRedactionMethod(e.target.value)}
-                    className="text-sm border border-slate-300 rounded-md px-2 py-1"
+                    className="text-sm border border-slate-300 dark:border-slate-600 rounded-md px-2 py-1 dark:bg-slate-700 dark:text-slate-100"
                   >
                     <option value="redbox">Red Box</option>
                     <option value="blackbox">Black Box</option>

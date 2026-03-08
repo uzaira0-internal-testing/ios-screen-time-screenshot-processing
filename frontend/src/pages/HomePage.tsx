@@ -296,10 +296,10 @@ export const HomePage = () => {
                   {/* Processing status grid - each is clickable */}
                   <div className="grid grid-cols-2 gap-2 text-center">
                     {([
-                      { status: "pending", label: "Pending", bg: "bg-primary-50", hoverBg: "hover:bg-primary-100", text: "text-primary-600" },
-                      { status: "completed", label: "Preprocessed", bg: "bg-green-50", hoverBg: "hover:bg-green-100", text: "text-green-600" },
-                      { status: "failed", label: "Failed", bg: "bg-red-50", hoverBg: "hover:bg-red-100", text: "text-red-600" },
-                      { status: "skipped", label: "Skipped", bg: "bg-slate-100", hoverBg: "hover:bg-slate-200", text: "text-slate-600" },
+                      { status: "pending", label: "Pending", bg: "bg-primary-50 dark:bg-primary-900/20", hoverBg: "hover:bg-primary-100 dark:hover:bg-primary-800/30", text: "text-primary-600 dark:text-primary-400" },
+                      { status: "completed", label: "Preprocessed", bg: "bg-green-50 dark:bg-green-900/20", hoverBg: "hover:bg-green-100 dark:hover:bg-green-800/30", text: "text-green-600 dark:text-green-400" },
+                      { status: "failed", label: "Failed", bg: "bg-red-50 dark:bg-red-900/20", hoverBg: "hover:bg-red-100 dark:hover:bg-red-800/30", text: "text-red-600 dark:text-red-400" },
+                      { status: "skipped", label: "Skipped", bg: "bg-slate-100 dark:bg-slate-900/20", hoverBg: "hover:bg-slate-200 dark:hover:bg-slate-800/30", text: "text-slate-600 dark:text-slate-400" },
                     ] as const).map(({ status, label, bg, hoverBg, text }) => (
                       <div
                         key={status}
@@ -363,9 +363,9 @@ export const HomePage = () => {
                         <div className="text-xs text-slate-500 dark:text-slate-400 mb-2 font-medium">Verification Status</div>
                         <div className="grid grid-cols-3 gap-2 text-center">
                           {([
-                            { key: "single_verified", label: "Once", bg: "bg-yellow-50", hoverBg: "hover:bg-yellow-100", text: "text-yellow-600" },
-                            { key: "agreed", label: "Multiple", bg: "bg-green-50", hoverBg: "hover:bg-green-100", text: "text-green-600" },
-                            { key: "disputed", label: "Disputed", bg: "bg-red-50", hoverBg: "hover:bg-red-100", text: "text-red-600" },
+                            { key: "single_verified", label: "Once", bg: "bg-yellow-50 dark:bg-yellow-900/20", hoverBg: "hover:bg-yellow-100 dark:hover:bg-yellow-800/30", text: "text-yellow-600 dark:text-yellow-400" },
+                            { key: "agreed", label: "Multiple", bg: "bg-green-50 dark:bg-green-900/20", hoverBg: "hover:bg-green-100 dark:hover:bg-green-800/30", text: "text-green-600 dark:text-green-400" },
+                            { key: "disputed", label: "Disputed", bg: "bg-red-50 dark:bg-red-900/20", hoverBg: "hover:bg-red-100 dark:hover:bg-red-800/30", text: "text-red-600 dark:text-red-400" },
                           ] as const).map(({ key, label, bg, hoverBg, text }) => (
                             <div
                               key={key}
@@ -383,7 +383,7 @@ export const HomePage = () => {
                               <div className={`text-lg font-bold ${text}`}>
                                 {tier[key]}
                               </div>
-                              <div className="text-xs text-slate-500">{label}</div>
+                              <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
                             </div>
                           ))}
                         </div>

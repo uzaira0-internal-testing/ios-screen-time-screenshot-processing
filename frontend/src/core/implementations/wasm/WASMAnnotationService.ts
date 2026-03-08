@@ -30,7 +30,6 @@ export class WASMAnnotationService implements IAnnotationService {
 
     await this.storageService.updateScreenshot(data.screenshot_id, {
       annotation_status: "annotated",
-      current_annotation_count: 1,
     });
 
     return annotation;

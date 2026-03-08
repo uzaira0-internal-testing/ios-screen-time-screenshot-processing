@@ -9,20 +9,20 @@ type VerificationTier = "single_verified" | "agreed" | "disputed";
 const TIER_CONFIG: Record<VerificationTier, { label: string; color: string; bgColor: string; description: string }> = {
   single_verified: {
     label: "Once",
-    color: "text-yellow-700",
-    bgColor: "bg-yellow-50 hover:bg-yellow-100",
+    color: "text-yellow-700 dark:text-yellow-400",
+    bgColor: "bg-yellow-50 hover:bg-yellow-100 dark:bg-yellow-900/20 dark:hover:bg-yellow-800/30",
     description: "Verified by 1 user",
   },
   agreed: {
     label: "Multiple",
-    color: "text-green-700",
-    bgColor: "bg-green-50 hover:bg-green-100",
+    color: "text-green-700 dark:text-green-400",
+    bgColor: "bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-800/30",
     description: "2+ users, all match",
   },
   disputed: {
     label: "Disputed",
-    color: "text-red-700",
-    bgColor: "bg-red-50 hover:bg-red-100",
+    color: "text-red-700 dark:text-red-400",
+    bgColor: "bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-800/30",
     description: "2+ users, differences found",
   },
 };
@@ -158,17 +158,17 @@ export const ConsensusPage = () => {
               <div className="text-2xl font-bold text-primary-600">{totals.verified}</div>
               <div className="text-sm text-slate-500 dark:text-slate-400">Verified</div>
             </div>
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-yellow-700">{totals.single}</div>
-              <div className="text-sm text-slate-500">Verified Once</div>
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 text-center">
+              <div className="text-2xl font-bold text-yellow-700 dark:text-yellow-400">{totals.single}</div>
+              <div className="text-sm text-slate-500 dark:text-slate-400">Verified Once</div>
             </div>
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-green-700">{totals.agreed}</div>
-              <div className="text-sm text-slate-500">Verified Multiple</div>
+            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 text-center">
+              <div className="text-2xl font-bold text-green-700 dark:text-green-400">{totals.agreed}</div>
+              <div className="text-sm text-slate-500 dark:text-slate-400">Verified Multiple</div>
             </div>
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-red-700">{totals.disputed}</div>
-              <div className="text-sm text-slate-500">Disputed</div>
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 text-center">
+              <div className="text-2xl font-bold text-red-700 dark:text-red-400">{totals.disputed}</div>
+              <div className="text-sm text-slate-500 dark:text-slate-400">Disputed</div>
             </div>
           </div>
         )}
@@ -202,7 +202,7 @@ export const ConsensusPage = () => {
                 No screenshots in this category
               </div>
             ) : (
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-slate-100 dark:divide-slate-700">
                 {tierScreenshots.map((screenshot) => (
                   <div
                     key={screenshot.id}
@@ -279,8 +279,8 @@ export const ConsensusPage = () => {
                     <span
                       className={`px-2 py-0.5 text-xs rounded-full ${
                         group.image_type === "battery"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-purple-100 text-purple-700"
+                          ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+                          : "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400"
                       }`}
                     >
                       {group.image_type === "battery" ? "Battery" : "Screen Time"}
@@ -309,13 +309,13 @@ export const ConsensusPage = () => {
                         tabIndex={count > 0 ? 0 : -1}
                         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleTierClick(group.id, tier, count); }}
                         className={`rounded p-2 transition-colors focus-ring ${
-                          count > 0 ? `cursor-pointer ${config.bgColor}` : "bg-slate-50 opacity-50"
+                          count > 0 ? `cursor-pointer ${config.bgColor}` : "bg-slate-50 dark:bg-slate-700 opacity-50"
                         }`}
                       >
                         <div className={`text-lg font-bold ${count > 0 ? config.color : "text-slate-400"}`}>
                           {count}
                         </div>
-                        <div className="text-xs text-slate-500">{config.label}</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">{config.label}</div>
                       </div>
                     );
                   })}
@@ -324,7 +324,7 @@ export const ConsensusPage = () => {
                 {/* Progress indicator */}
                 {group.total_verified > 0 && (
                   <div className="mt-3">
-                    <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                    <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
                       <div className="h-2 flex">
                         <div
                           className="bg-yellow-400 transition-all"

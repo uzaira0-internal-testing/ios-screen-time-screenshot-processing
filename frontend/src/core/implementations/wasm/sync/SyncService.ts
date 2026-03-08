@@ -288,6 +288,13 @@ export class SyncService {
 
         const consensus = await res.json();
         if (consensus.annotations) {
+          for (const annotation of consensus.annotations) {
+            await db.annotations.put({
+              ...annotation,
+              screenshot_id: record.localId,
+              sync_status: "remote",
+            });
+          }
           result.pulled.annotations += consensus.annotations.length;
         }
       } catch (err) {

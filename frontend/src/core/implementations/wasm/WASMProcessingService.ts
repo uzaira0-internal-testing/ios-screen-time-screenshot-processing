@@ -303,6 +303,9 @@ export class WASMProcessingService implements IProcessingService {
       this.worker.terminate();
       this.worker = null;
       this.initialized = false;
+      for (const request of this.pendingRequests.values()) {
+        request.reject(new Error("Worker terminated"));
+      }
       this.pendingRequests.clear();
     }
   }

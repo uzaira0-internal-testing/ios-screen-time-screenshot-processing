@@ -16,7 +16,8 @@ import { APIStorageService } from "../implementations/server/APIStorageService";
  */
 export function bootstrapServices(config: AppConfig): ServiceContainer {
   if (config.mode === "wasm") {
-    // Lazy import to avoid loading WASM deps in server mode
+    // TODO: Convert to dynamic import() for proper code-splitting once
+    // ServiceProvider supports async initialization
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { bootstrapWasmServices } = require("./bootstrapWasm");
     return bootstrapWasmServices(config);

@@ -2,11 +2,16 @@
 
 declare const self: ServiceWorkerGlobalScope;
 
-const CACHE_NAME = "ios-screenshot-v1";
 const STATIC_CACHE = "static-v1";
 const WASM_CACHE = "wasm-assets-v1";
 
-const STATIC_ASSETS = ["/", "/manifest.webmanifest"];
+// Derive base path from service worker scope (e.g., "/ios-screen-time-screenshot-processing/")
+const BASE_PATH = new URL(self.registration.scope).pathname.replace(/\/$/, "");
+
+const STATIC_ASSETS = [
+  `${BASE_PATH}/`,
+  `${BASE_PATH}/manifest.json`,
+];
 
 const WASM_ASSETS_PATTERNS = [
   /tesseract-core.*\.wasm$/,
@@ -29,7 +34,6 @@ self.addEventListener("activate", (event) => {
           keys
             .filter(
               (key) =>
-                key !== CACHE_NAME &&
                 key !== STATIC_CACHE &&
                 key !== WASM_CACHE,
             )
@@ -45,12 +49,12 @@ function isWasmAsset(url: string): boolean {
 }
 
 function isApiRequest(url: URL): boolean {
-  return url.pathname.startsWith("/api");
+  return url.pathname.startsWith(`${BASE_PATH}/api`);
 }
 
 function isStaticAsset(url: URL): boolean {
   return (
-    url.pathname.startsWith("/assets/") ||
+    url.pathname.startsWith(`${BASE_PATH}/assets/`) ||
     url.pathname.endsWith(".css") ||
     url.pathname.endsWith(".js") ||
     url.pathname.endsWith(".png") ||
@@ -62,7 +66,7 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
   // Share target: receives shared images from iOS (POST /share)
-  if (url.pathname === "/share" && event.request.method === "POST") {
+  if (url.pathname === `${BASE_PATH}/share` && event.request.method === "POST") {
     event.respondWith(
       (async () => {
         const formData = await event.request.formData();
@@ -77,7 +81,7 @@ self.addEventListener("fetch", (event) => {
           await cache.put(`/shared/${i}`, response);
         }
 
-        return Response.redirect("/?action=upload&shared=true", 303);
+        return Response.redirect(`${BASE_PATH}/?action=upload&shared=true`, 303);
       })(),
     );
     return;
@@ -141,7 +145,9 @@ self.addEventListener("fetch", (event) => {
   if (event.request.mode === "navigate") {
     event.respondWith(
       fetch(event.request).catch(() =>
-        caches.match("/").then((cached) => cached || new Response("Offline", { status: 503 })),
+        caches
+          .match(`${BASE_PATH}/`)
+          .then((cached) => cached || new Response("Offline", { status: 503 })),
       ),
     );
     return;
