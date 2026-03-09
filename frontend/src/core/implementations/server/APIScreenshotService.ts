@@ -50,13 +50,22 @@ export class APIScreenshotService implements IScreenshotService {
   async addScreenshots(
     file: File,
     imageType: ImageType,
-    options?: { groupId?: string },
+    options?: {
+      groupId?: string;
+      participantId?: string;
+      screenshotDate?: string;
+      originalFilepath?: string;
+    },
   ): Promise<Screenshot> {
     const groupId = options?.groupId || "default";
     const metadata = JSON.stringify({
       group_id: groupId,
       image_type: imageType,
-      items: [{ original_filepath: file.name }],
+      items: [{
+        original_filepath: options?.originalFilepath || file.name,
+        participant_id: options?.participantId,
+        screenshot_date: options?.screenshotDate,
+      }],
     });
 
     const formData = new FormData();

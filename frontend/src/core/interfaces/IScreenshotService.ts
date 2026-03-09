@@ -27,7 +27,12 @@ export interface IScreenshotService {
   addScreenshots(
     file: File,
     imageType: ImageType,
-    options?: { groupId?: string },
+    options?: {
+      groupId?: string;
+      participantId?: string;
+      screenshotDate?: string;
+      originalFilepath?: string;
+    },
   ): Promise<Screenshot>;
 
   /**

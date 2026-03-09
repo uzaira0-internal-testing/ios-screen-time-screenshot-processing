@@ -15,7 +15,8 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Card } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Download, Trash2, ImagePlus } from "lucide-react";
+import { Download, Trash2, FolderOpen } from "lucide-react";
+import { parseRelativePath, isImageFile } from "@/components/preprocessing/UploadDropZone";
 
 // Map group ID to verification tier data
 type VerificationTiersMap = Record<string, GroupVerificationSummary>;
@@ -43,27 +44,37 @@ export const HomePage = () => {
 
   const handleLoadFiles = useCallback(
     async (files: FileList | File[]) => {
-      const imageFiles = Array.from(files).filter((f) =>
-        f.type.startsWith("image/"),
-      );
+      const imageFiles = Array.from(files).filter(isImageFile);
       if (imageFiles.length === 0) {
-        toast.error("No image files selected");
+        toast.error("No image files found in selection");
         return;
       }
-      const groupId = groupName.trim() || undefined;
 
       setIsLoadingFiles(true);
       let loaded = 0;
       let failed = 0;
+      let duplicates = 0;
 
       for (const file of imageFiles) {
         try {
-          await screenshotService.addScreenshots(file, imageType, { groupId });
+          // Parse folder structure: participant_id/date/filename.png
+          const parsed = parseRelativePath(file);
+          // Use group name override if provided, otherwise derive from top-level folder
+          const groupId = groupName.trim() || parsed.participant_id || undefined;
+
+          await screenshotService.addScreenshots(file, imageType, {
+            groupId,
+            participantId: parsed.participant_id !== "unknown" ? parsed.participant_id : undefined,
+            screenshotDate: parsed.screenshot_date || undefined,
+            originalFilepath: parsed.original_filepath,
+          });
           loaded++;
         } catch (error) {
-          failed++;
           const msg = error instanceof Error ? error.message : String(error);
-          if (!msg.includes("Duplicate")) {
+          if (msg.includes("Duplicate")) {
+            duplicates++;
+          } else {
+            failed++;
             console.error(`Failed to load ${file.name}:`, error);
           }
         }
@@ -73,11 +84,13 @@ export const HomePage = () => {
 
       if (loaded > 0) {
         toast.success(`Loaded ${loaded} screenshot${loaded > 1 ? "s" : ""}`);
-        // Refresh groups inline instead of calling loadGroups to avoid stale closure
         screenshotService.getGroups().then((g) => setGroups(g ?? []));
       }
+      if (duplicates > 0) {
+        toast(`${duplicates} duplicate${duplicates > 1 ? "s" : ""} skipped`, { icon: "⏭️" });
+      }
       if (failed > 0) {
-        toast.error(`${failed} file${failed > 1 ? "s" : ""} failed (duplicates or errors)`);
+        toast.error(`${failed} file${failed > 1 ? "s" : ""} failed to load`);
       }
     },
     [screenshotService, imageType, groupName],
@@ -245,6 +258,8 @@ export const HomePage = () => {
                     type="file"
                     accept="image/*"
                     multiple
+                    webkitdirectory=""
+                    directory=""
                     className="hidden"
                     onChange={(e) => {
                       if (e.target.files) handleLoadFiles(e.target.files);
@@ -255,9 +270,9 @@ export const HomePage = () => {
                     variant="primary"
                     onClick={() => fileInputRef.current?.click()}
                     loading={isLoadingFiles}
-                    icon={<ImagePlus className="h-4 w-4" />}
+                    icon={<FolderOpen className="h-4 w-4" />}
                   >
-                    {isLoadingFiles ? "Loading..." : config.isLocalMode ? "Load Screenshots" : "Add Screenshots"}
+                    {isLoadingFiles ? "Loading..." : config.isLocalMode ? "Load Folder" : "Add Folder"}
                   </Button>
                 </>
               )}
@@ -314,22 +329,33 @@ export const HomePage = () => {
               onDragOver={isAuthenticated ? handleDragOver : undefined}
               onDragLeave={isAuthenticated ? handleDragLeave : undefined}
             >
-              <ImagePlus className="h-12 w-12 text-slate-400 dark:text-slate-500 mx-auto mb-4" />
+              <FolderOpen className="h-12 w-12 text-slate-400 dark:text-slate-500 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
                 No Groups Yet
               </h3>
               {isAuthenticated ? (
                 <div className="max-w-sm mx-auto space-y-3">
                   <p className="text-slate-600 dark:text-slate-400 text-sm">
-                    Drag and drop screenshots here, or use the button above.
+                    Drop a folder here or use the button above.
+                  </p>
+                  <div className="text-xs text-slate-400 dark:text-slate-500 font-mono bg-slate-100 dark:bg-slate-800/80 rounded px-3 py-2 inline-block">
+                    <div className="text-left">
+                      <div>study_folder/</div>
+                      <div className="ml-4">participant_id/</div>
+                      <div className="ml-8">date_folder/</div>
+                      <div className="ml-12">screenshot.png</div>
+                    </div>
+                  </div>
+                  <p className="text-slate-400 dark:text-slate-500 text-xs">
+                    Date folders: 2024-01-15, 01.15.2024, Day_1_01.02.2025, etc.
                   </p>
                   <div className="flex items-center gap-2 justify-center">
                     <input
                       type="text"
                       value={groupName}
                       onChange={(e) => setGroupName(e.target.value)}
-                      placeholder="Group name (optional)"
-                      className="text-sm border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 w-44"
+                      placeholder="Group name override (optional)"
+                      className="text-sm border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 w-52"
                     />
                     <select
                       value={imageType}

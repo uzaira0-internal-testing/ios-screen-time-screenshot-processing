@@ -181,7 +181,7 @@ function SyncSection() {
 
           <div className="text-sm text-slate-600 dark:text-slate-400 space-x-4">
             {pendingUploads > 0 && (
-              <span>{pendingUploads} pending upload{pendingUploads !== 1 ? "s" : ""}</span>
+              <span>{pendingUploads} screenshot{pendingUploads !== 1 ? "s" : ""} to sync</span>
             )}
             {lastSyncAt && (
               <span>

@@ -83,7 +83,12 @@ export class WASMScreenshotService implements IScreenshotService {
   async addScreenshots(
     file: File,
     imageType: ImageType,
-    options?: { groupId?: string },
+    options?: {
+      groupId?: string;
+      participantId?: string;
+      screenshotDate?: string;
+      originalFilepath?: string;
+    },
   ): Promise<Screenshot> {
     // File extends Blob — no need to copy
     const uploadedAt = new Date().toISOString();
@@ -104,9 +109,9 @@ export class WASMScreenshotService implements IScreenshotService {
     // Create screenshot record without ID (let IndexedDB auto-increment)
     // Omit id by using Partial and type assertion
     const screenshotData: Omit<Screenshot, "id"> & { id?: number; content_hash?: string } = {
-      file_path: file.name,
+      file_path: options?.originalFilepath || file.name,
       image_type: imageType,
-      uploaded_at: uploadedAt,
+      uploaded_at: options?.screenshotDate || uploadedAt,
       uploaded_by_id: null,
       current_annotation_count: 0,
       target_annotations: 1,
@@ -125,8 +130,8 @@ export class WASMScreenshotService implements IScreenshotService {
       processing_issues: null,
       has_blocking_issues: false,
       alignment_score: null,
-      // API upload metadata
-      participant_id: null,
+      // Folder structure metadata
+      participant_id: options?.participantId ?? null,
       group_id: options?.groupId ?? null,
       source_id: null,
       device_type: null,
