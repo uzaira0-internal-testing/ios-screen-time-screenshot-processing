@@ -232,7 +232,19 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
         sort_order: "asc",
       });
       if (data) {
-        set({ screenshots: data.items });
+        // Avoid replacing the array reference if data hasn't changed —
+        // this prevents downstream useMemo/re-renders from triggering.
+        const prev = get().screenshots;
+        const next = data.items;
+        const changed = prev.length !== next.length ||
+          next.some((item, i) =>
+            item.id !== prev[i]?.id ||
+            item.processing_status !== prev[i]?.processing_status ||
+            item.processed_at !== prev[i]?.processed_at
+          );
+        if (changed) {
+          set({ screenshots: next });
+        }
       }
     } catch (err) {
       console.error("Failed to load screenshots:", err);
@@ -333,8 +345,8 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
     try {
       await api.preprocessing.invalidateFromStage(screenshotId, stage);
       toast.success(`Downstream stages invalidated from ${stage.replace(/_/g, " ")}`);
-      get().loadScreenshots();
-      get().loadSummary();
+      await get().loadScreenshots();
+      await get().loadSummary();
     } catch (err) {
       console.error("Failed to invalidate:", err);
       toast.error("Failed to invalidate stages");

@@ -210,6 +210,7 @@ class ScreenshotRead(ScreenshotBase):
     potential_duplicate_of: int | None = None  # ID of the other screenshot
     # Processing metadata (preprocessing results, callback URLs, etc.)
     processing_metadata: dict | None = None
+    content_hash: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

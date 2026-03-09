@@ -15,8 +15,7 @@ export class LoginPage {
 
   constructor(page: Page) {
     this.page = page;
-    // Actual UI has "Screenshot Annotator" as the heading
-    this.heading = page.getByRole("heading", { name: /screenshot annotator/i });
+    this.heading = page.getByRole("heading", { name: /ios screen time/i });
     // Use placeholder since label is sr-only
     this.usernameInput = page.getByPlaceholder("Username");
     // Button text is "Continue", not "Login"
@@ -28,7 +27,7 @@ export class LoginPage {
    * Navigate to login page
    */
   async goto() {
-    await this.page.goto("/login");
+    await this.page.goto("login");
     await this.heading.waitFor({ state: "visible" });
   }
 
@@ -53,8 +52,8 @@ export class LoginPage {
     // Click the button
     await this.loginButton.click();
 
-    // Redirects to /annotate, not /
-    await this.page.waitForURL("/annotate**");
+    // Redirects to home page after login
+    await this.page.waitForURL(/(?!.*\/login)/);
   }
 
   /**

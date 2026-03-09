@@ -1,5 +1,5 @@
 import { ServiceContainer } from "./Container";
-import { TOKENS } from "./tokens";
+import { TOKENS, type AppFeatures } from "./tokens";
 import type { AppConfig } from "../config";
 import { config as runtimeConfig } from "@/config";
 
@@ -48,6 +48,17 @@ export function bootstrapWasmServices(_config: AppConfig): ServiceContainer {
     const storage = container.resolve<IndexedDBStorageService>(TOKENS.STORAGE_SERVICE);
     return new WASMConsensusService(storage);
   });
+
+  // WASM mode: local processing only, no server-dependent features
+  // WASM mode: groups and basic consensus work locally via IndexedDB.
+  // Server-only features: cross-rater comparison, admin, preprocessing.
+  const features: AppFeatures = {
+    groups: true,
+    consensusComparison: false,
+    admin: false,
+    preprocessing: false,
+  };
+  container.register(TOKENS.FEATURES, features);
 
   if (runtimeConfig.isDev) {
     console.log("[Bootstrap] WASM services registered.");

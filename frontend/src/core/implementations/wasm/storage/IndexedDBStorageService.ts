@@ -14,21 +14,79 @@ import {
   storeImageBlob,
   retrieveImageBlob,
   deleteImageBlob,
+  clearAllOpfsBlobs,
+  getTotalBlobSize,
 } from "./opfsBlobStorage";
 
-// Constants for WASM mode
-const LOCAL_USER_ID = 1;
+import type { Collection, IndexableType } from "dexie";
+import { useAuthStore } from "@/store/authStore";
+
+/** Get the current user's ID from the auth store, defaulting to 1 for WASM mode. */
+function getCurrentUserId(): number {
+  return useAuthStore.getState().userId ?? 1;
+}
+
+/** Apply verified_by_me / verified_by_others filters to a Dexie collection. */
+function applyVerificationFilter<TKey extends IndexableType>(
+  collection: Collection<Screenshot, TKey>,
+  params: { verified_by_me?: boolean; verified_by_others?: boolean },
+): Collection<Screenshot, TKey> {
+  const userId = getCurrentUserId();
+  if (params.verified_by_others === true) {
+    return collection.filter(
+      (s): boolean =>
+        !!(
+          s.verified_by_user_ids &&
+          s.verified_by_user_ids.length > 0 &&
+          !s.verified_by_user_ids.includes(userId)
+        ),
+    );
+  }
+  if (params.verified_by_me === true) {
+    return collection.filter(
+      (s): boolean =>
+        !!(s.verified_by_user_ids && s.verified_by_user_ids.includes(userId)),
+    );
+  }
+  if (params.verified_by_me === false) {
+    return collection.filter(
+      (s): boolean =>
+        !s.verified_by_user_ids || !s.verified_by_user_ids.includes(userId),
+    );
+  }
+  return collection;
+}
 
 export class IndexedDBStorageService implements IStorageService {
   private persistenceRequested = false;
+  private dbReady: Promise<void>;
+  private dbOpenFailed = false;
 
   constructor() {
-    db.open().catch((error) => {
-      console.error("Failed to open IndexedDB:", error);
-    });
+    this.dbReady = db.open().then(
+      () => {},
+      (error) => {
+        this.dbOpenFailed = true;
+        console.error("Failed to open IndexedDB:", error);
+        throw new Error(
+          `IndexedDB unavailable: ${error instanceof Error ? error.message : String(error)}. ` +
+            "Local storage mode requires IndexedDB. Check that you are not in private browsing mode.",
+        );
+      },
+    );
 
     // Request persistent storage to prevent browser from evicting data
     this.requestPersistentStorage();
+  }
+
+  /** Ensure the database is open before performing operations. */
+  private async ensureDB(): Promise<void> {
+    if (this.dbOpenFailed) {
+      throw new Error(
+        "IndexedDB is not available. Local storage mode cannot function without it.",
+      );
+    }
+    await this.dbReady;
   }
 
   /**
@@ -71,6 +129,7 @@ export class IndexedDBStorageService implements IStorageService {
   }
 
   async saveScreenshot(screenshot: Screenshot): Promise<number> {
+    await this.ensureDB();
     try {
       const id = await db.screenshots.add(screenshot);
       return id;
@@ -81,6 +140,7 @@ export class IndexedDBStorageService implements IStorageService {
   }
 
   async getScreenshot(id: number): Promise<Screenshot | null> {
+    await this.ensureDB();
     try {
       const screenshot = await db.screenshots.get(id);
       return screenshot || null;
@@ -95,6 +155,7 @@ export class IndexedDBStorageService implements IStorageService {
     group_id?: string;
     processing_status?: string;
   }): Promise<Screenshot[]> {
+    await this.ensureDB();
     try {
       // Use compound index if both annotation_status and group_id are provided
       if (filter?.annotation_status && filter?.group_id) {
@@ -149,6 +210,8 @@ export class IndexedDBStorageService implements IStorageService {
 
   async deleteScreenshot(id: number): Promise<void> {
     try {
+      // Delete IndexedDB records atomically, then clean up OPFS blob separately
+      // (OPFS is outside IndexedDB transaction scope)
       await db.transaction(
         "rw",
         db.screenshots,
@@ -156,12 +219,13 @@ export class IndexedDBStorageService implements IStorageService {
         db.imageBlobs,
         async () => {
           await db.screenshots.delete(id);
-
           await db.annotations.where("screenshot_id").equals(id).delete();
-
-          await deleteImageBlob(id);
+          // Delete IndexedDB fallback blob (if any) inside transaction
+          await db.imageBlobs.delete(id);
         },
       );
+      // Delete OPFS blob outside transaction — best-effort cleanup
+      await deleteImageBlob(id);
     } catch (error) {
       console.error("Failed to delete screenshot:", error);
       throw error;
@@ -294,18 +358,20 @@ export class IndexedDBStorageService implements IStorageService {
 
   async clearAll(): Promise<void> {
     try {
+      // Clear OPFS blobs first (outside transaction since OPFS is not part of IndexedDB)
+      await clearAllOpfsBlobs();
+
       await db.transaction(
         "rw",
-        db.screenshots,
-        db.annotations,
-        db.imageBlobs,
-        db.processingQueue,
+        [db.screenshots, db.annotations, db.imageBlobs, db.processingQueue, db.syncRecords, db.settings],
         async () => {
           await Promise.all([
             db.screenshots.clear(),
             db.annotations.clear(),
             db.imageBlobs.clear(),
             db.processingQueue.clear(),
+            db.syncRecords.clear(),
+            db.settings.clear(),
           ]);
         },
       );
@@ -322,23 +388,19 @@ export class IndexedDBStorageService implements IStorageService {
     totalSize: number;
   }> {
     try {
-      const [screenshotCount, annotationCount, blobCount, blobs] =
+      // Use screenshot count as blob count proxy (each screenshot has one blob)
+      // and use getTotalBlobSize() which checks OPFS first, falling back to IndexedDB
+      const [screenshotCount, annotationCount, totalSize] =
         await Promise.all([
           db.screenshots.count(),
           db.annotations.count(),
-          db.imageBlobs.count(),
-          db.imageBlobs.toArray(),
+          getTotalBlobSize(),
         ]);
-
-      const totalSize = blobs.reduce(
-        (sum, record) => sum + record.blob.size,
-        0,
-      );
 
       return {
         screenshotCount,
         annotationCount,
-        blobCount,
+        blobCount: screenshotCount,
         totalSize,
       };
     } catch (error) {
@@ -354,7 +416,7 @@ export class IndexedDBStorageService implements IStorageService {
           .where("annotation_status")
           .equals("pending")
           .and(
-            (s) => s.processing_status === "pending" || !s.has_blocking_issues,
+            (s) => s.processing_status !== "failed" && !s.has_blocking_issues,
           )
           .first()) || null
       );
@@ -388,17 +450,30 @@ export class IndexedDBStorageService implements IStorageService {
 
       await db.transaction("rw", db.annotations, db.screenshots, async () => {
         for (const annotation of annotations) {
-          const id = await db.annotations.add(annotation);
-          ids.push(id);
+          // Upsert: check for existing annotation for this screenshot (same as saveAnnotation)
+          const existing = await db.annotations
+            .where("screenshot_id")
+            .equals(annotation.screenshot_id)
+            .first();
 
-          const screenshot = await db.screenshots.get(annotation.screenshot_id);
-
-          if (screenshot) {
-            const currentCount = screenshot.current_annotation_count || 0;
-
-            await db.screenshots.update(annotation.screenshot_id, {
-              current_annotation_count: currentCount + 1,
+          if (existing) {
+            await db.annotations.update(existing.id!, {
+              ...annotation,
+              id: existing.id,
+              updated_at: new Date().toISOString(),
             });
+            ids.push(existing.id!);
+          } else {
+            const id = await db.annotations.add(annotation);
+            ids.push(id);
+
+            const screenshot = await db.screenshots.get(annotation.screenshot_id);
+            if (screenshot) {
+              const currentCount = screenshot.current_annotation_count || 0;
+              await db.screenshots.update(annotation.screenshot_id, {
+                current_annotation_count: currentCount + 1,
+              });
+            }
           }
         }
       });
@@ -441,22 +516,8 @@ export class IndexedDBStorageService implements IStorageService {
           .equals(params.processing_status);
       }
 
-      // Apply additional filters that can't use indexes
-      if (params.verified_by_me === true) {
-        collection = collection.filter(
-          (s): boolean =>
-            !!(
-              s.verified_by_user_ids &&
-              s.verified_by_user_ids.includes(LOCAL_USER_ID)
-            ),
-        );
-      } else if (params.verified_by_me === false) {
-        collection = collection.filter(
-          (s): boolean =>
-            !s.verified_by_user_ids ||
-            !s.verified_by_user_ids.includes(LOCAL_USER_ID),
-        );
-      }
+      // Apply verification filters
+      collection = applyVerificationFilter(collection, params);
 
       if (params.search) {
         const searchLower = params.search.toLowerCase();
@@ -555,21 +616,7 @@ export class IndexedDBStorageService implements IStorageService {
         );
       }
 
-      if (params.verified_by_me === true) {
-        baseQuery = baseQuery.filter(
-          (s): boolean =>
-            !!(
-              s.verified_by_user_ids &&
-              s.verified_by_user_ids.includes(LOCAL_USER_ID)
-            ),
-        );
-      } else if (params.verified_by_me === false) {
-        baseQuery = baseQuery.filter(
-          (s): boolean =>
-            !s.verified_by_user_ids ||
-            !s.verified_by_user_ids.includes(LOCAL_USER_ID),
-        );
-      }
+      baseQuery = applyVerificationFilter(baseQuery, params);
 
       // Get total count
       const total = await baseQuery.count();

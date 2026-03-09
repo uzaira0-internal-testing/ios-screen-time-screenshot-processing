@@ -23,7 +23,7 @@ test.describe("Hourly Usage Editor", () => {
    * Helper to wait for annotation page with screenshot
    */
   async function ensureScreenshotLoaded(page: import("@playwright/test").Page) {
-    await page.goto("/annotate");
+    await page.goto("annotate");
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
 

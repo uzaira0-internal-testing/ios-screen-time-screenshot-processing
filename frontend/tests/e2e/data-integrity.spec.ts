@@ -26,12 +26,12 @@ test.describe("Data Integrity", () => {
    */
   async function ensureScreenshotLoaded(page: import("@playwright/test").Page) {
     // Login first
-    await page.goto("/login");
+    await page.goto("login");
     await page.getByPlaceholder("Username").fill("testuser");
     await page.getByRole("button", { name: /continue/i }).click();
-    await page.waitForURL("/annotate**");
+    await page.waitForURL("**/annotate**");
 
-    await page.goto("/annotate");
+    await page.goto("annotate");
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
 

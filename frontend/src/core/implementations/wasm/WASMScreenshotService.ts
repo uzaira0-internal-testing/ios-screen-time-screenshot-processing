@@ -1,5 +1,6 @@
 import type {
   Screenshot,
+  Group,
   GridCoordinates,
   ProcessingResult,
   QueueStats,
@@ -15,10 +16,14 @@ import type { IStorageService } from "@/core/interfaces";
 import type { IProcessingService, ProcessingProgress } from "@/core/interfaces";
 import { db } from "./storage/database";
 import { createObjectURL } from "./storage/opfsBlobStorage";
+import { computeContentHash } from "./utils/contentHash";
+import { useAuthStore } from "@/store/authStore";
+import { DuplicateScreenshotError } from "@/core/errors";
 
 export class WASMScreenshotService implements IScreenshotService {
   private storageService: IStorageService;
   private processingService: IProcessingService;
+  private processingInProgress = new Set<number>();
 
   constructor(
     storageService: IStorageService,
@@ -76,14 +81,36 @@ export class WASMScreenshotService implements IScreenshotService {
     return screenshots.slice(skip, skip + limit);
   }
 
-  async upload(file: File, imageType: ImageType): Promise<Screenshot> {
-    const blob = new Blob([file], { type: file.type });
+  async addScreenshots(
+    file: File,
+    imageType: ImageType,
+    options?: {
+      groupId?: string;
+      participantId?: string;
+      screenshotDate?: string;
+      originalFilepath?: string;
+    },
+  ): Promise<Screenshot> {
+    // File extends Blob — no need to copy
     const uploadedAt = new Date().toISOString();
+
+    // Content-hash dedup: compute SHA-256 and check for existing screenshot
+    // Returns null in non-secure contexts where crypto.subtle is unavailable
+    const contentHash = await computeContentHash(file);
+    if (contentHash !== null) {
+      const existing = await db.screenshots
+        .where("content_hash")
+        .equals(contentHash)
+        .first();
+      if (existing) {
+        throw new DuplicateScreenshotError(existing.id!);
+      }
+    }
 
     // Create screenshot record without ID (let IndexedDB auto-increment)
     // Omit id by using Partial and type assertion
-    const screenshotData: Omit<Screenshot, "id"> & { id?: number } = {
-      file_path: file.name,
+    const screenshotData: Omit<Screenshot, "id"> & { id?: number; content_hash?: string } = {
+      file_path: options?.originalFilepath || file.name,
       image_type: imageType,
       uploaded_at: uploadedAt,
       uploaded_by_id: null,
@@ -104,22 +131,25 @@ export class WASMScreenshotService implements IScreenshotService {
       processing_issues: null,
       has_blocking_issues: false,
       alignment_score: null,
-      // API upload metadata
-      participant_id: null,
-      group_id: null,
+      // Folder structure metadata
+      participant_id: options?.participantId ?? null,
+      group_id: options?.groupId ?? null,
+      screenshot_date: options?.screenshotDate ?? null,
       source_id: null,
       device_type: null,
       verified_by_user_ids: null,
       // Computed readonly properties (provided as null for WASM mode)
       processing_time_seconds: null,
       alignment_score_status: null,
+      // Content hash for dedup (null when crypto.subtle unavailable)
+      content_hash: contentHash ?? undefined,
     };
 
     // Save to IndexedDB - this will assign a unique auto-incremented ID
     const id = await this.storageService.saveScreenshot(
       screenshotData as Screenshot,
     );
-    await this.storageService.saveImageBlob(id, blob);
+    await this.storageService.saveImageBlob(id, file);
 
     const screenshot: Screenshot = { ...screenshotData, id };
 
@@ -345,6 +375,14 @@ export class WASMScreenshotService implements IScreenshotService {
   }
 
   async processIfNeeded(screenshot: Screenshot): Promise<Screenshot> {
+    // Skip if already being processed (e.g., by autoProcess after upload)
+    if (this.processingInProgress.has(screenshot.id)) {
+      console.log(
+        `[WASMScreenshotService.processIfNeeded] Screenshot ${screenshot.id} already being processed, returning as-is`,
+      );
+      return screenshot;
+    }
+
     // IMPORTANT: Never reprocess verified screenshots - they are frozen
     const isVerified =
       screenshot.verified_by_user_ids &&
@@ -536,6 +574,13 @@ export class WASMScreenshotService implements IScreenshotService {
   }
 
   private async autoProcess(screenshot: Screenshot): Promise<void> {
+    // Prevent concurrent processing of the same screenshot
+    if (this.processingInProgress.has(screenshot.id)) {
+      console.log(`[WASMScreenshotService.autoProcess] Screenshot ${screenshot.id} already being processed, skipping`);
+      return;
+    }
+    this.processingInProgress.add(screenshot.id);
+
     try {
       const imageBlob = await this.storageService.getImageBlob(screenshot.id);
 
@@ -572,6 +617,8 @@ export class WASMScreenshotService implements IScreenshotService {
       await this.storageService.updateScreenshot(screenshot.id, {
         processing_status: "failed",
       });
+    } finally {
+      this.processingInProgress.delete(screenshot.id);
     }
   }
 
@@ -587,6 +634,7 @@ export class WASMScreenshotService implements IScreenshotService {
       group_id: params.group_id,
       processing_status: params.processing_status,
       verified_by_me: params.verified_by_me,
+      verified_by_others: params.verified_by_others,
       search: params.search,
       sort_by: sortBy,
       sort_order: sortOrder,
@@ -606,6 +654,7 @@ export class WASMScreenshotService implements IScreenshotService {
       group_id: params.group_id,
       processing_status: params.processing_status,
       verified_by_me: params.verified_by_me,
+      verified_by_others: params.verified_by_others,
       direction: params.direction,
     });
 
@@ -618,14 +667,25 @@ export class WASMScreenshotService implements IScreenshotService {
   ): Promise<Screenshot> {
     const screenshot = await this.getById(screenshotId);
     const verifiedIds = screenshot.verified_by_user_ids || [];
+    const verifiedUsernames = screenshot.verified_by_usernames || [];
 
     const updates: Partial<Screenshot> = {};
 
-    // Use local user ID = 1 for WASM mode
-    if (!verifiedIds.includes(1)) {
-      verifiedIds.push(1);
+    // Use local user ID and username for WASM mode
+    const userId = useAuthStore.getState().userId ?? 1;
+    const username = useAuthStore.getState().username ?? "local";
+
+    if (!verifiedIds.includes(userId)) {
+      verifiedIds.push(userId);
       updates.verified_by_user_ids = verifiedIds;
     }
+    if (!verifiedUsernames.includes(username)) {
+      verifiedUsernames.push(username);
+      updates.verified_by_usernames = verifiedUsernames;
+    }
+
+    // Mark as verified
+    updates.annotation_status = "verified";
 
     // Save grid coordinates if provided (freeze grid at verification time)
     if (gridCoords) {
@@ -643,22 +703,34 @@ export class WASMScreenshotService implements IScreenshotService {
       ...screenshot,
       ...updates,
       verified_by_user_ids: verifiedIds,
+      verified_by_usernames: verifiedUsernames,
     };
   }
 
   async unverify(screenshotId: number): Promise<Screenshot> {
     const screenshot = await this.getById(screenshotId);
-    let verifiedIds = screenshot.verified_by_user_ids || [];
+    const userId = useAuthStore.getState().userId ?? 1;
+    const username = useAuthStore.getState().username ?? "local";
 
-    // Use local user ID = 1 for WASM mode
-    verifiedIds = verifiedIds.filter((id) => id !== 1);
+    let verifiedIds = screenshot.verified_by_user_ids || [];
+    let verifiedUsernames = screenshot.verified_by_usernames || [];
+
+    verifiedIds = verifiedIds.filter((id) => id !== userId);
+    verifiedUsernames = verifiedUsernames.filter((u) => u !== username);
+
+    const hasVerifiers = verifiedIds.length > 0;
     await this.storageService.updateScreenshot(screenshotId, {
-      verified_by_user_ids: verifiedIds.length > 0 ? verifiedIds : null,
+      verified_by_user_ids: hasVerifiers ? verifiedIds : null,
+      verified_by_usernames: hasVerifiers ? verifiedUsernames : null,
+      // Revert to "annotated" if no verifiers remain
+      annotation_status: hasVerifiers ? "verified" : "annotated",
     });
 
     return {
       ...screenshot,
-      verified_by_user_ids: verifiedIds.length > 0 ? verifiedIds : null,
+      verified_by_user_ids: hasVerifiers ? verifiedIds : null,
+      verified_by_usernames: hasVerifiers ? verifiedUsernames : null,
+      annotation_status: hasVerifiers ? "verified" : "annotated",
     };
   }
 
@@ -692,4 +764,112 @@ export class WASMScreenshotService implements IScreenshotService {
     return null;
   }
 
+  async getGroups(): Promise<Group[]> {
+    const allScreenshots = await db.screenshots.toArray();
+
+    // Aggregate screenshots by group_id
+    const groupMap = new Map<
+      string,
+      {
+        count: number;
+        image_type: string;
+        created_at: string;
+        processing_pending: number;
+        processing_completed: number;
+        processing_failed: number;
+        processing_skipped: number;
+        processing_deleted: number;
+      }
+    >();
+
+    for (const s of allScreenshots) {
+      const gid = s.group_id || "ungrouped";
+      const existing = groupMap.get(gid) || {
+        count: 0,
+        image_type: s.image_type || "screen_time",
+        created_at: s.uploaded_at || new Date().toISOString(),
+        processing_pending: 0,
+        processing_completed: 0,
+        processing_failed: 0,
+        processing_skipped: 0,
+        processing_deleted: 0,
+      };
+
+      existing.count++;
+      const ps = s.processing_status || "pending";
+      if (ps === "pending" || ps === "processing")
+        existing.processing_pending++;
+      else if (ps === "completed") existing.processing_completed++;
+      else if (ps === "failed") existing.processing_failed++;
+      else if (ps === "skipped") existing.processing_skipped++;
+      else if (ps === "deleted") existing.processing_deleted++;
+
+      // Track earliest created_at
+      if (s.uploaded_at && s.uploaded_at < existing.created_at) {
+        existing.created_at = s.uploaded_at;
+      }
+
+      groupMap.set(gid, existing);
+    }
+
+    return Array.from(groupMap.entries()).map(([id, data]) => ({
+      id,
+      name: id === "ungrouped" ? "Ungrouped" : id,
+      image_type: data.image_type as "battery" | "screen_time",
+      created_at: data.created_at,
+      screenshot_count: data.count,
+      processing_pending: data.processing_pending,
+      processing_completed: data.processing_completed,
+      processing_failed: data.processing_failed,
+      processing_skipped: data.processing_skipped,
+      processing_deleted: data.processing_deleted,
+    }));
+  }
+
+  async exportCSV(): Promise<string> {
+    const allScreenshots = await db.screenshots.toArray();
+    const allAnnotations = await db.annotations.toArray();
+
+    // O(1) lookup by screenshot ID
+    const screenshotMap = new Map(allScreenshots.map((s) => [s.id, s]));
+
+    // Build CSV: screenshot_id, group, participant, title, total, hour_0..hour_23
+    const headers = [
+      "screenshot_id",
+      "group_id",
+      "participant_id",
+      "extracted_title",
+      "extracted_total",
+      ...Array.from({ length: 24 }, (_, i) => `hour_${i}`),
+    ];
+
+    const rows = allAnnotations.map((ann) => {
+      const screenshot = screenshotMap.get(ann.screenshot_id);
+      const hourlyValues = ann.hourly_values || {};
+      return [
+        ann.screenshot_id,
+        screenshot?.group_id || "",
+        screenshot?.participant_id || "",
+        screenshot?.extracted_title || "",
+        screenshot?.extracted_total || "",
+        ...Array.from({ length: 24 }, (_, i) => hourlyValues[i] ?? ""),
+      ];
+    });
+
+    const csvLines = [
+      headers.join(","),
+      ...rows.map((r) =>
+        r
+          .map((v) => {
+            const s = String(v);
+            return s.includes(",") || s.includes('"')
+              ? `"${s.replace(/"/g, '""')}"`
+              : s;
+          })
+          .join(","),
+      ),
+    ];
+
+    return csvLines.join("\n");
+  }
 }

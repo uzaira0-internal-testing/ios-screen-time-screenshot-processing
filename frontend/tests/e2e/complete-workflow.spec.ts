@@ -29,7 +29,7 @@ test.describe("Complete Annotation Workflow", () => {
       await expect(page).toHaveURL(/\/annotate/);
 
       // Step 2: Navigate to home to view groups
-      await page.goto("/");
+      await page.goto(".");
       await page.waitForLoadState("domcontentloaded");
       await page.waitForTimeout(1000);
 
@@ -45,7 +45,7 @@ test.describe("Complete Annotation Workflow", () => {
       }
 
       // Step 4: Navigate to annotation page
-      await page.goto("/annotate");
+      await page.goto("annotate");
       const annotationPage = new AnnotationPage(page);
 
       // Step 5: Wait for screenshot or empty state
@@ -230,7 +230,7 @@ test.describe("Complete Annotation Workflow", () => {
       await expect(page).toHaveURL(/\/annotate/);
 
       // Step 2: Navigate to home to view groups
-      await page.goto("/");
+      await page.goto(".");
       await page.waitForLoadState("domcontentloaded");
       await page.waitForTimeout(1000);
 
@@ -246,7 +246,7 @@ test.describe("Complete Annotation Workflow", () => {
       }
 
       // Step 4: Navigate to annotation page
-      await page.goto("/annotate");
+      await page.goto("annotate");
       const annotationPage = new AnnotationPage(page);
 
       // Step 5: Wait for screenshot or empty state
@@ -291,7 +291,7 @@ test.describe("Complete Annotation Workflow", () => {
       await loginPage.goto();
       await loginPage.login("testuser");
 
-      await page.goto("/annotate");
+      await page.goto("annotate");
       await page.waitForLoadState("domcontentloaded");
 
       try {
@@ -379,7 +379,7 @@ test.describe("Complete Annotation Workflow", () => {
       await loginPage.goto();
       await loginPage.login("testuser");
 
-      await page.goto("/annotate");
+      await page.goto("annotate");
       await page.waitForLoadState("domcontentloaded");
 
       const homeLink = page.getByRole("link", { name: /screenshot.*processor|home/i }).first();
@@ -387,10 +387,10 @@ test.describe("Complete Annotation Workflow", () => {
 
       if (hasHomeLink) {
         await homeLink.click();
-        await expect(page).toHaveURL("/");
+        await expect(page).toHaveURL(/\/$/);
       } else {
-        await page.goto("/");
-        await expect(page).toHaveURL("/");
+        await page.goto(".");
+        await expect(page).toHaveURL(/\/$/);
       }
 
       await page.waitForLoadState("domcontentloaded");
@@ -402,7 +402,7 @@ test.describe("Complete Annotation Workflow", () => {
       await loginPage.goto();
       await loginPage.login("testuser");
 
-      await page.goto("/annotate");
+      await page.goto("annotate");
       await page.waitForLoadState("domcontentloaded");
 
       try {

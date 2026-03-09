@@ -13,11 +13,11 @@ async function createUserContext(
   const page = await context.newPage();
 
   // Login the user
-  await page.goto("/login");
+  await page.goto("login");
   await page.waitForLoadState("domcontentloaded");
   await page.getByPlaceholder("Username").fill(username);
   await page.getByRole("button", { name: /continue/i }).click();
-  await page.waitForURL("/annotate**");
+  await page.waitForURL("**/annotate**");
 
   return { context, page };
 }
@@ -355,10 +355,10 @@ test.describe("Consensus API Integration", () => {
     const baseURL = process.env.VITE_API_BASE_URL || "http://localhost:8002/api/v1";
 
     // Login
-    await page.goto("/login");
+    await page.goto("login");
     await page.getByPlaceholder("Username").fill("testuser");
     await page.getByRole("button", { name: /continue/i }).click();
-    await page.waitForURL("/annotate**");
+    await page.waitForURL("**/annotate**");
 
     // Fetch consensus groups via API
     const response = await request.get(`${baseURL}/consensus/groups`, {
@@ -383,10 +383,10 @@ test.describe("Consensus API Integration", () => {
     const baseURL = process.env.VITE_API_BASE_URL || "http://localhost:8002/api/v1";
 
     // Login
-    await page.goto("/login");
+    await page.goto("login");
     await page.getByPlaceholder("Username").fill("testuser");
     await page.getByRole("button", { name: /continue/i }).click();
-    await page.waitForURL("/annotate**");
+    await page.waitForURL("**/annotate**");
 
     // Navigate to get a screenshot ID
     const annotationPage = new AnnotationPage(page);
@@ -420,10 +420,10 @@ test.describe("Consensus API Integration", () => {
     const baseURL = process.env.VITE_API_BASE_URL || "http://localhost:8002/api/v1";
 
     // Login
-    await page.goto("/login");
+    await page.goto("login");
     await page.getByPlaceholder("Username").fill("testuser");
     await page.getByRole("button", { name: /continue/i }).click();
-    await page.waitForURL("/annotate**");
+    await page.waitForURL("**/annotate**");
 
     // Fetch summary stats
     const response = await request.get(`${baseURL}/consensus/summary/stats`, {

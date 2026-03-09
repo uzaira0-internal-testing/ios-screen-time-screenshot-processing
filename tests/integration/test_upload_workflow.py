@@ -283,16 +283,14 @@ class TestScreenshotUpload:
         data = response.json()
         assert data["group_created"] is False
 
-    async def test_duplicate_detection_by_file_hash(
+    async def test_duplicate_detection_by_content_hash(
         self,
         client: AsyncClient,
         db_session: AsyncSession,
     ):
-        """Test that uploading same image twice creates two separate screenshots.
+        """Test that uploading the same image twice is deduplicated by content hash.
 
-        Note: The API does not currently deduplicate by content hash.
-        Each upload creates a new screenshot record. Deduplication is
-        a future enhancement if needed.
+        The second upload returns the existing screenshot ID with duplicate=True.
         """
         upload_data = {
             "screenshot": TEST_PNG_BASE64,
@@ -308,9 +306,10 @@ class TestScreenshotUpload:
             json=upload_data,
         )
         assert response1.status_code == 201
-        screenshot_id_1 = response1.json()["screenshot_id"]
+        data1 = response1.json()
+        screenshot_id_1 = data1["screenshot_id"]
 
-        # Second upload (same content, different record)
+        # Second upload (same content — should be deduplicated)
         response2 = await client.post(
             "/api/v1/screenshots/upload",
             headers={"X-API-Key": TEST_API_KEY},
@@ -319,15 +318,13 @@ class TestScreenshotUpload:
         assert response2.status_code == 201
         data2 = response2.json()
         assert data2["success"] is True
-        screenshot_id_2 = data2["screenshot_id"]
+        assert data2["duplicate"] is True
+        assert data2["screenshot_id"] == screenshot_id_1
 
-        # Both uploads succeed and create separate records
-        assert screenshot_id_1 != screenshot_id_2
-
-        # Verify two screenshots in database
+        # Only one screenshot in database
         result = await db_session.execute(select(Screenshot))
         screenshots = result.scalars().all()
-        assert len(screenshots) == 2
+        assert len(screenshots) == 1
 
     async def test_device_type_auto_detection(
         self,

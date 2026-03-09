@@ -3,17 +3,19 @@ import clsx from "clsx";
 
 interface ActionButtonsProps {
   onSkip: () => void;
-  onSubmit: () => void;
+  onSave: () => void;
   isLoading?: boolean;
-  canSubmit?: boolean;
+  canSave?: boolean;
+  saveLabel?: string;
   shortcuts?: ReactNode;
 }
 
 export const ActionButtons = ({
   onSkip,
-  onSubmit,
+  onSave,
   isLoading = false,
-  canSubmit = false,
+  canSave = false,
+  saveLabel = "Save (Enter)",
   shortcuts,
 }: ActionButtonsProps) => {
   return (
@@ -28,16 +30,16 @@ export const ActionButtons = ({
         </button>
 
         <button
-          onClick={onSubmit}
-          disabled={isLoading || !canSubmit}
+          onClick={onSave}
+          disabled={isLoading || !canSave}
           className={clsx(
             "w-full px-3 py-2 text-sm font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
-            canSubmit
+            canSave
               ? "bg-primary-600 hover:bg-primary-700 text-white"
               : "bg-slate-300 text-slate-500 dark:bg-slate-600 dark:text-slate-400",
           )}
         >
-          Submit (Enter)
+          {saveLabel}
         </button>
       </div>
 

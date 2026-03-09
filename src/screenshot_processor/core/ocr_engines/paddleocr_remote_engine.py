@@ -64,16 +64,19 @@ class PaddleOCRRemoteEngine:
 
         self._is_available: bool | None = None  # Lazy check
 
+        # Persistent HTTP client for connection reuse
+        self._client = httpx.Client(timeout=self.timeout)
+        self._health_client = httpx.Client(timeout=10)
+
         logger.info(f"PaddleOCR remote engine initialized: {self.base_url}")
 
     def _check_availability(self) -> bool:
         """Check if the PaddleOCR API is reachable."""
         try:
-            with httpx.Client(timeout=10) as client:
-                response = client.get(f"{self.base_url}/health")
-                if response.status_code == 200:
-                    logger.info("PaddleOCR API health check passed")
-                    return True
+            response = self._health_client.get(f"{self.base_url}/health")
+            if response.status_code == 200:
+                logger.info("PaddleOCR API health check passed")
+                return True
             return False
         except Exception as e:
             logger.warning(f"PaddleOCR API not available: {e}")
@@ -98,13 +101,12 @@ class PaddleOCRRemoteEngine:
 
         for attempt in range(self.max_retries):
             try:
-                with httpx.Client(timeout=self.timeout) as client:
-                    response = client.post(
-                        f"{self.base_url}/ocr",
-                        files=files,
-                    )
-                    response.raise_for_status()
-                    return response.json()
+                response = self._client.post(
+                    f"{self.base_url}/ocr",
+                    files=files,
+                )
+                response.raise_for_status()
+                return response.json()
 
             except httpx.HTTPStatusError as e:
                 if 400 <= e.response.status_code < 500:
@@ -225,6 +227,17 @@ class PaddleOCRRemoteEngine:
         if self._is_available is None:
             self._is_available = self._check_availability()
         return self._is_available
+
+    def close(self) -> None:
+        """Close the persistent HTTP clients."""
+        self._client.close()
+        self._health_client.close()
+
+    def __del__(self) -> None:
+        try:
+            self.close()
+        except Exception:
+            pass
 
     def get_engine_name(self) -> str:
         """Get the name of the OCR engine.

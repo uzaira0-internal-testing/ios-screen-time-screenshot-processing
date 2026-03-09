@@ -1,5 +1,6 @@
 import type {
   Screenshot,
+  Group,
   GridCoordinates,
   ProcessingResult,
   QueueStats,
@@ -23,7 +24,16 @@ export interface IScreenshotService {
 
   getAll(status?: string, skip?: number, limit?: number): Promise<Screenshot[]>;
 
-  upload(file: File, imageType: ImageType): Promise<Screenshot>;
+  addScreenshots(
+    file: File,
+    imageType: ImageType,
+    options?: {
+      groupId?: string;
+      participantId?: string;
+      screenshotDate?: string;
+      originalFilepath?: string;
+    },
+  ): Promise<Screenshot>;
 
   /**
    * Get URL for displaying a screenshot image.
@@ -109,7 +119,17 @@ export interface IScreenshotService {
    */
   recalculateOcr(screenshotId: number): Promise<string | null>;
 
+  /**
+   * List all groups with screenshot counts.
+   * Server: queries /screenshots/groups
+   * WASM: aggregates from IndexedDB screenshots by group_id
+   */
+  getGroups(): Promise<Group[]>;
 
-
-
+  /**
+   * Export annotations as CSV data string.
+   * Server: fetches from /screenshots/export/csv
+   * WASM: generates CSV from local IndexedDB data
+   */
+  exportCSV(): Promise<string>;
 }

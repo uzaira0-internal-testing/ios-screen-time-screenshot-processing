@@ -14,7 +14,7 @@ import numpy as np
 from .config import get_hybrid_ocr_config
 from .image_utils import convert_dark_mode
 from .interfaces import ITitleExtractor, TitleTotalResult
-from .ocr import find_screenshot_title, find_screenshot_total_usage
+from .ocr import find_screenshot_title, find_screenshot_total_usage, find_title_and_total
 
 logger = logging.getLogger(__name__)
 
@@ -66,21 +66,30 @@ class OCRTitleExtractor(ITitleExtractor):
             img = convert_dark_mode(image.copy())
             ocr_config = get_hybrid_ocr_config()
 
-            # Extract title if needed
-            if not has_valid_title:
+            need_title = not has_valid_title
+            need_total = not has_valid_total
+
+            if need_title and need_total:
+                # Extract both with a single Tesseract call (saves ~1-3s)
+                try:
+                    title, title_y_position, total, _ = find_title_and_total(img, ocr_config)
+                    result.title = title
+                    result.title_y_position = title_y_position
+                    if title == "Daily Total":
+                        result.is_daily_total = True
+                    result.total = total if total and total != "N/A" else None
+                except Exception as e:
+                    logger.warning(f"Error extracting title and total: {e}")
+            elif need_title:
                 try:
                     title, title_y_position = find_screenshot_title(img, ocr_config)
                     result.title = title
                     result.title_y_position = title_y_position
-
-                    # Check if this is a Daily Total screenshot
                     if title == "Daily Total":
                         result.is_daily_total = True
                 except Exception as e:
                     logger.warning(f"Error extracting title: {e}")
-
-            # Extract total if needed
-            if not has_valid_total:
+            elif need_total:
                 try:
                     total, _ = find_screenshot_total_usage(img, ocr_config)
                     result.total = total if total and total != "N/A" else None

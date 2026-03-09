@@ -1,6 +1,11 @@
 export type { IScreenshotService } from "./IScreenshotService";
 export type { IAnnotationService } from "./IAnnotationService";
-export type { IConsensusService } from "./IConsensusService";
+export type {
+  IConsensusService,
+  GroupVerificationSummary,
+  ScreenshotTierItem,
+  VerificationTier,
+} from "./IConsensusService";
 export type {
   IStorageService,
   PaginationParams,

@@ -205,7 +205,10 @@ export class WebSocketService {
 
 let webSocketService: WebSocketService | null = null;
 
-export const getWebSocketService = (): WebSocketService => {
+export const getWebSocketService = (): WebSocketService | null => {
+  if (config.isLocalMode) {
+    return null;
+  }
   if (!webSocketService) {
     webSocketService = new WebSocketService(config.wsUrl);
   }

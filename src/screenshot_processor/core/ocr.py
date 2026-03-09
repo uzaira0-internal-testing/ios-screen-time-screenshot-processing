@@ -106,15 +106,31 @@ def is_daily_total_page(ocr_dict: dict) -> bool:
     return daily_count > app_count
 
 
+def _full_image_ocr_data(
+    img: np.ndarray,
+    cached_data: dict | None = None,
+) -> dict:
+    """Run full-image Tesseract OCR or return cached result.
+
+    This is the most expensive single operation (~1-3s). By caching the result,
+    we avoid running it twice when extracting both title and total from the same image.
+    """
+    if cached_data is not None:
+        return cached_data
+    return pytesseract.image_to_data(img, config="--psm 3", output_type=Output.DICT)
+
+
 def find_screenshot_title(
     img: np.ndarray,
     ocr_config: OCRConfig | None = None,
+    _cached_ocr_data: dict | None = None,
 ) -> tuple[str, int | None]:
     """Find the screenshot title and return the Y position of the title area.
 
     Args:
         img: Input image (BGR format from OpenCV)
         ocr_config: Optional OCR config. If use_hybrid=True, uses HybridOCREngine
+        _cached_ocr_data: Pre-computed full-image OCR data to avoid redundant Tesseract call.
 
     Returns:
         tuple: (title string, title_y_position or None if not found)
@@ -131,7 +147,7 @@ def find_screenshot_title(
     # Step 1: Find "INFO" position - use Tesseract for reliable bounding boxes
     # Tesseract provides consistent bbox coordinates for grid anchor detection
     # HunyuanOCR is only used later for reading the extracted title subimage
-    title_find = pytesseract.image_to_data(img, config="--psm 3", output_type=Output.DICT)
+    title_find = _full_image_ocr_data(img, _cached_ocr_data)
 
     if is_daily_total_page(title_find):
         title = "Daily Total"
@@ -402,12 +418,14 @@ def _extract_time_from_text(text: str) -> str:
 def find_screenshot_total_usage(
     img: np.ndarray,
     ocr_config: OCRConfig | None = None,
+    _cached_ocr_data: dict | None = None,
 ) -> tuple[str, str | None]:
     """Find the total usage time from screenshot.
 
     Args:
         img: Input image (BGR format)
         ocr_config: Optional OCR config. If use_hybrid=True, uses HybridOCREngine
+        _cached_ocr_data: Pre-computed full-image OCR data to avoid redundant Tesseract call.
 
     Returns:
         tuple: (total time string like "4h 36m", debug image path or None)
@@ -421,10 +439,9 @@ def find_screenshot_total_usage(
     total = ""
     total_image = None
 
-    # Step 1: Find "SCREEN TIME" position - use Tesseract for reliable bounding boxes
-    # Tesseract provides consistent bbox coordinates for region extraction
-    # HunyuanOCR is only used later for reading the extracted total subimage
-    total_find = pytesseract.image_to_data(img, config="--psm 3", output_type=Output.DICT)
+    # Step 1: Find "SCREEN TIME" position - reuse cached full-image OCR data
+    # when available (same Tesseract call as find_screenshot_title)
+    total_find = _full_image_ocr_data(img, _cached_ocr_data)
 
     is_daily = is_daily_total_page(total_find)
     total_rect = [-1, -1, -1, -1]
@@ -520,6 +537,26 @@ def find_screenshot_total_usage(
             return regex_total, regex_image_path
 
     return total, str(total_image_path)
+
+
+def find_title_and_total(
+    img: np.ndarray,
+    ocr_config: OCRConfig | None = None,
+) -> tuple[str, int | None, str, str | None]:
+    """Extract both title and total from an image with a single Tesseract call.
+
+    This avoids the redundant full-image OCR that occurs when calling
+    find_screenshot_title() and find_screenshot_total_usage() separately.
+    Saves ~1-3 seconds per image.
+
+    Returns:
+        (title, title_y_position, total, total_image_path)
+    """
+    # Run full-image Tesseract ONCE and share the result
+    cached = _full_image_ocr_data(img)
+    title, title_y_pos = find_screenshot_title(img, ocr_config, _cached_ocr_data=cached)
+    total, total_img_path = find_screenshot_total_usage(img, ocr_config, _cached_ocr_data=cached)
+    return title, title_y_pos, total, total_img_path
 
 
 def extract_all_text(

@@ -105,7 +105,7 @@ test.describe("Visual Regression Tests", () => {
       await loginPage.goto();
       await loginPage.login("admin");
 
-      await page.goto("/admin");
+      await page.goto("admin");
       await page.waitForLoadState("networkidle");
 
       await expect(page).toHaveScreenshot("admin-page.png", {
@@ -119,7 +119,7 @@ test.describe("Visual Regression Tests", () => {
       await loginPage.goto();
       await loginPage.login("testuser");
 
-      await page.goto("/admin");
+      await page.goto("admin");
       await page.waitForLoadState("networkidle");
 
       await expect(page).toHaveScreenshot("admin-access-denied.png", {

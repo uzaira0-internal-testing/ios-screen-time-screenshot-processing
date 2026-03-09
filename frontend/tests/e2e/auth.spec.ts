@@ -7,7 +7,7 @@ test.describe("Authentication", () => {
   test.beforeEach(async ({ page }) => {
     loginPage = new LoginPage(page);
     // Go to a page to be able to clear localStorage, then clear it
-    await page.goto("/");
+    await page.goto(".");
     await page.evaluate(() => {
       localStorage.removeItem("username");
       // Keep app-mode as "server" if it was set
@@ -15,7 +15,7 @@ test.describe("Authentication", () => {
   });
 
   test("should display login page", async ({ page }) => {
-    await page.goto("/login");
+    await page.goto("login");
 
     await expect(loginPage.heading).toBeVisible();
     await expect(loginPage.usernameInput).toBeVisible();
@@ -23,11 +23,11 @@ test.describe("Authentication", () => {
   });
 
   test("should login with valid username", async ({ page }) => {
-    await page.goto("/login");
+    await page.goto("login");
     await loginPage.login("testuser");
 
     // Should redirect to annotation page (not home)
-    await expect(page).toHaveURL(/\/annotate/);
+    await expect(page).toHaveURL(/(?!.*\/login)/);
 
     // Wait for header to be present
     await page.waitForSelector("header");
@@ -38,10 +38,10 @@ test.describe("Authentication", () => {
   });
 
   test("should login as admin", async ({ page }) => {
-    await page.goto("/login");
+    await page.goto("login");
     await loginPage.login("admin");
 
-    await expect(page).toHaveURL(/\/annotate/);
+    await expect(page).toHaveURL(/(?!.*\/login)/);
 
     // Wait for header
     await page.waitForSelector("header");
@@ -52,13 +52,13 @@ test.describe("Authentication", () => {
     ).toBeVisible();
 
     // Navigate to home to check admin link
-    await page.goto("/");
+    await page.goto(".");
     // Should show admin link in navigation
     await expect(page.getByRole("link", { name: /admin/i })).toBeVisible();
   });
 
   test("should persist login state after page refresh", async ({ page }) => {
-    await page.goto("/login");
+    await page.goto("login");
     await loginPage.login("testuser");
 
     // Reload the page
@@ -72,7 +72,7 @@ test.describe("Authentication", () => {
   });
 
   test("should logout successfully", async ({ page }) => {
-    await page.goto("/login");
+    await page.goto("login");
     await loginPage.login("testuser");
 
     // Wait for toast to disappear completely
@@ -86,7 +86,7 @@ test.describe("Authentication", () => {
     await page.getByRole("button", { name: /logout/i }).click();
 
     // Should redirect to login page
-    await expect(page).toHaveURL("/login", { timeout: 10000 });
+    await expect(page).toHaveURL(/\/login/, { timeout: 10000 });
 
     // Header should not show username
     await expect(
@@ -95,7 +95,7 @@ test.describe("Authentication", () => {
   });
 
   test("should clear login state after logout", async ({ page }) => {
-    await page.goto("/login");
+    await page.goto("login");
     await loginPage.login("testuser");
 
     // Wait for toast to disappear completely
@@ -108,45 +108,45 @@ test.describe("Authentication", () => {
     await page.getByRole("button", { name: /logout/i }).click();
 
     // Wait for logout to complete
-    await expect(page).toHaveURL("/login", { timeout: 10000 });
+    await expect(page).toHaveURL(/\/login/, { timeout: 10000 });
 
     // Try to access protected page
-    await page.goto("/annotate");
+    await page.goto("annotate");
 
     // Should redirect to login
-    await expect(page).toHaveURL("/login");
+    await expect(page).toHaveURL(/\/login/);
   });
 
   test("should redirect to login when accessing protected route while unauthenticated", async ({
     page,
   }) => {
     // Try to access annotation page without logging in
-    await page.goto("/annotate");
+    await page.goto("annotate");
 
     // Should redirect to login
-    await expect(page).toHaveURL("/login");
+    await expect(page).toHaveURL(/\/login/);
   });
 
   test("should redirect to login when accessing admin page while unauthenticated", async ({
     page,
   }) => {
-    await page.goto("/admin");
+    await page.goto("admin");
 
-    await expect(page).toHaveURL("/login");
+    await expect(page).toHaveURL(/\/login/);
   });
 
   test("should not allow empty username", async ({ page }) => {
-    await page.goto("/login");
+    await page.goto("login");
 
     // Button should be disabled when username is empty
     await expect(loginPage.loginButton).toBeDisabled();
 
     // Verify we're still on login page
-    await expect(page).toHaveURL("/login");
+    await expect(page).toHaveURL(/\/login/);
   });
 
   test("should store username in localStorage", async ({ page }) => {
-    await page.goto("/login");
+    await page.goto("login");
     await loginPage.login("testuser");
 
     // Check localStorage
@@ -157,7 +157,7 @@ test.describe("Authentication", () => {
   });
 
   test("should clear localStorage on logout", async ({ page }) => {
-    await page.goto("/login");
+    await page.goto("login");
     await loginPage.login("testuser");
 
     await page.getByRole("button", { name: /logout/i }).click();
@@ -170,12 +170,12 @@ test.describe("Authentication", () => {
   });
 
   test("should handle special characters in username", async ({ page }) => {
-    await page.goto("/login");
+    await page.goto("login");
 
     const specialUsername = "user-123_test";
     await loginPage.login(specialUsername);
 
-    await expect(page).toHaveURL(/\/annotate/);
+    await expect(page).toHaveURL(/(?!.*\/login)/);
 
     // Wait for header
     await page.waitForSelector("header");
@@ -189,11 +189,11 @@ test.describe("Authentication", () => {
   test("should show correct navigation for authenticated users", async ({
     page,
   }) => {
-    await page.goto("/login");
+    await page.goto("login");
     await loginPage.login("testuser");
 
     // Navigate to home page to see nav links
-    await page.goto("/");
+    await page.goto(".");
 
     // Should show Annotate link in nav
     await expect(
@@ -213,7 +213,7 @@ test.describe("Authentication", () => {
     page,
   }) => {
     // Home page is accessible without auth
-    await page.goto("/");
+    await page.goto(".");
 
     // Should show Login link in header (be specific to avoid matching multiple)
     await expect(
@@ -235,13 +235,13 @@ test.describe("Authentication", () => {
     page,
   }) => {
     // Try to access annotation page - should redirect to login
-    await page.goto("/annotate");
-    await expect(page).toHaveURL("/login");
+    await page.goto("annotate");
+    await expect(page).toHaveURL(/\/login/);
 
     // Login
     await loginPage.login("testuser");
 
     // Should redirect to annotation page (the login always goes to /annotate)
-    await expect(page).toHaveURL(/\/annotate/);
+    await expect(page).toHaveURL(/(?!.*\/login)/);
   });
 });

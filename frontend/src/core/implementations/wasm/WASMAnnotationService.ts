@@ -2,6 +2,7 @@ import type { Annotation, AnnotationCreate } from "@/types";
 import type { IAnnotationService } from "@/core/interfaces";
 import type { IStorageService } from "@/core/interfaces";
 import { db } from "./storage/database";
+import { useAuthStore } from "@/store/authStore";
 
 export class WASMAnnotationService implements IAnnotationService {
   private storageService: IStorageService;
@@ -15,7 +16,7 @@ export class WASMAnnotationService implements IAnnotationService {
     const annotation: Annotation = {
       id: Date.now(),
       screenshot_id: data.screenshot_id,
-      user_id: 1,
+      user_id: useAuthStore.getState().userId ?? 1,
       grid_upper_left: data.grid_upper_left ?? null,
       grid_lower_right: data.grid_lower_right ?? null,
       hourly_values: data.hourly_values,
@@ -36,10 +37,22 @@ export class WASMAnnotationService implements IAnnotationService {
   }
 
   async update(
-    _id: number,
-    _data: Partial<AnnotationCreate>,
+    id: number,
+    data: Partial<AnnotationCreate>,
   ): Promise<Annotation> {
-    throw new Error("WASMAnnotationService.update: Not implemented yet");
+    const updates = {
+      ...data,
+      updated_at: new Date().toISOString(),
+    };
+
+    const updated = await db.annotations.update(id, updates);
+    if (updated === 0) {
+      throw new Error(`Annotation with ID ${id} not found`);
+    }
+
+    // Fetch the updated record to return the full annotation
+    const annotation = await db.annotations.get(id);
+    return annotation!;
   }
 
   async getByScreenshot(screenshotId: number): Promise<Annotation[]> {

@@ -4,10 +4,10 @@ import type { Page, APIRequestContext } from "@playwright/test";
  * Login helper function
  */
 export async function login(page: Page, username: string) {
-  await page.goto("/login");
+  await page.goto("login");
   await page.getByLabel("Username").fill(username);
   await page.getByRole("button", { name: /login/i }).click();
-  await page.waitForURL("/");
+  await page.waitForURL("**/");
 }
 
 /**
@@ -15,7 +15,7 @@ export async function login(page: Page, username: string) {
  */
 export async function logout(page: Page) {
   await page.getByRole("button", { name: /logout/i }).click();
-  await page.waitForURL("/login");
+  await page.waitForURL("**/login");
 }
 
 /**

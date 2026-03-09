@@ -22,6 +22,7 @@ export class PerformanceMonitor {
   private static processingMetrics: ProcessingMetrics[] = [];
   private static memorySnapshots: MemoryMetrics[] = [];
   private static maxMetricsHistory = 100;
+  private static memoryInterval: ReturnType<typeof setInterval> | null = null;
 
   /**
    * Measure processing time for a screenshot
@@ -58,7 +59,7 @@ export class PerformanceMonitor {
         }
 
         // Log to console in development
-        if (process.env.NODE_ENV === "development") {
+        if (import.meta.env?.MODE === "development") {
           console.log(
             `Processing screenshot ${screenshotId}: ${duration.toFixed(0)}ms`,
           );
@@ -189,6 +190,16 @@ export class PerformanceMonitor {
   }
 
   /**
+   * Stop periodic monitoring.
+   */
+  static dispose() {
+    if (this.memoryInterval) {
+      clearInterval(this.memoryInterval);
+      this.memoryInterval = null;
+    }
+  }
+
+  /**
    * Clear all metrics
    */
   static clearMetrics() {
@@ -287,7 +298,7 @@ export class PerformanceMonitor {
     this.measureMemory();
 
     // Periodic memory snapshots (every 30 seconds)
-    setInterval(() => {
+    this.memoryInterval = setInterval(() => {
       this.measureMemory();
     }, 30000);
 

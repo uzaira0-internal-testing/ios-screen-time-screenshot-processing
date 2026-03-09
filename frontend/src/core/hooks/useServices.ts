@@ -1,6 +1,6 @@
 import { useContext } from "react";
 import { ServiceContext } from "./ServiceProvider";
-import { TOKENS } from "../di";
+import { TOKENS, type AppFeatures } from "../di/tokens";
 import type {
   IScreenshotService,
   IAnnotationService,
@@ -50,4 +50,14 @@ export function useProcessingService(): IProcessingService | null {
     return container.resolve<IProcessingService>(TOKENS.PROCESSING_SERVICE);
   }
   return null;
+}
+
+/**
+ * Returns the feature flags for the current mode.
+ * Components use this to check what capabilities are available
+ * instead of checking config.isLocalMode directly.
+ */
+export function useFeatures(): AppFeatures {
+  const container = useServiceContainer();
+  return container.resolve<AppFeatures>(TOKENS.FEATURES);
 }

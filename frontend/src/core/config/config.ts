@@ -1,19 +1,18 @@
 /**
  * Application Configuration
  *
- * Supports dual-mode operation:
+ * Supports three-mode operation:
  * - Server mode: when apiBaseUrl is present in window.__CONFIG__
- * - WASM mode: when apiBaseUrl is absent (local-first, offline)
+ * - WASM mode: when apiBaseUrl is absent (local-first, offline in browser)
+ * - Tauri mode: when running inside a Tauri desktop shell
  */
 
 import { config } from "@/config";
 
-export type AppMode = "server" | "wasm";
-
-export type ProcessingMode = AppMode;
+export type AppMode = "server" | "wasm" | "tauri";
 
 export interface AppConfig {
-  mode: ProcessingMode;
+  mode: AppMode;
   apiBaseUrl?: string;
   features: {
     offlineMode: boolean;
@@ -24,9 +23,10 @@ export interface AppConfig {
 
 /**
  * Detect application mode based on configuration.
- * If apiBaseUrl is present → server mode, otherwise → wasm mode.
+ * Tauri → tauri mode, apiBaseUrl present → server mode, otherwise → wasm mode.
  */
-export function detectMode(): ProcessingMode {
+export function detectMode(): AppMode {
+  if (config.isTauri) return "tauri";
   return config.hasApi ? "server" : "wasm";
 }
 
@@ -36,9 +36,9 @@ export function detectMode(): ProcessingMode {
 export function createConfig(): AppConfig {
   const mode = detectMode();
 
-  if (mode === "wasm") {
+  if (mode === "tauri" || mode === "wasm") {
     return {
-      mode: "wasm",
+      mode,
       features: {
         offlineMode: true,
         autoProcessing: true,

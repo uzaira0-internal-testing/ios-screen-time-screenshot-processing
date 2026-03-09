@@ -2,6 +2,7 @@ import { api } from "@/services/apiClient";
 import { config } from "@/config";
 import type {
   Screenshot,
+  Group,
   GridCoordinates,
   ProcessingResult,
   QueueStats,
@@ -46,9 +47,37 @@ export class APIScreenshotService implements IScreenshotService {
     return result?.items ?? [];
   }
 
-  async upload(_file: File, _imageType: ImageType): Promise<Screenshot> {
-    // Upload is handled via API key, not through frontend
-    throw new Error("Upload not supported in server mode frontend");
+  async addScreenshots(
+    file: File,
+    imageType: ImageType,
+    options?: {
+      groupId?: string;
+      participantId?: string;
+      screenshotDate?: string;
+      originalFilepath?: string;
+    },
+  ): Promise<Screenshot> {
+    const groupId = options?.groupId || "default";
+    const metadata = JSON.stringify({
+      group_id: groupId,
+      image_type: imageType,
+      items: [{
+        original_filepath: options?.originalFilepath || file.name,
+        participant_id: options?.participantId,
+        screenshot_date: options?.screenshotDate,
+      }],
+    });
+
+    const formData = new FormData();
+    formData.append("metadata", metadata);
+    formData.append("files", file);
+
+    const result = await api.preprocessing.uploadBrowser(formData);
+    const item = result?.results?.[0];
+    if (!item?.screenshot_id) {
+      throw new Error("Upload failed: no screenshot ID returned");
+    }
+    return this.getById(item.screenshot_id);
   }
 
   async getImageUrl(screenshotId: number): Promise<string> {
@@ -142,5 +171,22 @@ export class APIScreenshotService implements IScreenshotService {
   async recalculateOcr(screenshotId: number): Promise<string | null> {
     const result = await api.screenshots.recalculateOcr(screenshotId);
     return (result as any)?.extracted_total ?? null;
+  }
+
+  async getGroups(): Promise<Group[]> {
+    const groups = await api.groups.list();
+    return (groups ?? []) as Group[];
+  }
+
+  async exportCSV(): Promise<string> {
+    const csvUrl = api.export.getCSVUrl();
+    const response = await fetch(csvUrl, {
+      headers: {
+        "X-Username": localStorage.getItem("username") || "",
+        "X-Site-Password": localStorage.getItem("sitePassword") || "",
+      },
+    });
+    if (!response.ok) throw new Error("Export failed");
+    return response.text();
   }
 }

@@ -9,6 +9,7 @@ export interface PaginationParams {
   group_id?: string;
   processing_status?: string;
   verified_by_me?: boolean;
+  verified_by_others?: boolean;
   search?: string;
   sort_by?: string;
   sort_order?: "asc" | "desc";
@@ -20,6 +21,7 @@ export interface NavigationQueryParams {
   group_id?: string;
   processing_status?: string;
   verified_by_me?: boolean;
+  verified_by_others?: boolean;
   direction?: "prev" | "next" | "current";
 }
 

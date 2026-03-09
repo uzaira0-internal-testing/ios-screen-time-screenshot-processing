@@ -139,7 +139,14 @@ export class WASMProcessingService implements IProcessingService {
         "[WASMProcessingService.sendMessage] Posted message to worker:",
         fullMessage.type,
       );
-      this.worker!.postMessage(fullMessage);
+
+      // Collect transferable ArrayBuffers from ImageData payloads for zero-copy transfer
+      const transferables: Transferable[] = [];
+      const payload = fullMessage.payload as Record<string, unknown> | undefined;
+      if (payload?.imageData && (payload.imageData as ImageData).data?.buffer) {
+        transferables.push((payload.imageData as ImageData).data.buffer);
+      }
+      this.worker!.postMessage(fullMessage, transferables);
     });
   }
 
@@ -303,6 +310,7 @@ export class WASMProcessingService implements IProcessingService {
       this.worker.terminate();
       this.worker = null;
       this.initialized = false;
+      this.initializationPromise = null;
       for (const request of this.pendingRequests.values()) {
         request.reject(new Error("Worker terminated"));
       }

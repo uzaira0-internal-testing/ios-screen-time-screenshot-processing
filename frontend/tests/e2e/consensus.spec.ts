@@ -8,7 +8,7 @@ test.describe("Consensus Page", () => {
     consensusPage = new ConsensusPage(page);
 
     // Login first
-    await page.goto("/login");
+    await page.goto("login");
     await page.fill('input[name="username"]', "testuser");
     await page.click('button[type="submit"]');
     await page.waitForURL(/\/(annotate|home)/);
@@ -75,7 +75,7 @@ test.describe("Consensus Page", () => {
 
     test("should show loading spinner initially", async ({ page }) => {
       // Navigate without waiting
-      await page.goto("/consensus");
+      await page.goto("consensus");
 
       // Spinner might be visible very briefly
       // Just verify page eventually loads
@@ -406,7 +406,7 @@ test.describe("Consensus Comparison Page", () => {
     consensusPage = new ConsensusPage(page);
 
     // Login first
-    await page.goto("/login");
+    await page.goto("login");
     await page.fill('input[name="username"]', "testuser");
     await page.click('button[type="submit"]');
     await page.waitForURL(/\/(annotate|home)/);
@@ -584,7 +584,7 @@ test.describe("Consensus Comparison Page", () => {
 test.describe("Consensus Page - API Integration", () => {
   test.beforeEach(async ({ page }) => {
     // Login first
-    await page.goto("/login");
+    await page.goto("login");
     await page.fill('input[name="username"]', "testuser");
     await page.click('button[type="submit"]');
     await page.waitForURL(/\/(annotate|home)/);
@@ -597,7 +597,7 @@ test.describe("Consensus Page - API Integration", () => {
         response.status() === 200
     );
 
-    await page.goto("/consensus");
+    await page.goto("consensus");
 
     const response = await responsePromise;
     expect(response.ok()).toBe(true);
@@ -690,7 +690,7 @@ test.describe("Consensus Page - API Integration", () => {
 
   test("should handle API errors gracefully", async ({ page }) => {
     // Navigate to a non-existent screenshot
-    await page.goto("/consensus/compare/999999999");
+    await page.goto("consensus/compare/999999999");
 
     // Should show error message or redirect
     // Wait for page to settle
@@ -703,7 +703,7 @@ test.describe("Consensus Page - API Integration", () => {
 
 test.describe("Consensus Page - Accessibility", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/login");
+    await page.goto("login");
     await page.fill('input[name="username"]', "testuser");
     await page.click('button[type="submit"]');
     await page.waitForURL(/\/(annotate|home)/);
@@ -774,7 +774,7 @@ test.describe("Consensus Page - Accessibility", () => {
 
 test.describe("Consensus Page - Visual States", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/login");
+    await page.goto("login");
     await page.fill('input[name="username"]', "testuser");
     await page.click('button[type="submit"]');
     await page.waitForURL(/\/(annotate|home)/);

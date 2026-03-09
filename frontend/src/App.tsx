@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { BrowserRouter } from "react-router";
+import { BrowserRouter, HashRouter } from "react-router";
 import { Toaster } from "react-hot-toast";
 import toast from "react-hot-toast";
 import { AppRouter } from "./components/routing/AppRouter";
@@ -75,11 +75,12 @@ function WebSocketIntegration() {
  * Main App Component
  */
 function App() {
-  const basePath = config.basePath;
+  const Router = config.isTauri ? HashRouter : BrowserRouter;
+  const routerProps = config.isTauri ? {} : { basename: config.basePath };
 
   return (
-    <BrowserRouter basename={basePath}>
-      <WebSocketIntegration />
+    <Router {...routerProps}>
+      {config.hasApi && <WebSocketIntegration />}
 
       <Toaster
         position="top-right"
@@ -107,7 +108,7 @@ function App() {
       />
 
       <AppRouter />
-    </BrowserRouter>
+    </Router>
   );
 }
 

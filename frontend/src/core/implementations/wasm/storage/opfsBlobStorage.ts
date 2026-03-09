@@ -173,6 +173,29 @@ export function revokeAllObjectURLs(): void {
   cacheAccessOrder.length = 0;
 }
 
+/**
+ * Delete all image blobs from OPFS storage.
+ * Falls back to clearing IndexedDB imageBlobs table if OPFS is unavailable.
+ */
+export async function clearAllOpfsBlobs(): Promise<void> {
+  revokeAllObjectURLs();
+
+  const root = await getOpfsRoot();
+  if (root) {
+    try {
+      const entries: string[] = [];
+      for await (const [name] of root as unknown as AsyncIterable<[string, FileSystemHandle]>) {
+        entries.push(name);
+      }
+      await Promise.all(entries.map((name) => root.removeEntry(name)));
+    } catch (error) {
+      console.error("[opfsBlobStorage] Error clearing all OPFS blobs:", error);
+    }
+  } else {
+    await db.imageBlobs.clear();
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Utility functions for storage quota, blob info, and image compression
 // ---------------------------------------------------------------------------

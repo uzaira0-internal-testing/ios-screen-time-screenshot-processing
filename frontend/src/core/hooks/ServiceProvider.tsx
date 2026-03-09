@@ -2,7 +2,7 @@ import React, {
   createContext,
   useRef,
   useEffect,
-  ReactNode,
+  type ReactNode,
   useState,
 } from "react";
 import { ServiceContainer, bootstrapServices } from "../di";
@@ -14,8 +14,9 @@ export const ServiceContext = createContext<ServiceContainer | null>(null);
 // Module-level singleton to survive React StrictMode unmount/remount cycles
 let globalContainer: ServiceContainer | null = null;
 let globalConfig: AppConfig | null = null;
+let bootstrapPromise: Promise<ServiceContainer> | null = null;
 
-function getOrCreateContainer(config: AppConfig): ServiceContainer {
+function getOrCreateContainer(config: AppConfig): Promise<ServiceContainer> {
   // If we have a container and the config matches, reuse it
   if (
     globalContainer &&
@@ -26,8 +27,11 @@ function getOrCreateContainer(config: AppConfig): ServiceContainer {
     if (runtimeConfig.isDev) {
       console.log("[ServiceProvider] Reusing existing global container");
     }
-    return globalContainer;
+    return Promise.resolve(globalContainer);
   }
+
+  // If bootstrap is already in progress for this config, reuse the promise
+  if (bootstrapPromise) return bootstrapPromise;
 
   // Otherwise create a new one
   if (runtimeConfig.isDev) {
@@ -36,9 +40,18 @@ function getOrCreateContainer(config: AppConfig): ServiceContainer {
       config.mode,
     );
   }
-  globalContainer = bootstrapServices(config);
-  globalConfig = config;
-  return globalContainer;
+  bootstrapPromise = bootstrapServices(config)
+    .then((container) => {
+      globalContainer = container;
+      globalConfig = config;
+      bootstrapPromise = null;
+      return container;
+    })
+    .catch((err) => {
+      bootstrapPromise = null; // Allow retry on next mount
+      throw err;
+    });
+  return bootstrapPromise;
 }
 
 interface ServiceProviderProps {
@@ -52,9 +65,10 @@ export const ServiceProvider: React.FC<ServiceProviderProps> = ({
 }) => {
   // Create config once
   const [effectiveConfig] = useState(() => config || createConfig());
-
-  // Get or create the container (uses module-level singleton)
-  const container = getOrCreateContainer(effectiveConfig);
+  const [container, setContainer] = useState<ServiceContainer | null>(
+    globalContainer,
+  );
+  const [error, setError] = useState<string | null>(null);
 
   // Track mount count for debugging
   const mountCountRef = useRef(0);
@@ -65,37 +79,52 @@ export const ServiceProvider: React.FC<ServiceProviderProps> = ({
       console.log("[ServiceProvider] Mounted, count:", mountCountRef.current);
     }
 
-    // Only destroy on actual unmount (not StrictMode remount)
-    // In production, cleanup is important. In dev with StrictMode, we skip cleanup
-    // to avoid the double-mount issue destroying services
+    // Bootstrap services (async for WASM/Tauri code-splitting)
+    if (!container) {
+      getOrCreateContainer(effectiveConfig)
+        .then(setContainer)
+        .catch((err) => {
+          console.error("[ServiceProvider] Bootstrap failed:", err);
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Failed to initialize application services",
+          );
+        });
+    }
+
     return () => {
       if (runtimeConfig.isDev) {
         console.log(
           "[ServiceProvider] Cleanup called, mount count:",
           mountCountRef.current,
+          "— keeping services alive (module singleton)",
         );
-      }
-      // In development, don't destroy services on unmount because StrictMode
-      // will immediately remount and the services would be gone
-      // In production (no StrictMode), this cleanup is fine
-      if (runtimeConfig.isProd) {
-        if (runtimeConfig.isDev) {
-          console.log("[ServiceProvider] Production mode - destroying services");
-        }
-        if (globalContainer) {
-          globalContainer.destroy();
-          globalContainer = null;
-          globalConfig = null;
-        }
-      } else {
-        if (runtimeConfig.isDev) {
-          console.log(
-            "[ServiceProvider] Dev mode - keeping services for StrictMode compatibility",
-          );
-        }
       }
     };
   }, []);
+
+  if (error) {
+    return (
+      <div role="alert" className="flex items-center justify-center min-h-screen p-8">
+        <div className="max-w-md text-center space-y-4">
+          <h1 className="text-xl font-semibold text-red-600">Application failed to start</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400">{error}</p>
+          <button
+            type="button"
+            className="px-4 py-2 text-sm bg-slate-100 dark:bg-slate-700 rounded-md hover:bg-slate-200 dark:hover:bg-slate-600"
+            onClick={() => window.location.reload()}
+          >
+            Reload
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Show nothing until services are ready (typically <1ms for server mode,
+  // slightly longer for WASM due to dynamic import)
+  if (!container) return null;
 
   return (
     <ServiceContext.Provider value={container}>

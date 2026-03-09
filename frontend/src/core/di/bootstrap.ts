@@ -1,5 +1,5 @@
 import { ServiceContainer } from "./Container";
-import { TOKENS } from "./tokens";
+import { TOKENS, type AppFeatures } from "./tokens";
 import type { AppConfig } from "../config";
 import { config as runtimeConfig } from "@/config";
 
@@ -11,15 +11,19 @@ import { APIStorageService } from "../implementations/server/APIStorageService";
 /**
  * Bootstrap services based on application mode.
  *
- * - Server mode: API-based services (when apiBaseUrl is configured)
- * - WASM mode: Local-first services (when apiBaseUrl is absent)
+ * Uses dynamic import() for WASM/Tauri so their dependencies (Dexie,
+ * Tesseract.js, Web Workers) are code-split from the server bundle.
  */
-export function bootstrapServices(config: AppConfig): ServiceContainer {
+export async function bootstrapServices(
+  config: AppConfig,
+): Promise<ServiceContainer> {
+  if (config.mode === "tauri") {
+    const { bootstrapTauriServices } = await import("./bootstrapTauri");
+    return bootstrapTauriServices(config);
+  }
+
   if (config.mode === "wasm") {
-    // TODO: Convert to dynamic import() for proper code-splitting once
-    // ServiceProvider supports async initialization
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { bootstrapWasmServices } = require("./bootstrapWasm");
+    const { bootstrapWasmServices } = await import("./bootstrapWasm");
     return bootstrapWasmServices(config);
   }
 
@@ -56,6 +60,15 @@ function bootstrapServerServices(config: AppConfig): ServiceContainer {
     TOKENS.STORAGE_SERVICE,
     () => new APIStorageService(),
   );
+
+  // Server mode has all server-dependent features
+  const features: AppFeatures = {
+    groups: true,
+    consensusComparison: true,
+    admin: true,
+    preprocessing: true,
+  };
+  container.register(TOKENS.FEATURES, features);
 
   if (runtimeConfig.isDev) {
     console.log(

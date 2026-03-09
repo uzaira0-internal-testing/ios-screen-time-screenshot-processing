@@ -20,7 +20,9 @@ export const useAuth = () => {
 
   // Always verify userId and role with server on mount
   // This handles stale cached data after database reset/migration or role changes
+  // Skip in Tauri/WASM mode — no server to verify against
   useEffect(() => {
+    if (config.isLocalMode) return;
     if (isAuthenticated && username) {
       api.auth
         .getMe()

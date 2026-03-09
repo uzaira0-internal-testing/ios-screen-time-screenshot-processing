@@ -159,6 +159,9 @@ class Screenshot(Base):
     )
     grid_detection_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
 
+    # Content hash for dedup (blake2b, 32-byte digest → 64 hex chars)
+    content_hash: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+
     # User verification tracking - stores list of user IDs who have verified this screenshot
     verified_by_user_ids: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
 

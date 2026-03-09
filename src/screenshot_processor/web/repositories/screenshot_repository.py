@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Sequence
 
-from sqlalchemy import String, and_, case, cast, extract, func, or_, select
+from sqlalchemy import String, and_, case, cast, delete, extract, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from screenshot_processor.web.database import (
@@ -22,6 +22,7 @@ from screenshot_processor.web.database import (
     Screenshot,
     ScreenshotRead,
     User,
+    UserQueueState,
 )
 
 
@@ -72,9 +73,7 @@ class ScreenshotRepository:
 
         Returns None if not found (caller decides whether to raise 404).
         """
-        result = await self.db.execute(
-            select(Screenshot).where(Screenshot.id == screenshot_id)
-        )
+        result = await self.db.execute(select(Screenshot).where(Screenshot.id == screenshot_id))
         return result.scalar_one_or_none()
 
     async def get_by_id_for_update(self, screenshot_id: int) -> Screenshot | None:
@@ -83,11 +82,7 @@ class ScreenshotRepository:
         Use this when modifying fields that could be updated concurrently
         (e.g., verified_by_user_ids, annotation counts).
         """
-        result = await self.db.execute(
-            select(Screenshot)
-            .where(Screenshot.id == screenshot_id)
-            .with_for_update()
-        )
+        result = await self.db.execute(select(Screenshot).where(Screenshot.id == screenshot_id).with_for_update())
         return result.scalar_one_or_none()
 
     async def get_usernames_for_ids(self, user_ids: Sequence[int]) -> dict[int, str]:
@@ -98,29 +93,20 @@ class ScreenshotRepository:
         if not user_ids:
             return {}
 
-        result = await self.db.execute(
-            select(User.id, User.username).where(User.id.in_(user_ids))
-        )
+        result = await self.db.execute(select(User.id, User.username).where(User.id.in_(user_ids)))
         return {row.id: row.username for row in result.all()}
 
-    async def enrich_with_usernames(
-        self, screenshot: Screenshot
-    ) -> ScreenshotRead:
+    async def enrich_with_usernames(self, screenshot: Screenshot) -> ScreenshotRead:
         """Convert Screenshot to ScreenshotRead with verified_by_usernames populated."""
         data = ScreenshotRead.model_validate(screenshot)
 
         if screenshot.verified_by_user_ids:
             user_map = await self.get_usernames_for_ids(screenshot.verified_by_user_ids)
-            data.verified_by_usernames = [
-                user_map.get(uid, f"User {uid}")
-                for uid in screenshot.verified_by_user_ids
-            ]
+            data.verified_by_usernames = [user_map.get(uid, f"User {uid}") for uid in screenshot.verified_by_user_ids]
 
         return data
 
-    async def enrich_many_with_usernames(
-        self, screenshots: Sequence[Screenshot]
-    ) -> list[ScreenshotRead]:
+    async def enrich_many_with_usernames(self, screenshots: Sequence[Screenshot]) -> list[ScreenshotRead]:
         """Convert list of Screenshots to ScreenshotRead with usernames populated."""
         if not screenshots:
             return []
@@ -139,10 +125,7 @@ class ScreenshotRepository:
         for s in screenshots:
             data = ScreenshotRead.model_validate(s)
             if s.verified_by_user_ids:
-                data.verified_by_usernames = [
-                    user_map.get(uid, f"User {uid}")
-                    for uid in s.verified_by_user_ids
-                ]
+                data.verified_by_usernames = [user_map.get(uid, f"User {uid}") for uid in s.verified_by_user_ids]
             enriched.append(data)
 
         return enriched
@@ -198,10 +181,9 @@ class ScreenshotRepository:
         # Helper to check if user ID is in verified_by_user_ids array
         # Column is JSON type, need to cast both sides to JSONB for @> operator
         from sqlalchemy.dialects.postgresql import JSONB
+
         def user_in_verified_list(user_id: int):
-            return cast(Screenshot.verified_by_user_ids, JSONB).op("@>")(
-                cast(literal(f"[{user_id}]"), JSONB)
-            )
+            return cast(Screenshot.verified_by_user_ids, JSONB).op("@>")(cast(literal(f"[{user_id}]"), JSONB))
 
         def has_verifications():
             return and_(
@@ -289,7 +271,6 @@ class ScreenshotRepository:
                     (
                         and_(
                             Screenshot.annotation_status == AnnotationStatus.PENDING,
-                            
                         ),
                         1,
                     )
@@ -299,26 +280,16 @@ class ScreenshotRepository:
                 case(
                     (
                         and_(
-                            Screenshot.current_annotation_count
-                            >= Screenshot.target_annotations,
-                            
+                            Screenshot.current_annotation_count >= Screenshot.target_annotations,
                         ),
                         1,
                     )
                 )
             ).label("completed_annotation"),
-            func.count(
-                case((Screenshot.processing_status == ProcessingStatus.PENDING, 1))
-            ).label("pending_processing"),
-            func.count(
-                case((Screenshot.processing_status == ProcessingStatus.COMPLETED, 1))
-            ).label("auto_processed"),
-            func.count(
-                case((Screenshot.processing_status == ProcessingStatus.FAILED, 1))
-            ).label("failed"),
-            func.count(
-                case((Screenshot.processing_status == ProcessingStatus.SKIPPED, 1))
-            ).label("skipped"),
+            func.count(case((Screenshot.processing_status == ProcessingStatus.PENDING, 1))).label("pending_processing"),
+            func.count(case((Screenshot.processing_status == ProcessingStatus.COMPLETED, 1))).label("auto_processed"),
+            func.count(case((Screenshot.processing_status == ProcessingStatus.FAILED, 1))).label("failed"),
+            func.count(case((Screenshot.processing_status == ProcessingStatus.SKIPPED, 1))).label("skipped"),
         )
         result = await self.db.execute(screenshot_stats_stmt)
         screenshot_stats = result.one()
@@ -364,10 +335,7 @@ class ScreenshotRepository:
     async def list_groups(self) -> list[GroupRead]:
         """List all groups with screenshot counts by processing status."""
         # Compute processing time in seconds: processed_at - processing_started_at
-        processing_time_expr = extract(
-            "epoch",
-            Screenshot.processed_at - Screenshot.processing_started_at
-        )
+        processing_time_expr = extract("epoch", Screenshot.processed_at - Screenshot.processing_started_at)
         # Only count processing time for screenshots that have both timestamps
         valid_time_case = case(
             (
@@ -384,18 +352,10 @@ class ScreenshotRepository:
             select(
                 Group,
                 func.count(Screenshot.id).label("total_count"),
-                func.count(
-                    case((Screenshot.processing_status == ProcessingStatus.PENDING, 1))
-                ).label("pending"),
-                func.count(
-                    case((Screenshot.processing_status == ProcessingStatus.COMPLETED, 1))
-                ).label("completed"),
-                func.count(
-                    case((Screenshot.processing_status == ProcessingStatus.FAILED, 1))
-                ).label("failed"),
-                func.count(
-                    case((Screenshot.processing_status == ProcessingStatus.SKIPPED, 1))
-                ).label("skipped"),
+                func.count(case((Screenshot.processing_status == ProcessingStatus.PENDING, 1))).label("pending"),
+                func.count(case((Screenshot.processing_status == ProcessingStatus.COMPLETED, 1))).label("completed"),
+                func.count(case((Screenshot.processing_status == ProcessingStatus.FAILED, 1))).label("failed"),
+                func.count(case((Screenshot.processing_status == ProcessingStatus.SKIPPED, 1))).label("skipped"),
                 # Processing time metrics
                 func.sum(valid_time_case).label("total_processing_time"),
                 func.avg(valid_time_case).label("avg_processing_time"),
@@ -430,10 +390,7 @@ class ScreenshotRepository:
     async def get_group(self, group_id: str) -> GroupRead | None:
         """Get a single group by ID with screenshot counts."""
         # Compute processing time in seconds: processed_at - processing_started_at
-        processing_time_expr = extract(
-            "epoch",
-            Screenshot.processed_at - Screenshot.processing_started_at
-        )
+        processing_time_expr = extract("epoch", Screenshot.processed_at - Screenshot.processing_started_at)
         # Only count processing time for screenshots that have both timestamps
         valid_time_case = case(
             (
@@ -450,18 +407,10 @@ class ScreenshotRepository:
             select(
                 Group,
                 func.count(Screenshot.id).label("total_count"),
-                func.count(
-                    case((Screenshot.processing_status == ProcessingStatus.PENDING, 1))
-                ).label("pending"),
-                func.count(
-                    case((Screenshot.processing_status == ProcessingStatus.COMPLETED, 1))
-                ).label("completed"),
-                func.count(
-                    case((Screenshot.processing_status == ProcessingStatus.FAILED, 1))
-                ).label("failed"),
-                func.count(
-                    case((Screenshot.processing_status == ProcessingStatus.SKIPPED, 1))
-                ).label("skipped"),
+                func.count(case((Screenshot.processing_status == ProcessingStatus.PENDING, 1))).label("pending"),
+                func.count(case((Screenshot.processing_status == ProcessingStatus.COMPLETED, 1))).label("completed"),
+                func.count(case((Screenshot.processing_status == ProcessingStatus.FAILED, 1))).label("failed"),
+                func.count(case((Screenshot.processing_status == ProcessingStatus.SKIPPED, 1))).label("skipped"),
                 # Processing time metrics
                 func.sum(valid_time_case).label("total_processing_time"),
                 func.avg(valid_time_case).label("avg_processing_time"),
@@ -496,15 +445,11 @@ class ScreenshotRepository:
 
     async def get_annotation_count(self, screenshot_id: int) -> int:
         """Get the number of annotations for a screenshot."""
-        stmt = select(func.count(Annotation.id)).where(
-            Annotation.screenshot_id == screenshot_id
-        )
+        stmt = select(func.count(Annotation.id)).where(Annotation.screenshot_id == screenshot_id)
         result = await self.db.execute(stmt)
         return result.scalar_one()
 
-    async def update(
-        self, screenshot: Screenshot, **fields: object
-    ) -> Screenshot:
+    async def update(self, screenshot: Screenshot, **fields: object) -> Screenshot:
         """Update screenshot fields and commit.
 
         Args:
@@ -521,9 +466,12 @@ class ScreenshotRepository:
         await self.db.refresh(screenshot)
         return screenshot
 
-    async def find_potential_duplicate(
-        self, screenshot: Screenshot
-    ) -> int | None:
+    async def find_by_content_hash(self, content_hash: str) -> Screenshot | None:
+        """Find a screenshot by content hash for dedup."""
+        result = await self.db.execute(select(Screenshot).where(Screenshot.content_hash == content_hash))
+        return result.scalar_one_or_none()
+
+    async def find_potential_duplicate(self, screenshot: Screenshot) -> int | None:
         """Find a potential semantic duplicate of this screenshot.
 
         A duplicate is another screenshot with the same:
@@ -536,12 +484,14 @@ class ScreenshotRepository:
         Only checks completed/skipped screenshots (not pending/failed).
         """
         # Need all 4 fields to have values to check for duplicates
-        if not all([
-            screenshot.participant_id,
-            screenshot.screenshot_date,
-            screenshot.extracted_title,
-            screenshot.extracted_total,
-        ]):
+        if not all(
+            [
+                screenshot.participant_id,
+                screenshot.screenshot_date,
+                screenshot.extracted_title,
+                screenshot.extracted_total,
+            ]
+        ):
             return None
 
         stmt = (
@@ -553,10 +503,12 @@ class ScreenshotRepository:
                     Screenshot.screenshot_date == screenshot.screenshot_date,
                     Screenshot.extracted_title == screenshot.extracted_title,
                     Screenshot.extracted_total == screenshot.extracted_total,
-                    Screenshot.processing_status.in_([
-                        ProcessingStatus.COMPLETED,
-                        ProcessingStatus.SKIPPED,
-                    ]),
+                    Screenshot.processing_status.in_(
+                        [
+                            ProcessingStatus.COMPLETED,
+                            ProcessingStatus.SKIPPED,
+                        ]
+                    ),
                 )
             )
             .order_by(Screenshot.id.asc())
@@ -565,3 +517,270 @@ class ScreenshotRepository:
         result = await self.db.execute(stmt)
         duplicate_id = result.scalar_one_or_none()
         return duplicate_id
+
+    # =========================================================================
+    # Batch / filtering queries (extracted from routes)
+    # =========================================================================
+
+    async def get_by_group(self, group_id: str) -> list[Screenshot]:
+        """Get all screenshots in a group.
+
+        Used for preprocessing summary and batch operations.
+        """
+        result = await self.db.execute(select(Screenshot).where(Screenshot.group_id == group_id))
+        return list(result.scalars().all())
+
+    async def list_basic(
+        self,
+        *,
+        annotation_status: str | None = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[Screenshot]:
+        """List screenshots with optional status filter and pagination.
+
+        Simple listing without user-specific or verified filters.
+        """
+        stmt = select(Screenshot)
+
+        if annotation_status:
+            stmt = stmt.where(Screenshot.annotation_status == annotation_status)
+
+        stmt = stmt.offset(skip).limit(limit).order_by(Screenshot.uploaded_at.desc())
+
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_ids_by_group(
+        self,
+        group_id: str,
+        screenshot_ids: list[int] | None = None,
+    ) -> list[int]:
+        """Get screenshot IDs in a group, optionally filtered to specific IDs.
+
+        Args:
+            group_id: Group to filter by.
+            screenshot_ids: If provided, only return IDs that are both in
+                this list AND belong to the group.
+
+        Returns:
+            List of screenshot IDs.
+        """
+        if screenshot_ids:
+            stmt = select(Screenshot.id).where(
+                Screenshot.id.in_(screenshot_ids),
+                Screenshot.group_id == group_id,
+            )
+        else:
+            stmt = select(Screenshot.id).where(Screenshot.group_id == group_id).order_by(Screenshot.id)
+
+        result = await self.db.execute(stmt)
+        return [row[0] for row in result.all()]
+
+    async def get_by_ids_or_group(
+        self,
+        screenshot_ids: list[int] | None = None,
+        group_id: str | None = None,
+    ) -> list[Screenshot]:
+        """Get screenshots by a list of IDs or by group_id.
+
+        At least one of screenshot_ids or group_id must be provided.
+
+        Returns:
+            List of Screenshot objects.
+        """
+        if screenshot_ids:
+            stmt = select(Screenshot).where(Screenshot.id.in_(screenshot_ids))
+        elif group_id:
+            stmt = select(Screenshot).where(Screenshot.group_id == group_id)
+        else:
+            raise ValueError("At least one of screenshot_ids or group_id must be provided")
+
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
+
+    # =========================================================================
+    # Navigation queries (extracted from routes & screenshot_service)
+    # =========================================================================
+
+    async def navigate_with_filters(
+        self,
+        screenshot_id: int,
+        direction: str,
+        conditions: list,
+    ) -> NavigationResult:
+        """Navigate screenshots with filter conditions.
+
+        Args:
+            screenshot_id: Current screenshot ID for directional navigation.
+            direction: "current", "next", or "prev".
+            conditions: Pre-built SQLAlchemy filter conditions.
+
+        Returns:
+            NavigationResult with screenshot, index, total, and has_next/has_prev.
+        """
+        # Get total count in filter
+        count_stmt = select(func.count(Screenshot.id))
+        if conditions:
+            count_stmt = count_stmt.where(and_(*conditions))
+        result = await self.db.execute(count_stmt)
+        total_in_filter = result.scalar_one()
+
+        # Get the target screenshot based on direction
+        if direction == "next":
+            stmt = select(Screenshot).where(Screenshot.id > screenshot_id)
+            if conditions:
+                stmt = stmt.where(and_(*conditions))
+            stmt = stmt.order_by(Screenshot.id.asc()).limit(1)
+        elif direction == "prev":
+            stmt = select(Screenshot).where(Screenshot.id < screenshot_id)
+            if conditions:
+                stmt = stmt.where(and_(*conditions))
+            stmt = stmt.order_by(Screenshot.id.desc()).limit(1)
+        else:
+            stmt = select(Screenshot).where(Screenshot.id == screenshot_id)
+            if conditions:
+                stmt = stmt.where(and_(*conditions))
+
+        result = await self.db.execute(stmt)
+        screenshot = result.scalar_one_or_none()
+
+        if not screenshot:
+            return NavigationResult(
+                screenshot=None,
+                current_index=0,
+                total_in_filter=total_in_filter,
+                has_next=False,
+                has_prev=False,
+            )
+
+        # Calculate current index (1-indexed)
+        index_stmt = select(func.count(Screenshot.id)).where(Screenshot.id < screenshot.id)
+        if conditions:
+            index_stmt = index_stmt.where(and_(*conditions))
+        result = await self.db.execute(index_stmt)
+        current_index = result.scalar_one() + 1
+
+        # Check if there's a next screenshot
+        next_stmt = select(func.count(Screenshot.id)).where(Screenshot.id > screenshot.id)
+        if conditions:
+            next_stmt = next_stmt.where(and_(*conditions))
+        result = await self.db.execute(next_stmt)
+        has_next = result.scalar_one() > 0
+
+        # Check if there's a previous screenshot
+        prev_stmt = select(func.count(Screenshot.id)).where(Screenshot.id < screenshot.id)
+        if conditions:
+            prev_stmt = prev_stmt.where(and_(*conditions))
+        result = await self.db.execute(prev_stmt)
+        has_prev = result.scalar_one() > 0
+
+        return NavigationResult(
+            screenshot=screenshot,
+            current_index=current_index,
+            total_in_filter=total_in_filter,
+            has_next=has_next,
+            has_prev=has_prev,
+        )
+
+    # =========================================================================
+    # Content-hash batch queries (extracted from upload routes)
+    # =========================================================================
+
+    async def find_existing_by_content_hashes(self, content_hashes: list[str]) -> dict[str, int]:
+        """Find screenshots matching any of the given content hashes.
+
+        Returns:
+            Dict mapping content_hash -> screenshot_id for existing matches.
+        """
+        if not content_hashes:
+            return {}
+
+        result = await self.db.execute(
+            select(Screenshot.content_hash, Screenshot.id).where(Screenshot.content_hash.in_(content_hashes))
+        )
+        return {row[0]: row[1] for row in result.fetchall()}
+
+    async def find_existing_file_paths(self, file_paths: list[str]) -> set[str]:
+        """Find which file_paths already exist in the database.
+
+        Returns:
+            Set of file paths that already have screenshot records.
+        """
+        if not file_paths:
+            return set()
+
+        result = await self.db.execute(select(Screenshot.file_path).where(Screenshot.file_path.in_(file_paths)))
+        return {row[0] for row in result.fetchall()}
+
+    # =========================================================================
+    # Upload duplicate cleanup (extracted from upload routes)
+    # =========================================================================
+
+    async def clear_screenshot_related_data(self, screenshot_ids: Sequence[int]) -> None:
+        """Clear annotations, consensus results, and queue states for screenshots.
+
+        Used when re-uploading duplicates to ensure a fresh start.
+        Does NOT commit — caller is responsible for committing.
+        """
+        if not screenshot_ids:
+            return
+
+        id_list = list(screenshot_ids)
+        await self.db.execute(delete(Annotation).where(Annotation.screenshot_id.in_(id_list)))
+        await self.db.execute(delete(ConsensusResult).where(ConsensusResult.screenshot_id.in_(id_list)))
+        await self.db.execute(delete(UserQueueState).where(UserQueueState.screenshot_id.in_(id_list)))
+
+    async def reset_screenshot_state(self, screenshot_ids: Sequence[int]) -> None:
+        """Reset annotation/verification state for screenshots.
+
+        Used after clearing related data for re-uploaded duplicates.
+        Does NOT commit — caller is responsible for committing.
+        """
+        if not screenshot_ids:
+            return
+
+        await self.db.execute(
+            update(Screenshot)
+            .where(Screenshot.id.in_(list(screenshot_ids)))
+            .values(
+                current_annotation_count=0,
+                annotation_status=AnnotationStatus.PENDING,
+                has_consensus=False,
+                verified_by_user_ids=None,
+            )
+        )
+
+    # =========================================================================
+    # Export queries (extracted from CSV export route)
+    # =========================================================================
+
+    async def get_screenshots_with_consensus(self, conditions: list) -> list:
+        """Get screenshots joined with consensus results for export.
+
+        Args:
+            conditions: Pre-built SQLAlchemy filter conditions.
+
+        Returns:
+            List of (Screenshot, ConsensusResult|None) tuples.
+        """
+        stmt = select(Screenshot, ConsensusResult).outerjoin(
+            ConsensusResult, Screenshot.id == ConsensusResult.screenshot_id
+        )
+        if conditions:
+            stmt = stmt.where(and_(*conditions))
+        stmt = stmt.order_by(Screenshot.uploaded_at)
+
+        result = await self.db.execute(stmt)
+        return list(result.all())
+
+
+@dataclass
+class NavigationResult:
+    """Result of a navigation query."""
+
+    screenshot: Screenshot | None
+    current_index: int
+    total_in_filter: int
+    has_next: bool
+    has_prev: bool

@@ -5,7 +5,7 @@ test.describe("Admin Page", () => {
   test("should deny access to non-admin users", async ({
     authenticatedPage,
   }) => {
-    await authenticatedPage.goto("/admin");
+    await authenticatedPage.goto("admin");
 
     await expect(authenticatedPage.getByText(/access denied/i)).toBeVisible();
     await expect(
@@ -14,7 +14,7 @@ test.describe("Admin Page", () => {
   });
 
   test("should allow access to admin users", async ({ adminPage }) => {
-    await adminPage.goto("/admin");
+    await adminPage.goto("admin");
 
     await expect(
       adminPage.getByRole("heading", { name: /user management/i }),
@@ -22,7 +22,7 @@ test.describe("Admin Page", () => {
   });
 
   test("should display user list", async ({ adminPage }) => {
-    await adminPage.goto("/admin");
+    await adminPage.goto("admin");
 
     // Wait for users to load
     await adminPage.waitForLoadState("networkidle");
@@ -54,7 +54,7 @@ test.describe("Admin Page", () => {
   test("should display user information when users exist", async ({
     adminPage,
   }) => {
-    await adminPage.goto("/admin");
+    await adminPage.goto("admin");
     await adminPage.waitForLoadState("networkidle");
 
     // Check for user table presence
@@ -89,7 +89,7 @@ test.describe("Admin Page", () => {
   });
 
   test("should toggle user role", async ({ adminPage }) => {
-    await adminPage.goto("/admin");
+    await adminPage.goto("admin");
     await adminPage.waitForLoadState("networkidle");
 
     // Find a non-admin user to promote (or admin to demote)
@@ -133,7 +133,7 @@ test.describe("Admin Page", () => {
   });
 
   test("should toggle user active status", async ({ adminPage }) => {
-    await adminPage.goto("/admin");
+    await adminPage.goto("admin");
     await adminPage.waitForLoadState("networkidle");
 
     // Find activate/deactivate buttons
@@ -177,7 +177,7 @@ test.describe("Admin Page", () => {
   });
 
   test("should show user table or empty message", async ({ adminPage }) => {
-    await adminPage.goto("/admin");
+    await adminPage.goto("admin");
     await adminPage.waitForLoadState("networkidle");
 
     // Either show user table or "no users" message
@@ -192,7 +192,7 @@ test.describe("Admin Page", () => {
   });
 
   test("should display role badges correctly", async ({ adminPage }) => {
-    await adminPage.goto("/admin");
+    await adminPage.goto("admin");
     await adminPage.waitForLoadState("networkidle");
 
     const userTable = adminPage.getByTestId("user-table");
@@ -216,7 +216,7 @@ test.describe("Admin Page", () => {
   });
 
   test("should display active status badges", async ({ adminPage }) => {
-    await adminPage.goto("/admin");
+    await adminPage.goto("admin");
     await adminPage.waitForLoadState("networkidle");
 
     const userTable = adminPage.getByTestId("user-table");

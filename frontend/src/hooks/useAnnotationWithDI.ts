@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useEffect, useRef } from "react";
 import type { GridCoordinates } from "@/core";
+import type { ProcessingStatus } from "@/types";
 import {
   useScreenshotService,
   useAnnotationService,
@@ -22,7 +23,7 @@ const storeInstances = new Map<string, StoreEntry>();
 // Cleanup delay to allow for quick re-mounts (e.g., React strict mode)
 const CLEANUP_DELAY_MS = 5000;
 
-export const useAnnotation = (groupId?: string, processingStatus?: string) => {
+export const useAnnotation = (groupId?: string, processingStatus?: ProcessingStatus) => {
   const screenshotService = useScreenshotService();
   const annotationService = useAnnotationService();
   const consensusService = useConsensusService();
@@ -100,7 +101,7 @@ export const useAnnotation = (groupId?: string, processingStatus?: string) => {
     setHourlyValues,
     updateHourValue,
     setExtractedTitle,
-    submitAnnotation,
+    saveAnnotation,
     skipScreenshot,
     reprocessWithGrid: storeReprocessWithGrid,
     reprocessWithLineBased: storeReprocessWithLineBased,
@@ -142,8 +143,8 @@ export const useAnnotation = (groupId?: string, processingStatus?: string) => {
         if (config.isDev) {
           console.log("[useAnnotation.handleSubmit] Starting submission...");
         }
-        await submitAnnotation(notes);
-        toast.success("Annotation submitted successfully!");
+        await saveAnnotation(notes);
+        toast.success(config.isLocalMode ? "Annotation saved!" : "Annotation submitted!");
         if (config.isDev) {
           console.log("[useAnnotation.handleSubmit] Loading next screenshot...");
         }
@@ -154,29 +155,29 @@ export const useAnnotation = (groupId?: string, processingStatus?: string) => {
       } catch (err: unknown) {
         console.error("[useAnnotation.handleSubmit] Error:", err);
         const errorMessage =
-          err instanceof Error ? err.message : "Failed to submit annotation";
+          err instanceof Error ? err.message : "Failed to save annotation";
         toastErrorWithRetry({
           message: errorMessage,
           // eslint-disable-next-line react-hooks/immutability
           onRetry: () => handleSubmit(notes),
-          retryLabel: "Retry Submit",
+          retryLabel: "Retry",
         });
       }
     },
-    [submitAnnotation, loadNextScreenshot],
+    [saveAnnotation, loadNextScreenshot],
   );
 
   // Save without navigating (for auto-save)
   const handleSaveOnly = useCallback(
     async (notes?: string) => {
       try {
-        await submitAnnotation(notes);
+        await saveAnnotation(notes);
       } catch (err: unknown) {
         console.error("[useAnnotation.handleSaveOnly] Error:", err);
         throw err;
       }
     },
-    [submitAnnotation],
+    [saveAnnotation],
   );
 
   const handleSkip = useCallback(async () => {

@@ -4,6 +4,7 @@ import type {
   IAnnotationService,
   IConsensusService,
 } from "@/core";
+import type { ProcessingStatus } from "@/types";
 import {
   type AnnotationState,
   createScreenshotSlice,
@@ -31,7 +32,7 @@ export function createAnnotationStore(
   annotationService: IAnnotationService,
   consensusService: IConsensusService,
   groupId?: string,
-  processingStatus?: string,
+  processingStatus?: ProcessingStatus,
 ) {
   return create<AnnotationState>()((...args) => ({
     // Screenshot slice: Loading, stats, skip

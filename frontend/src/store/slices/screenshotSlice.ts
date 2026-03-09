@@ -1,5 +1,6 @@
 import type { StateCreator } from "zustand";
 import type { IScreenshotService, NavigationParams, ProcessingIssue, Screenshot } from "@/core";
+import type { ProcessingStatus } from "@/types";
 import type { AnnotationState, ScreenshotSlice, UIAnnotation } from "./types";
 import { initialAnnotation } from "./types";
 import { filterToApiParams, isVerifiedByCurrentUser } from "./helpers";
@@ -7,7 +8,7 @@ import { filterToApiParams, isVerifiedByCurrentUser } from "./helpers";
 export const createScreenshotSlice = (
   screenshotService: IScreenshotService,
   groupId?: string,
-  processingStatus?: string,
+  processingStatus?: ProcessingStatus,
 ): StateCreator<AnnotationState, [], [], ScreenshotSlice> => (set, get) => ({
   // State
   currentScreenshot: null,
@@ -138,7 +139,7 @@ export const createScreenshotSlice = (
         try {
           const navParams: NavigationParams = {
             group_id: groupId,
-            processing_status: processingStatus as any,
+            processing_status: processingStatus,
             ...filterToApiParams(verificationFilter),
             direction: "current", // Just get position info, don't navigate
           };
@@ -244,7 +245,7 @@ export const createScreenshotSlice = (
         try {
           const navParams: NavigationParams = {
             group_id: groupId,
-            processing_status: processingStatus as any,
+            processing_status: processingStatus,
             ...filterToApiParams(verificationFilter),
             direction: "current", // Just get position info, don't navigate
           };

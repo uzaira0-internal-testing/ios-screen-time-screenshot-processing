@@ -14,10 +14,13 @@
     "test:e2e:ui": "bunx playwright test --ui",
     "test:e2e:headed": "bunx playwright test --headed",
     "test:e2e:debug": "bunx playwright test --debug",
-    "test:e2e:report": "bunx playwright show-report"
+    "test:e2e:report": "bunx playwright show-report",
+    "tauri:dev": "npx tauri dev",
+    "tauri:build": "npx tauri build"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
+    "@tanstack/react-virtual": "^3.13.21",
     "@tailwindcss/cli": "^4.2.1",
     "chart.js": "^4.4.7",
     "clsx": "^2.1.1",
@@ -31,7 +34,11 @@
     "react-router": "^7.13.1",
     "tesseract.js": "^7.0.0",
     "xlsx": "^0.18.5",
-    "zustand": "^5.0.2"
+    "zustand": "^5.0.2",
+    "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/plugin-dialog": "^2",
+    "@tauri-apps/plugin-fs": "^2",
+    "@tauri-apps/plugin-shell": "^2"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.0",
@@ -50,6 +57,10 @@
     "openapi-typescript": "^7.10.1",
     "tailwindcss": "^4.2.1",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.50.1"
+    "typescript-eslint": "^8.50.1",
+    "@tauri-apps/cli": "^2",
+    "vite": "^6",
+    "@vitejs/plugin-react": "^4",
+    "@tailwindcss/vite": "^4"
   }
 }

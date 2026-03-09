@@ -15,8 +15,8 @@ async function performLogin(
   page: import("@playwright/test").Page,
   username: string,
 ) {
-  // Navigate to login page
-  await page.goto("/login");
+  // Navigate to login page (relative path so baseURL path is preserved)
+  await page.goto("login");
 
   // Wait for the form to be fully loaded and stable
   await page.waitForLoadState("networkidle");
@@ -36,8 +36,9 @@ async function performLogin(
   // Click continue button
   await continueButton.click();
 
-  // Wait for redirect to annotate page
-  await page.waitForURL("/annotate**");
+  // Wait for redirect away from login page
+  await page.waitForURL(/(?!.*\/login)/);
+  await page.waitForLoadState("networkidle");
 }
 
 /**

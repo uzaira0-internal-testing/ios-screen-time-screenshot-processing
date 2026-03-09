@@ -133,6 +133,7 @@ export type ProcessingStatus =
   | "completed"
   | "failed"
   | "skipped"
+  | "deleted"
 
 export type AnnotationStatus = "pending" | "annotated" | "verified" | "skipped";
 export type ProcessingMethod = "ocr_anchored" | "line_based" | "manual";
