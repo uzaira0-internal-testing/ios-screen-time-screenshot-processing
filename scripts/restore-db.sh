@@ -25,8 +25,15 @@ set -euo pipefail
 BACKUP_DIR="/home/uzair/backups/ios-screen-time/db"
 UPLOADS_BACKUP_DIR="/home/uzair/backups/ios-screen-time/uploads"
 
+# Auto-detect container name: try production name first, then dev
 CONTAINER_NAME="ios-screen-time-screenshot-processing-postgres"
+if ! docker inspect --format='{{.State.Status}}' "$CONTAINER_NAME" 2>/dev/null | grep -q running; then
+    CONTAINER_NAME="ios-screen-time-screenshot-processing-postgres-dev"
+fi
 BACKEND_CONTAINER="ios-screen-time-screenshot-processing-backend"
+if ! docker inspect --format='{{.State.Status}}' "$BACKEND_CONTAINER" 2>/dev/null | grep -q running; then
+    BACKEND_CONTAINER="ios-screen-time-screenshot-processing-backend-dev"
+fi
 
 # Auto-detect credentials from the running container (Dokploy may override .env values)
 DB_USER=$(docker exec "$CONTAINER_NAME" bash -c 'echo $POSTGRES_USER' 2>/dev/null || echo "screenshot")

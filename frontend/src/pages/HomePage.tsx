@@ -39,6 +39,7 @@ export const HomePage = () => {
   const [deleteConfirm, setDeleteConfirm] = useState<Group | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+  const [loadProgress, setLoadProgress] = useState({ current: 0, total: 0 });
   const [imageType, setImageType] = useState<ImageType>("screen_time");
   const [groupName, setGroupName] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
@@ -53,10 +54,9 @@ export const HomePage = () => {
       }
 
       setIsLoadingFiles(true);
+      setLoadProgress({ current: 0, total: imageFiles.length });
       const results = { loaded: 0, failed: 0, duplicates: 0 };
 
-      // Process in batches to overlap hash computation and IndexedDB writes
-      // without overwhelming memory (each file's ArrayBuffer is live during hash)
       const BATCH_SIZE = 5;
       for (let i = 0; i < imageFiles.length; i += BATCH_SIZE) {
         const batch = imageFiles.slice(i, i + BATCH_SIZE);
@@ -83,6 +83,7 @@ export const HomePage = () => {
             }
           }),
         );
+        setLoadProgress({ current: Math.min(i + BATCH_SIZE, imageFiles.length), total: imageFiles.length });
       }
 
       setIsLoadingFiles(false);
@@ -305,6 +306,22 @@ export const HomePage = () => {
               )}
             </div>
           </div>
+
+          {/* Progress bar during folder loading */}
+          {isLoadingFiles && loadProgress.total > 0 && (
+            <div className="mb-6 space-y-2">
+              <div className="flex justify-between text-sm text-slate-600 dark:text-slate-400">
+                <span>Loading screenshots...</span>
+                <span>{loadProgress.current} / {loadProgress.total}</span>
+              </div>
+              <div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary-600 rounded-full transition-all duration-200"
+                  style={{ width: `${(loadProgress.current / loadProgress.total) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
 
           {loading && initialLoad ? (
             <div className="space-y-4">

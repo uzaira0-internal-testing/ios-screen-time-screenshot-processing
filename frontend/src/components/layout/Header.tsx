@@ -23,10 +23,12 @@ export const Header = () => {
   const isAnnotatePage = location.pathname === "/annotate";
 
   const navLinks = [
+    { to: "/", label: "Home" },
     ...(features.preprocessing ? [{ to: "/upload", label: "Upload" }] : []),
     ...(features.preprocessing ? [{ to: "/preprocessing", label: "Preprocessing" }] : []),
-    { to: "/", label: "Annotate" },
+    { to: "/annotate", label: "Annotate" },
     { to: "/consensus", label: "Consensus" },
+    { to: "/settings", label: "Settings" },
     ...(features.admin && isAdmin ? [{ to: "/admin", label: "Admin" }] : []),
   ];
 

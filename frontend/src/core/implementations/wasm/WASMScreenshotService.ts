@@ -153,11 +153,6 @@ export class WASMScreenshotService implements IScreenshotService {
 
     const screenshot: Screenshot = { ...screenshotData, id };
 
-    // Auto-process in background (don't await to avoid blocking)
-    this.autoProcess(screenshot).catch((error) => {
-      console.error("Auto-processing failed:", error);
-    });
-
     return screenshot;
   }
 
@@ -375,7 +370,7 @@ export class WASMScreenshotService implements IScreenshotService {
   }
 
   async processIfNeeded(screenshot: Screenshot): Promise<Screenshot> {
-    // Skip if already being processed (e.g., by autoProcess after upload)
+    // Skip if already being processed
     if (this.processingInProgress.has(screenshot.id)) {
       console.log(
         `[WASMScreenshotService.processIfNeeded] Screenshot ${screenshot.id} already being processed, returning as-is`,
@@ -571,55 +566,6 @@ export class WASMScreenshotService implements IScreenshotService {
       deleted: allScreenshots.filter((s) => s.processing_status === "deleted")
         .length,
     };
-  }
-
-  private async autoProcess(screenshot: Screenshot): Promise<void> {
-    // Prevent concurrent processing of the same screenshot
-    if (this.processingInProgress.has(screenshot.id)) {
-      console.log(`[WASMScreenshotService.autoProcess] Screenshot ${screenshot.id} already being processed, skipping`);
-      return;
-    }
-    this.processingInProgress.add(screenshot.id);
-
-    try {
-      const imageBlob = await this.storageService.getImageBlob(screenshot.id);
-
-      if (!imageBlob) {
-        console.warn(`[WASMScreenshotService.autoProcess] No image blob for screenshot ${screenshot.id}`);
-        await this.storageService.updateScreenshot(screenshot.id, {
-          processing_status: "failed",
-        });
-        return;
-      }
-
-      // Use full processImage to get title, total, grid, and hourly data
-      const result = await this.processingService.processImage(imageBlob, {
-        imageType: screenshot.image_type,
-      });
-
-      if (result) {
-        const processingStatus = result.hourlyData ? "completed" : "failed";
-
-        await this.storageService.updateScreenshot(screenshot.id, {
-          extracted_title: result.title || null,
-          extracted_total: result.total || null,
-          extracted_hourly_data: result.hourlyData || null,
-          grid_upper_left_x: result.gridCoordinates?.upper_left?.x ?? null,
-          grid_upper_left_y: result.gridCoordinates?.upper_left?.y ?? null,
-          grid_lower_right_x: result.gridCoordinates?.lower_right?.x ?? null,
-          grid_lower_right_y: result.gridCoordinates?.lower_right?.y ?? null,
-          processing_status: processingStatus,
-          processed_at: new Date().toISOString(),
-        });
-      }
-    } catch (error) {
-      console.error("Auto-processing failed:", error);
-      await this.storageService.updateScreenshot(screenshot.id, {
-        processing_status: "failed",
-      });
-    } finally {
-      this.processingInProgress.delete(screenshot.id);
-    }
   }
 
   async getList(params: ScreenshotListParams): Promise<ScreenshotListResponse> {
