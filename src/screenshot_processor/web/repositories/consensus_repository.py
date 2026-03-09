@@ -12,6 +12,7 @@ from screenshot_processor.web.database.models import (
     ConsensusResult,
     Group,
     Screenshot,
+    User,
 )
 
 
@@ -23,14 +24,10 @@ class ConsensusRepository:
 
     async def get_consensus_result(self, screenshot_id: int) -> ConsensusResult | None:
         """Get consensus result for a screenshot."""
-        result = await self.db.execute(
-            select(ConsensusResult).where(ConsensusResult.screenshot_id == screenshot_id)
-        )
+        result = await self.db.execute(select(ConsensusResult).where(ConsensusResult.screenshot_id == screenshot_id))
         return result.scalar_one_or_none()
 
-    async def get_or_create_consensus_result(
-        self, screenshot_id: int
-    ) -> ConsensusResult:
+    async def get_or_create_consensus_result(self, screenshot_id: int) -> ConsensusResult:
         """Get or create consensus result for a screenshot."""
         existing = await self.get_consensus_result(screenshot_id)
         if existing:
@@ -60,9 +57,7 @@ class ConsensusRepository:
         result = await self.db.execute(select(Group).order_by(Group.name))
         return list(result.scalars().all())
 
-    async def get_verified_screenshots_in_group(
-        self, group_id: str
-    ) -> list[Screenshot]:
+    async def get_verified_screenshots_in_group(self, group_id: str) -> list[Screenshot]:
         """Get all verified screenshots in a group with their annotations."""
         # Note: JSON columns can have SQL NULL or JSON null (literal "null" string)
         result = await self.db.execute(
@@ -80,14 +75,10 @@ class ConsensusRepository:
 
     async def get_group_screenshot_count(self, group_id: str) -> int:
         """Get total screenshot count for a group."""
-        result = await self.db.execute(
-            select(func.count(Screenshot.id)).where(Screenshot.group_id == group_id)
-        )
+        result = await self.db.execute(select(func.count(Screenshot.id)).where(Screenshot.group_id == group_id))
         return result.scalar_one()
 
-    async def get_screenshot_with_annotations(
-        self, screenshot_id: int
-    ) -> Screenshot | None:
+    async def get_screenshot_with_annotations(self, screenshot_id: int) -> Screenshot | None:
         """Get screenshot with annotations and users eagerly loaded."""
         result = await self.db.execute(
             select(Screenshot)
@@ -99,10 +90,60 @@ class ConsensusRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_users_by_ids(self, user_ids: list[int]) -> list:
+        """Get users by their IDs."""
+        result = await self.db.execute(select(User).where(User.id.in_(user_ids)))
+        return list(result.scalars().all())
+
     async def get_group_by_id(self, group_id: str) -> Group | None:
         """Get group by ID."""
         result = await self.db.execute(select(Group).where(Group.id == group_id))
         return result.scalar_one_or_none()
+
+    async def get_screenshot_with_annotations_for_update(self, screenshot_id: int) -> Screenshot | None:
+        """Get screenshot with annotations eagerly loaded and row lock.
+
+        Used by consensus analysis to prevent race conditions when
+        multiple annotations are submitted concurrently.
+        """
+        result = await self.db.execute(
+            select(Screenshot)
+            .options(selectinload(Screenshot.annotations))
+            .where(Screenshot.id == screenshot_id)
+            .with_for_update()
+        )
+        return result.scalar_one_or_none()
+
+    async def get_consensus_counts(self) -> dict:
+        """Get consensus-related counts for the summary endpoint.
+
+        Returns:
+            Dict with total_with_consensus, total_with_disagreements,
+            and total_completed counts.
+        """
+        total_with_consensus_stmt = select(func.count(ConsensusResult.id)).where(
+            ConsensusResult.has_consensus == True  # noqa: E712
+        )
+        result = await self.db.execute(total_with_consensus_stmt)
+        total_with_consensus = result.scalar_one()
+
+        total_with_disagreements_stmt = select(func.count(ConsensusResult.id)).where(
+            ConsensusResult.has_consensus == False  # noqa: E712
+        )
+        result = await self.db.execute(total_with_disagreements_stmt)
+        total_with_disagreements = result.scalar_one()
+
+        total_annotations_stmt = select(func.count(Screenshot.id)).where(
+            Screenshot.current_annotation_count >= Screenshot.target_annotations
+        )
+        result = await self.db.execute(total_annotations_stmt)
+        total_completed = result.scalar_one()
+
+        return {
+            "total_with_consensus": total_with_consensus,
+            "total_with_disagreements": total_with_disagreements,
+            "total_completed": total_completed,
+        }
 
     async def get_consensus_summary_stats(self) -> dict:
         """Get summary statistics for consensus analysis."""
@@ -111,9 +152,7 @@ class ConsensusRepository:
         total = total_result.scalar_one()
 
         # Screenshots with consensus results
-        with_consensus_result = await self.db.execute(
-            select(func.count(ConsensusResult.id))
-        )
+        with_consensus_result = await self.db.execute(select(func.count(ConsensusResult.id)))
         with_consensus = with_consensus_result.scalar_one()
 
         # Screenshots with disagreements
@@ -125,9 +164,7 @@ class ConsensusRepository:
         with_disagreements = with_disagreements_result.scalar_one()
 
         # Total disagreements
-        total_disagreements_result = await self.db.execute(
-            select(func.sum(ConsensusResult.disagreement_count))
-        )
+        total_disagreements_result = await self.db.execute(select(func.sum(ConsensusResult.disagreement_count)))
         total_disagreements = total_disagreements_result.scalar_one() or 0
 
         return {

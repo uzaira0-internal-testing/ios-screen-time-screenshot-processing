@@ -7,6 +7,7 @@ This module provides OCR functions specifically for detecting
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
 
 import cv2
@@ -119,8 +120,12 @@ def perform_ocr(
             img_left_rgb = cv2.cvtColor(img_left, cv2.COLOR_BGR2RGB)
             img_right_rgb = cv2.cvtColor(img_right, cv2.COLOR_BGR2RGB)
 
-            results_left = engine.extract_text_with_bboxes(img_left_rgb, config=psm_config)
-            results_right = engine.extract_text_with_bboxes(img_right_rgb, config=psm_config)
+            # Run left and right OCR in parallel (each is a network call or CPU-bound Tesseract)
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                future_left = pool.submit(engine.extract_text_with_bboxes, img_left_rgb, psm_config)
+                future_right = pool.submit(engine.extract_text_with_bboxes, img_right_rgb, psm_config)
+                results_left = future_left.result()
+                results_right = future_right.result()
 
             used_engine = engine.last_engine_used
             logger.debug(f"Grid anchor OCR used: {used_engine}")
@@ -166,9 +171,20 @@ def perform_ocr(
         except Exception as e:
             logger.warning(f"HybridOCR failed, falling back to direct Tesseract: {e}")
 
-    # Default/fallback: use Tesseract directly
-    d_left = pytesseract.image_to_data(img_left, config=psm_config, output_type=Output.DICT)
-    d_right = pytesseract.image_to_data(img_right, config=psm_config, output_type=Output.DICT)
+    # Default/fallback: use Tesseract directly (parallelize left + right)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        future_left = pool.submit(pytesseract.image_to_data, img_left, config=psm_config, output_type=Output.DICT)
+        future_right = pool.submit(pytesseract.image_to_data, img_right, config=psm_config, output_type=Output.DICT)
+        try:
+            d_left = future_left.result()
+        except Exception as e:
+            logger.error(f"Left-side Tesseract OCR failed: {e}")
+            raise
+        try:
+            d_right = future_right.result()
+        except Exception as e:
+            logger.error(f"Right-side Tesseract OCR failed: {e}")
+            raise
 
     # Log Tesseract bbox details
     for i, txt in enumerate(d_left["text"]):

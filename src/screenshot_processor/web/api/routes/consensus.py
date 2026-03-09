@@ -4,8 +4,6 @@ import datetime
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import String, cast, func, select
-from sqlalchemy.orm import selectinload
 
 from screenshot_processor.web.api.dependencies import CurrentUser, DatabaseSession
 from screenshot_processor.web.database import (
@@ -20,7 +18,8 @@ from screenshot_processor.web.database import (
     ScreenshotTierItem,
     VerifierAnnotation,
 )
-from screenshot_processor.web.database.models import Annotation, Group, Screenshot, UserRole
+from screenshot_processor.web.database.models import Annotation, Screenshot, UserRole
+from screenshot_processor.web.repositories import ConsensusRepo, ScreenshotRepo
 from screenshot_processor.web.services import ConsensusService
 
 router = APIRouter(prefix="/consensus", tags=["Consensus"])
@@ -101,7 +100,7 @@ def _get_verification_tier(
 
 @router.get("/groups", response_model=list[GroupVerificationSummary])
 async def get_groups_with_verification_tiers(
-    db: DatabaseSession,
+    repo: ConsensusRepo,
     current_user: CurrentUser,
 ):
     """
@@ -112,28 +111,15 @@ async def get_groups_with_verification_tiers(
     - agreed: 2+ users verified, all values match exactly
     - disputed: 2+ users verified, any difference exists
     """
+
     # Get all groups
-    groups_stmt = select(Group).order_by(Group.name)
-    groups_result = await db.execute(groups_stmt)
-    groups = groups_result.scalars().all()
+    groups = await repo.get_all_groups()
 
     summaries = []
 
     for group in groups:
         # Get all verified screenshots in this group
-        # Note: JSON columns can have SQL NULL or JSON null (literal "null" string)
-        screenshots_stmt = (
-            select(Screenshot)
-            .options(selectinload(Screenshot.annotations))
-            .where(
-                Screenshot.group_id == group.id,
-                Screenshot.verified_by_user_ids.isnot(None),
-                cast(Screenshot.verified_by_user_ids, String) != "null",
-                cast(Screenshot.verified_by_user_ids, String) != "[]",
-            )
-        )
-        screenshots_result = await db.execute(screenshots_stmt)
-        verified_screenshots = list(screenshots_result.scalars().all())
+        verified_screenshots = await repo.get_verified_screenshots_in_group(group.id)
 
         single_verified = 0
         agreed = 0
@@ -149,9 +135,7 @@ async def get_groups_with_verification_tiers(
                 disputed += 1
 
         # Get total screenshot count for this group
-        total_stmt = select(func.count(Screenshot.id)).where(Screenshot.group_id == group.id)
-        total_result = await db.execute(total_stmt)
-        total_screenshots = total_result.scalar_one()
+        total_screenshots = await repo.get_group_screenshot_count(group.id)
 
         summaries.append(
             GroupVerificationSummary(
@@ -172,36 +156,22 @@ async def get_groups_with_verification_tiers(
 @router.get("/groups/{group_id}/screenshots", response_model=list[ScreenshotTierItem])
 async def get_screenshots_by_tier(
     group_id: str,
+    repo: ConsensusRepo,
+    current_user: CurrentUser,
     tier: Literal["single_verified", "agreed", "disputed"] = Query(..., description="Verification tier to filter by"),
-    db: DatabaseSession = None,
-    current_user: CurrentUser = None,
 ):
     """
     Get screenshots in a specific verification tier for a group.
     """
+
     # Verify group exists
-    group_stmt = select(Group).where(Group.id == group_id)
-    group_result = await db.execute(group_stmt)
-    group = group_result.scalar_one_or_none()
+    group = await repo.get_group_by_id(group_id)
 
     if not group:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
 
     # Get all verified screenshots in this group
-    # Note: JSON columns can have SQL NULL or JSON null (literal "null" string)
-    screenshots_stmt = (
-        select(Screenshot)
-        .options(selectinload(Screenshot.annotations))
-        .where(
-            Screenshot.group_id == group_id,
-            Screenshot.verified_by_user_ids.isnot(None),
-            cast(Screenshot.verified_by_user_ids, String) != "null",
-            cast(Screenshot.verified_by_user_ids, String) != "[]",
-        )
-        .order_by(Screenshot.screenshot_date, Screenshot.id)
-    )
-    screenshots_result = await db.execute(screenshots_stmt)
-    verified_screenshots = list(screenshots_result.scalars().all())
+    verified_screenshots = await repo.get_verified_screenshots_in_group(group_id)
 
     items = []
     for screenshot in verified_screenshots:
@@ -232,24 +202,16 @@ async def get_screenshots_by_tier(
 @router.get("/screenshots/{screenshot_id}/compare", response_model=ScreenshotComparison)
 async def get_screenshot_comparison(
     screenshot_id: int,
-    db: DatabaseSession,
+    repo: ConsensusRepo,
     current_user: CurrentUser,
 ):
     """
     Get comparison data for a screenshot with multiple verifiers.
     Shows each verifier's annotation and highlights differences.
     """
+
     # Get screenshot with annotations and resolved_by user
-    screenshot_stmt = (
-        select(Screenshot)
-        .options(
-            selectinload(Screenshot.annotations).selectinload(Annotation.user),
-            selectinload(Screenshot.resolved_by),
-        )
-        .where(Screenshot.id == screenshot_id)
-    )
-    screenshot_result = await db.execute(screenshot_stmt)
-    screenshot = screenshot_result.scalar_one_or_none()
+    screenshot = await repo.get_screenshot_with_annotations(screenshot_id)
 
     if not screenshot:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Screenshot not found")
@@ -280,12 +242,9 @@ async def get_screenshot_comparison(
     # They verified using the screenshot's extracted data
     missing_verifier_ids = [vid for vid in verifier_ids if vid not in annotation_user_ids]
     if missing_verifier_ids:
-        from screenshot_processor.web.database.models import User
-
         # Look up usernames for verifiers without annotations
-        users_stmt = select(User).where(User.id.in_(missing_verifier_ids))
-        users_result = await db.execute(users_stmt)
-        users_by_id = {u.id: u for u in users_result.scalars().all()}
+        users = await repo.get_users_by_ids(missing_verifier_ids)
+        users_by_id = {u.id: u for u in users}
 
         for vid in missing_verifier_ids:
             user = users_by_id.get(vid)
@@ -330,7 +289,7 @@ async def get_screenshot_comparison(
 async def resolve_dispute(
     screenshot_id: int,
     request: ResolveDisputeRequest,
-    db: DatabaseSession,
+    screenshot_repo: ScreenshotRepo,
     current_user: CurrentUser,
 ):
     """
@@ -347,10 +306,8 @@ async def resolve_dispute(
             detail="Only administrators can resolve disputes",
         )
 
-    # Get screenshot
-    screenshot_stmt = select(Screenshot).where(Screenshot.id == screenshot_id)
-    screenshot_result = await db.execute(screenshot_stmt)
-    screenshot = screenshot_result.scalar_one_or_none()
+    # Get screenshot with row lock
+    screenshot = await screenshot_repo.get_by_id_for_update(screenshot_id)
 
     if not screenshot:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Screenshot not found")
@@ -380,7 +337,7 @@ async def resolve_dispute(
     from sqlalchemy.orm.attributes import flag_modified
     flag_modified(screenshot, "extracted_hourly_data")
     flag_modified(screenshot, "resolved_hourly_data")
-    await db.commit()
+    await screenshot_repo.db.commit()
 
     return ResolveDisputeResponse(
         success=True,

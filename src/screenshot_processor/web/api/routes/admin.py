@@ -4,25 +4,20 @@ from pathlib import Path
 import cv2
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
-from sqlalchemy import func, or_, select
 
 from screenshot_processor.core.image_utils import convert_dark_mode
 from screenshot_processor.core.ocr import find_screenshot_total_usage
-from screenshot_processor.web.api.dependencies import CurrentUser, DatabaseSession
+from screenshot_processor.web.api.dependencies import CurrentUser
 from screenshot_processor.web.database.models import UserRole
 from screenshot_processor.web.rate_limiting import ADMIN_DESTRUCTIVE_RATE_LIMIT, limiter
 from screenshot_processor.web.database import (
-    Annotation,
-    ConsensusResult,
     DeleteGroupResponse,
-    Group,
     ResetTestDataResponse,
-    Screenshot,
     User,
-    UserQueueState,
     UserStatsRead,
     UserUpdateResponse,
 )
+from screenshot_processor.web.repositories import AdminRepo
 from screenshot_processor.web.services import reprocess_screenshot
 
 logger = logging.getLogger(__name__)
@@ -48,35 +43,23 @@ AdminUser = Depends(require_admin)
 
 
 @router.get("/users", response_model=list[UserStatsRead])
-async def get_all_users(db: DatabaseSession, admin: User = AdminUser):
+async def get_all_users(repo: AdminRepo, admin: User = AdminUser):
     """Get all users with their annotation statistics. Admin only.
 
     Uses a single query with LEFT JOIN to avoid N+1 problem.
     """
-    # Single query with aggregation - avoids N+1 problem
-    stmt = (
-        select(
-            User,
-            func.count(Annotation.id).label("annotations_count"),
-            func.coalesce(func.avg(Annotation.time_spent_seconds), 0).label("avg_time"),
-        )
-        .outerjoin(Annotation, Annotation.user_id == User.id)
-        .group_by(User.id)
-        .order_by(User.created_at.desc())
-    )
-    result = await db.execute(stmt)
-    rows = result.all()
+    rows = await repo.get_users_with_stats()
 
     return [
         UserStatsRead(
-            id=row.User.id,
-            username=row.User.username,
-            email=row.User.email,
-            role=row.User.role,
-            is_active=row.User.is_active,
-            created_at=row.User.created_at.isoformat(),
+            id=row.user.id,
+            username=row.user.username,
+            email=row.user.email,
+            role=row.user.role,
+            is_active=row.user.is_active,
+            created_at=row.user.created_at.isoformat(),
             annotations_count=row.annotations_count,
-            avg_time_spent_seconds=round(float(row.avg_time), 2),
+            avg_time_spent_seconds=row.avg_time_spent_seconds,
         )
         for row in rows
     ]
@@ -85,14 +68,13 @@ async def get_all_users(db: DatabaseSession, admin: User = AdminUser):
 @router.put("/users/{user_id}", response_model=UserUpdateResponse)
 async def update_user(
     user_id: int,
-    db: DatabaseSession,
+    repo: AdminRepo,
     is_active: bool | None = None,
     role: str | None = None,
     admin: User = AdminUser,
 ):
     """Update user status or role. Admin only."""
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
+    user = await repo.get_user_by_id(user_id)
 
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -101,16 +83,10 @@ async def update_user(
         old_role = user.role
         old_active = user.is_active
 
-        if is_active is not None:
-            user.is_active = is_active
+        if role is not None and role not in ["annotator", "admin"]:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role")
 
-        if role is not None:
-            if role not in ["annotator", "admin"]:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role")
-            user.role = role
-
-        await db.commit()
-        await db.refresh(user)
+        user = await repo.update_user(user, is_active=is_active, role=role)
 
         # Audit logging
         if role is not None and role != old_role:
@@ -130,7 +106,7 @@ async def update_user(
     except HTTPException:
         raise
     except Exception as e:
-        await db.rollback()
+        await repo.db.rollback()
         logger.error("Failed to update user", extra={"user_id": user_id, "error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -145,41 +121,21 @@ async def update_user(
 
 @router.post("/reset-test-data", response_model=ResetTestDataResponse)
 @limiter.limit(ADMIN_DESTRUCTIVE_RATE_LIMIT)
-async def reset_test_data(request: Request, db: DatabaseSession, admin: User = AdminUser):
+async def reset_test_data(request: Request, repo: AdminRepo, admin: User = AdminUser):
     """
     Reset test data for e2e testing.
     Clears user queue states and annotations to allow fresh test runs.
     Admin only.
     """
-    from screenshot_processor.web.database import AnnotationStatus, Screenshot
-
     try:
-        # Clear all user queue states (skipped screenshots)
-        await db.execute(select(UserQueueState).execution_options(synchronize_session="fetch"))
-        from sqlalchemy import delete
-
-        await db.execute(delete(UserQueueState))
-
-        # Clear all annotations
-        await db.execute(delete(Annotation))
-
-        # Reset screenshot annotation counts
-        result = await db.execute(select(Screenshot))
-        screenshots = result.scalars().all()
-        for screenshot in screenshots:
-            screenshot.current_annotation_count = 0
-            screenshot.annotation_status = AnnotationStatus.PENDING
-            screenshot.has_consensus = False
-            screenshot.verified_by_user_ids = None
-
-        await db.commit()
+        await repo.reset_test_data()
 
         logger.info("Admin reset test data", extra={"audit": True, "admin_username": admin.username})
 
         return ResetTestDataResponse(success=True, message="Test data reset successfully")
 
     except Exception as e:
-        await db.rollback()
+        await repo.db.rollback()
         logger.error("Failed to reset test data", extra={"error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -197,7 +153,7 @@ async def reset_test_data(request: Request, db: DatabaseSession, admin: User = A
 async def delete_group(
     request: Request,
     group_id: str,
-    db: DatabaseSession,
+    repo: AdminRepo,
     admin: User = AdminUser,
 ):
     """
@@ -209,12 +165,9 @@ async def delete_group(
 
     Admin only.
     """
-    from sqlalchemy import delete
-
     try:
         # Check if group exists
-        result = await db.execute(select(Group).where(Group.id == group_id))
-        group = result.scalar_one_or_none()
+        group = await repo.get_group_by_id(group_id)
 
         if not group:
             raise HTTPException(
@@ -222,57 +175,26 @@ async def delete_group(
                 detail=f"Group '{group_id}' not found",
             )
 
-        # Get all screenshot IDs in this group
-        screenshots_result = await db.execute(select(Screenshot.id).where(Screenshot.group_id == group_id))
-        screenshot_ids = [row[0] for row in screenshots_result.fetchall()]
+        # Get screenshot IDs first
+        screenshot_ids = await repo.get_screenshot_ids_for_group(group_id)
 
-        screenshots_count = len(screenshot_ids)
-        annotations_count = 0
+        # Cascade delete all DB rows
+        counts = await repo.delete_group_cascade(group_id, screenshot_ids)
 
-        if screenshot_ids:
-            # Delete all related records for these screenshots
-            # 1. Delete annotations
-            annotations_result = await db.execute(
-                delete(Annotation).where(Annotation.screenshot_id.in_(screenshot_ids))
-            )
-            annotations_count = annotations_result.rowcount
-
-            # 2. Delete consensus results
-            consensus_result = await db.execute(
-                delete(ConsensusResult).where(ConsensusResult.screenshot_id.in_(screenshot_ids))
-            )
-            consensus_count = consensus_result.rowcount
-
-            # 3. Delete user queue states
-            queue_result = await db.execute(
-                delete(UserQueueState).where(UserQueueState.screenshot_id.in_(screenshot_ids))
-            )
-            queue_count = queue_result.rowcount
-
-            logger.info("Cleaning up group", extra={"group_id": group_id, "annotations_count": annotations_count, "consensus_count": consensus_count, "queue_states_count": queue_count})
-
-            # 4. Delete all screenshots in this group
-            await db.execute(delete(Screenshot).where(Screenshot.group_id == group_id))
-
-        # Delete the group itself
-        await db.execute(delete(Group).where(Group.id == group_id))
-
-        await db.commit()
-
-        logger.info("Admin deleted group", extra={"audit": True, "admin_username": admin.username, "group_id": group_id, "screenshots_deleted": screenshots_count, "annotations_deleted": annotations_count})
+        logger.info("Admin deleted group", extra={"audit": True, "admin_username": admin.username, "group_id": group_id, "screenshots_deleted": counts.screenshots_deleted, "annotations_deleted": counts.annotations_deleted})
 
         return DeleteGroupResponse(
             success=True,
             group_id=group_id,
-            screenshots_deleted=screenshots_count,
-            annotations_deleted=annotations_count,
+            screenshots_deleted=counts.screenshots_deleted,
+            annotations_deleted=counts.annotations_deleted,
             message=f"Group '{group_id}' deleted successfully",
         )
 
     except HTTPException:
         raise
     except Exception as e:
-        await db.rollback()
+        await repo.db.rollback()
         logger.error("Failed to delete group", extra={"group_id": group_id, "error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -296,7 +218,7 @@ class RecalculateOcrTotalResponse(BaseModel):
 
 @router.post("/recalculate-ocr-totals", response_model=RecalculateOcrTotalResponse)
 async def recalculate_ocr_totals(
-    db: DatabaseSession,
+    repo: AdminRepo,
     admin: User = AdminUser,
     limit: int = Query(default=100, ge=1, le=1000, description="Max screenshots to process"),
     group_id: str | None = Query(default=None, description="Filter by group ID"),
@@ -308,22 +230,9 @@ async def recalculate_ocr_totals(
     Admin only.
     """
     try:
-        # Find screenshots missing extracted_total (only screen_time type)
-        query = select(Screenshot).where(
-            Screenshot.image_type == "screen_time",
-            or_(
-                Screenshot.extracted_total.is_(None),
-                Screenshot.extracted_total == "",
-            ),
+        screenshots = await repo.get_screenshots_missing_ocr_total(
+            group_id=group_id, limit=limit
         )
-
-        if group_id:
-            query = query.where(Screenshot.group_id == group_id)
-
-        query = query.limit(limit)
-
-        result = await db.execute(query)
-        screenshots = result.scalars().all()
 
         total_missing = len(screenshots)
         processed = 0
@@ -364,7 +273,7 @@ async def recalculate_ocr_totals(
                 logger.error("Error extracting OCR total", extra={"screenshot_id": screenshot.id, "error": str(e)})
                 failed += 1
 
-        await db.commit()
+        await repo.db.commit()
 
         logger.info("Admin recalculated OCR totals", extra={"audit": True, "admin_username": admin.username, "processed": processed, "updated": updated, "failed": failed})
 
@@ -378,7 +287,7 @@ async def recalculate_ocr_totals(
         )
 
     except Exception as e:
-        await db.rollback()
+        await repo.db.rollback()
         logger.error("Failed to recalculate OCR totals", extra={"error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -435,6 +344,7 @@ async def _bulk_reprocess_task(
     import asyncio
 
     from screenshot_processor.web.database import async_session_maker
+    from screenshot_processor.web.repositories import ScreenshotRepository
 
     status_key = f"reprocess_{group_id}"
     _bulk_reprocess_status[status_key] = BulkReprocessStatus(
@@ -448,9 +358,9 @@ async def _bulk_reprocess_task(
     for screenshot_id in screenshot_ids:
         try:
             async with async_session_maker() as db:
+                screenshot_repo = ScreenshotRepository(db)
                 # Fetch the screenshot object
-                result = await db.execute(select(Screenshot).where(Screenshot.id == screenshot_id))
-                screenshot = result.scalar_one_or_none()
+                screenshot = await screenshot_repo.get_by_id(screenshot_id)
                 if screenshot is None:
                     logger.warning("Screenshot not found for reprocessing", extra={"screenshot_id": screenshot_id})
                     _bulk_reprocess_status[status_key].failed += 1
@@ -481,7 +391,7 @@ async def _bulk_reprocess_task(
 @limiter.limit(ADMIN_DESTRUCTIVE_RATE_LIMIT)
 async def bulk_reprocess_screenshots(
     request: Request,
-    db: DatabaseSession,
+    repo: AdminRepo,
     admin: User = AdminUser,
     group_id: str | None = Query(default=None, description="Filter by group ID"),
     processing_method: str | None = Query(default=None, description="Processing method: 'ocr' or 'line_based'"),
@@ -498,18 +408,9 @@ async def bulk_reprocess_screenshots(
     Admin only.
     """
     try:
-        # Find screenshots to reprocess
-        query = select(Screenshot.id).where(
-            Screenshot.image_type == "screen_time",
+        screenshot_ids = await repo.get_screenshot_ids_for_reprocess(
+            group_id=group_id, limit=limit
         )
-
-        if group_id:
-            query = query.where(Screenshot.group_id == group_id)
-
-        query = query.limit(limit)
-
-        result = await db.execute(query)
-        screenshot_ids = [row[0] for row in result.fetchall()]
 
         if not screenshot_ids:
             return BulkReprocessResponse(
@@ -575,7 +476,7 @@ class RetryStuckResponse(BaseModel):
 @limiter.limit(ADMIN_DESTRUCTIVE_RATE_LIMIT)
 async def retry_stuck_screenshots(
     request: Request,
-    db: DatabaseSession,
+    repo: AdminRepo,
     admin: User = AdminUser,
     group_id: str | None = Query(default=None, description="Filter by group ID"),
     mark_processing_as_failed: bool = Query(
@@ -593,60 +494,19 @@ async def retry_stuck_screenshots(
     Use this when screenshots are stuck and not being processed by Celery workers.
     Admin only.
     """
-    from datetime import datetime, timezone
-    from sqlalchemy import update
-    from screenshot_processor.web.database import ProcessingStatus
-
     try:
         # Count current stuck screenshots
-        pending_query = select(func.count(Screenshot.id)).where(
-            Screenshot.processing_status == ProcessingStatus.PENDING,
-        )
-        processing_query = select(func.count(Screenshot.id)).where(
-            Screenshot.processing_status == ProcessingStatus.PROCESSING,
-        )
-
-        if group_id:
-            pending_query = pending_query.where(Screenshot.group_id == group_id)
-            processing_query = processing_query.where(Screenshot.group_id == group_id)
-
-        pending_result = await db.execute(pending_query)
-        pending_count = pending_result.scalar() or 0
-
-        processing_result = await db.execute(processing_query)
-        processing_count = processing_result.scalar() or 0
+        stuck_counts = await repo.count_stuck_screenshots(group_id=group_id)
 
         marked_failed = 0
 
         # Step 1: Mark PROCESSING screenshots as FAILED (they're orphaned)
-        if mark_processing_as_failed and processing_count > 0:
-            update_query = (
-                update(Screenshot)
-                .where(Screenshot.processing_status == ProcessingStatus.PROCESSING)
-                .values(
-                    processing_status=ProcessingStatus.FAILED,
-                    processing_issues=["Marked as failed by admin: stuck in PROCESSING status"],
-                    processed_at=datetime.now(timezone.utc),
-                )
-            )
-            if group_id:
-                update_query = update_query.where(Screenshot.group_id == group_id)
-
-            result = await db.execute(update_query)
-            marked_failed = result.rowcount
-            await db.commit()
-
+        if mark_processing_as_failed and stuck_counts.processing_count > 0:
+            marked_failed = await repo.mark_processing_as_failed(group_id=group_id)
             logger.info("Marked stuck PROCESSING screenshots as FAILED", extra={"count": marked_failed})
 
         # Step 2: Get all PENDING screenshot IDs and requeue them
-        ids_query = select(Screenshot.id).where(
-            Screenshot.processing_status == ProcessingStatus.PENDING,
-        )
-        if group_id:
-            ids_query = ids_query.where(Screenshot.group_id == group_id)
-
-        ids_result = await db.execute(ids_query)
-        screenshot_ids = [row[0] for row in ids_result.fetchall()]
+        screenshot_ids = await repo.get_pending_screenshot_ids(group_id=group_id)
 
         requeued = 0
         if screenshot_ids:
@@ -661,19 +521,19 @@ async def retry_stuck_screenshots(
 
             logger.info("Requeued PENDING screenshots to Celery", extra={"count": requeued})
 
-        logger.info("Admin retried stuck screenshots", extra={"audit": True, "admin_username": admin.username, "group_id": group_id, "pending_count": pending_count, "processing_count": processing_count, "marked_failed": marked_failed, "requeued": requeued})
+        logger.info("Admin retried stuck screenshots", extra={"audit": True, "admin_username": admin.username, "group_id": group_id, "pending_count": stuck_counts.pending_count, "processing_count": stuck_counts.processing_count, "marked_failed": marked_failed, "requeued": requeued})
 
         return RetryStuckResponse(
             success=True,
-            pending_count=pending_count,
-            processing_count=processing_count,
+            pending_count=stuck_counts.pending_count,
+            processing_count=stuck_counts.processing_count,
             requeued=requeued,
             marked_failed=marked_failed,
             message=f"Marked {marked_failed} as failed, requeued {requeued} pending screenshots",
         )
 
     except Exception as e:
-        await db.rollback()
+        await repo.db.rollback()
         logger.error("Failed to retry stuck screenshots", extra={"error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -702,99 +562,43 @@ class CleanupResponse(BaseModel):
 
 
 @router.get("/orphaned-entries", response_model=OrphanedEntriesResponse)
-async def find_orphaned_entries(db: DatabaseSession, admin: User = AdminUser):
+async def find_orphaned_entries(repo: AdminRepo, admin: User = AdminUser):
     """
     Find orphaned database entries that reference non-existent screenshots.
     Admin only.
     """
-    from sqlalchemy import not_
-
-    # Find annotations referencing non-existent screenshots
-    orphaned_annotations_result = await db.execute(
-        select(func.count(Annotation.id)).where(
-            not_(Annotation.screenshot_id.in_(select(Screenshot.id)))
-        )
-    )
-    orphaned_annotations = orphaned_annotations_result.scalar() or 0
-
-    # Find consensus results referencing non-existent screenshots
-    orphaned_consensus_result = await db.execute(
-        select(func.count(ConsensusResult.id)).where(
-            not_(ConsensusResult.screenshot_id.in_(select(Screenshot.id)))
-        )
-    )
-    orphaned_consensus = orphaned_consensus_result.scalar() or 0
-
-    # Find queue states referencing non-existent screenshots
-    orphaned_queue_result = await db.execute(
-        select(func.count(UserQueueState.id)).where(
-            not_(UserQueueState.screenshot_id.in_(select(Screenshot.id)))
-        )
-    )
-    orphaned_queue_states = orphaned_queue_result.scalar() or 0
-
-    # Find screenshots with no group
-    screenshots_no_group_result = await db.execute(
-        select(func.count(Screenshot.id)).where(Screenshot.group_id.is_(None))
-    )
-    screenshots_without_group = screenshots_no_group_result.scalar() or 0
+    counts = await repo.find_orphaned_entries()
 
     return OrphanedEntriesResponse(
-        orphaned_annotations=orphaned_annotations,
-        orphaned_consensus=orphaned_consensus,
-        orphaned_queue_states=orphaned_queue_states,
-        screenshots_without_group=screenshots_without_group,
+        orphaned_annotations=counts.orphaned_annotations,
+        orphaned_consensus=counts.orphaned_consensus,
+        orphaned_queue_states=counts.orphaned_queue_states,
+        screenshots_without_group=counts.screenshots_without_group,
     )
 
 
 @router.post("/cleanup-orphaned", response_model=CleanupResponse)
 @limiter.limit(ADMIN_DESTRUCTIVE_RATE_LIMIT)
-async def cleanup_orphaned_entries(request: Request, db: DatabaseSession, admin: User = AdminUser):
+async def cleanup_orphaned_entries(request: Request, repo: AdminRepo, admin: User = AdminUser):
     """
     Delete orphaned database entries that reference non-existent screenshots.
     Admin only.
     """
-    from sqlalchemy import delete, not_
-
     try:
-        # Delete orphaned annotations
-        result1 = await db.execute(
-            delete(Annotation).where(
-                not_(Annotation.screenshot_id.in_(select(Screenshot.id)))
-            )
-        )
-        deleted_annotations = result1.rowcount
+        counts = await repo.cleanup_orphaned_entries()
 
-        # Delete orphaned consensus results
-        result2 = await db.execute(
-            delete(ConsensusResult).where(
-                not_(ConsensusResult.screenshot_id.in_(select(Screenshot.id)))
-            )
-        )
-        deleted_consensus = result2.rowcount
-
-        # Delete orphaned queue states
-        result3 = await db.execute(
-            delete(UserQueueState).where(
-                not_(UserQueueState.screenshot_id.in_(select(Screenshot.id)))
-            )
-        )
-        deleted_queue_states = result3.rowcount
-
-        await db.commit()
-
-        logger.info("Admin cleaned up orphaned entries", extra={"audit": True, "admin_username": admin.username, "deleted_annotations": deleted_annotations, "deleted_consensus": deleted_consensus, "deleted_queue_states": deleted_queue_states})
+        logger.info("Admin cleaned up orphaned entries", extra={"audit": True, "admin_username": admin.username, "deleted_annotations": counts.deleted_annotations, "deleted_consensus": counts.deleted_consensus, "deleted_queue_states": counts.deleted_queue_states})
 
         return CleanupResponse(
             success=True,
-            deleted_annotations=deleted_annotations,
-            deleted_consensus=deleted_consensus,
-            deleted_queue_states=deleted_queue_states,
-            message=f"Cleaned up {deleted_annotations + deleted_consensus + deleted_queue_states} orphaned entries",
+            deleted_annotations=counts.deleted_annotations,
+            deleted_consensus=counts.deleted_consensus,
+            deleted_queue_states=counts.deleted_queue_states,
+            message=f"Cleaned up {counts.deleted_annotations + counts.deleted_consensus + counts.deleted_queue_states} orphaned entries",
         )
 
     except Exception as e:
-        await db.rollback()
+        await repo.db.rollback()
         logger.error("Failed to cleanup orphaned entries", extra={"error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

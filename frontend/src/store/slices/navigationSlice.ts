@@ -5,6 +5,7 @@ import type {
   ScreenshotListParams,
   NavigationParams,
 } from "@/core";
+import type { ProcessingStatus } from "@/types";
 import type {
   AnnotationState,
   NavigationSlice,
@@ -16,7 +17,7 @@ export const createNavigationSlice = (
   screenshotService: IScreenshotService,
   annotationService: IAnnotationService,
   groupId?: string,
-  processingStatus?: string,
+  processingStatus?: ProcessingStatus,
 ): StateCreator<AnnotationState, [], [], NavigationSlice> => (set, get) => ({
   // State
   currentIndex: 0,
@@ -35,7 +36,7 @@ export const createNavigationSlice = (
     try {
       const navParams: NavigationParams = {
         group_id: groupId,
-        processing_status: processingStatus as any,
+        processing_status: processingStatus,
         ...filterToApiParams(verificationFilter),
         direction: "next",
       };
@@ -71,7 +72,7 @@ export const createNavigationSlice = (
     try {
       const navParams: NavigationParams = {
         group_id: groupId,
-        processing_status: processingStatus as any,
+        processing_status: processingStatus,
         ...filterToApiParams(verificationFilter),
         direction: "prev",
       };
@@ -101,7 +102,7 @@ export const createNavigationSlice = (
     try {
       const listParams: ScreenshotListParams = {
         group_id: groupId,
-        processing_status: processingStatus as any,
+        processing_status: processingStatus,
         ...filterToApiParams(get().verificationFilter),
         page_size: 5000,
         sort_by: "id",
@@ -119,24 +120,25 @@ export const createNavigationSlice = (
     }
   },
 
-  setVerificationFilter: (value: VerificationFilterType) => {
+  setVerificationFilter: async (value: VerificationFilterType) => {
     set({ verificationFilter: value });
 
     // Reload the list with new filter and reload first screenshot
-    get()
-      .loadScreenshotList()
-      .then(() => {
-        const { screenshotList } = get();
-        if (
-          screenshotList &&
-          screenshotList.items &&
-          screenshotList.items.length > 0
-        ) {
-          get().loadScreenshot(screenshotList.items[0]!.id);
-        } else {
-          set({ noScreenshots: true, currentScreenshot: null });
-        }
-      });
+    try {
+      await get().loadScreenshotList();
+      const { screenshotList } = get();
+      if (
+        screenshotList &&
+        screenshotList.items &&
+        screenshotList.items.length > 0
+      ) {
+        await get().loadScreenshot(screenshotList.items[0]!.id);
+      } else {
+        set({ noScreenshots: true, currentScreenshot: null });
+      }
+    } catch (error) {
+      console.error("Failed to apply verification filter:", error);
+    }
   },
 
   verifyCurrentScreenshot: async () => {
@@ -171,9 +173,9 @@ export const createNavigationSlice = (
         hourly_values: hourlyValues,
         extracted_title: editedTitle || null,
         extracted_total: currentScreenshot.extracted_total || null,
-        grid_upper_left: gridCoords?.upper_left,
-        grid_lower_right: gridCoords?.lower_right,
-      } as any);
+        grid_upper_left: gridCoords?.upper_left ?? null,
+        grid_lower_right: gridCoords?.lower_right ?? null,
+      });
 
       const updatedScreenshot = await screenshotService.verify(
         currentScreenshot.id,

@@ -17,7 +17,8 @@ import { ProcessingStatusFilter } from "./ProcessingStatusFilter";
 import { SaveStatusIndicator } from "./SaveStatusIndicator";
 import { TotalsDisplay } from "./TotalsDisplay";
 import { AlignmentWarning } from "./AlignmentWarning";
-import type { ProcessingStatus } from "@/constants/processingStatus";
+import type { ProcessingStatus } from "@/types";
+import type { ProcessingStatus as FilterProcessingStatus } from "@/constants/processingStatus";
 import { PreprocessingSummary } from "./PreprocessingSummary";
 import { useScreenshotImage } from "@/hooks/useScreenshotImage";
 import toast from "react-hot-toast";
@@ -28,7 +29,7 @@ export type GraphDisplayMode = "separate" | "overlay";
 
 interface AnnotationWorkspaceProps {
   groupId?: string;
-  processingStatus?: string;
+  processingStatus?: ProcessingStatus;
   initialScreenshotId?: number;
 }
 
@@ -275,7 +276,7 @@ export const AnnotationWorkspace = ({
             <div>
               <div className="text-xs text-slate-500 dark:text-slate-400 mb-2 font-medium">Processing Status</div>
               <ProcessingStatusFilter
-                value={(processingStatus as ProcessingStatus) || "all"}
+                value={(processingStatus as FilterProcessingStatus) || "all"}
                 onChange={handleProcessingStatusChange}
               />
             </div>
@@ -436,7 +437,7 @@ export const AnnotationWorkspace = ({
               <div>
                 <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Status</div>
                 <ProcessingStatusFilter
-                  value={(processingStatus as ProcessingStatus) || "all"}
+                  value={(processingStatus as FilterProcessingStatus) || "all"}
                   onChange={handleProcessingStatusChange}
                 />
               </div>

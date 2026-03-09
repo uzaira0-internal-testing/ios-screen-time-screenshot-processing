@@ -18,9 +18,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from screenshot_processor.web.database import get_db
 
+from .admin_repository import AdminRepository
 from .annotation_repository import AnnotationRepository
 from .consensus_repository import ConsensusRepository
-from .screenshot_repository import ScreenshotRepository
+from .queue_repository import QueueRepository
+from .screenshot_repository import NavigationResult, ScreenshotRepository
 
 
 # =============================================================================
@@ -49,6 +51,20 @@ def get_consensus_repo(
     return ConsensusRepository(db)
 
 
+def get_admin_repo(
+    db: AsyncSession = Depends(get_db),
+) -> AdminRepository:
+    """FastAPI dependency for AdminRepository."""
+    return AdminRepository(db)
+
+
+def get_queue_repo(
+    db: AsyncSession = Depends(get_db),
+) -> QueueRepository:
+    """FastAPI dependency for QueueRepository."""
+    return QueueRepository(db)
+
+
 # =============================================================================
 # Type Aliases for Route Parameters
 # =============================================================================
@@ -56,6 +72,8 @@ def get_consensus_repo(
 ScreenshotRepo = Annotated[ScreenshotRepository, Depends(get_screenshot_repo)]
 AnnotationRepo = Annotated[AnnotationRepository, Depends(get_annotation_repo)]
 ConsensusRepo = Annotated[ConsensusRepository, Depends(get_consensus_repo)]
+AdminRepo = Annotated[AdminRepository, Depends(get_admin_repo)]
+QueueRepo = Annotated[QueueRepository, Depends(get_queue_repo)]
 
 
 __all__ = [
@@ -63,12 +81,20 @@ __all__ = [
     "ScreenshotRepository",
     "AnnotationRepository",
     "ConsensusRepository",
+    "AdminRepository",
+    "QueueRepository",
+    # Dataclasses
+    "NavigationResult",
     # DI factories
     "get_screenshot_repo",
     "get_annotation_repo",
     "get_consensus_repo",
+    "get_admin_repo",
+    "get_queue_repo",
     # Type aliases for route parameters
     "ScreenshotRepo",
     "AnnotationRepo",
     "ConsensusRepo",
+    "AdminRepo",
+    "QueueRepo",
 ]

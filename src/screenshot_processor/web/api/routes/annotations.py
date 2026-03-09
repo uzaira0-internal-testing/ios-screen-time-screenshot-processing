@@ -3,11 +3,10 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import and_, select
-from sqlalchemy.orm import selectinload
 
 from screenshot_processor.web.api.dependencies import CurrentUser, DatabaseSession
 from screenshot_processor.web.database.models import SubmissionStatus, UserRole
+from screenshot_processor.web.repositories import AnnotationRepo, ScreenshotRepo, ScreenshotRepository
 from screenshot_processor.web.database import (
     Annotation,
     AnnotationCreate,
@@ -87,10 +86,9 @@ async def create_audit_log(
     db.add(audit_log)
 
 
-async def get_screenshot_for_update(db, screenshot_id: int) -> Screenshot:
+async def get_screenshot_for_update(repo: ScreenshotRepository, screenshot_id: int) -> Screenshot:
     """Get screenshot with row lock for safe concurrent annotation count updates."""
-    result = await db.execute(select(Screenshot).where(Screenshot.id == screenshot_id).with_for_update())
-    screenshot = result.scalar_one_or_none()
+    screenshot = await repo.get_by_id_for_update(screenshot_id)
     if not screenshot:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Screenshot not found")
     return screenshot
@@ -113,7 +111,7 @@ router = APIRouter(prefix="/annotations", tags=["Annotations"])
 
 @router.post("/", response_model=AnnotationRead, status_code=status.HTTP_201_CREATED)
 async def create_or_update_annotation(
-    annotation_data: AnnotationCreate, db: DatabaseSession, current_user: CurrentUser
+    annotation_data: AnnotationCreate, db: DatabaseSession, current_user: CurrentUser, repo: AnnotationRepo, screenshot_repo: ScreenshotRepo
 ):
     """
     Create or update an annotation (upsert).
@@ -121,18 +119,10 @@ async def create_or_update_annotation(
     Otherwise, create a new one.
     """
     # Use row lock to prevent race condition when incrementing annotation count
-    screenshot = await get_screenshot_for_update(db, annotation_data.screenshot_id)
+    screenshot = await get_screenshot_for_update(screenshot_repo, annotation_data.screenshot_id)
 
     # Check for existing annotation by this user for this screenshot
-    existing_annotation_result = await db.execute(
-        select(Annotation).where(
-            and_(
-                Annotation.screenshot_id == annotation_data.screenshot_id,
-                Annotation.user_id == current_user.id,
-            )
-        )
-    )
-    existing = existing_annotation_result.scalar_one_or_none()
+    existing = await repo.get_by_user_and_screenshot(current_user.id, annotation_data.screenshot_id)
 
     try:
         if existing:
@@ -242,23 +232,12 @@ async def create_or_update_annotation(
 
 @router.get("/history", response_model=list[AnnotationWithIssues])
 async def get_user_annotation_history(
-    db: DatabaseSession,
+    repo: AnnotationRepo,
     current_user: CurrentUser,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
 ):
-    # Use selectinload to eagerly load issues in a single query (avoids N+1)
-    stmt = (
-        select(Annotation)
-        .options(selectinload(Annotation.issues))
-        .where(Annotation.user_id == current_user.id)
-        .offset(skip)
-        .limit(limit)
-        .order_by(Annotation.created_at.desc())
-    )
-
-    result = await db.execute(stmt)
-    annotations = result.scalars().all()
+    annotations = await repo.list_by_user(current_user.id, skip, limit)
 
     # Issues already loaded via selectinload - no additional queries needed
     return [
@@ -271,12 +250,8 @@ async def get_user_annotation_history(
 
 
 @router.get("/{annotation_id}", response_model=AnnotationWithIssues)
-async def get_annotation(annotation_id: int, db: DatabaseSession, current_user: CurrentUser):
-    # Eagerly load issues to avoid separate query
-    result = await db.execute(
-        select(Annotation).options(selectinload(Annotation.issues)).where(Annotation.id == annotation_id)
-    )
-    annotation = result.scalar_one_or_none()
+async def get_annotation(annotation_id: int, repo: AnnotationRepo, current_user: CurrentUser):
+    annotation = await repo.get_by_id_with_issues(annotation_id)
 
     if not annotation:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Annotation not found")
@@ -299,12 +274,11 @@ async def update_annotation(
     annotation_data: AnnotationUpdate,
     db: DatabaseSession,
     current_user: CurrentUser,
+    repo: AnnotationRepo,
+    screenshot_repo: ScreenshotRepo,
 ):
     # Use row lock to prevent lost updates from concurrent requests
-    result = await db.execute(
-        select(Annotation).where(Annotation.id == annotation_id).with_for_update()
-    )
-    annotation = result.scalar_one_or_none()
+    annotation = await repo.get_by_id_for_update(annotation_id)
 
     if not annotation:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Annotation not found")
@@ -328,7 +302,7 @@ async def update_annotation(
 
         if annotation.screenshot_id:
             # Lock the screenshot before consensus analysis to prevent race conditions
-            await get_screenshot_for_update(db, annotation.screenshot_id)
+            await get_screenshot_for_update(screenshot_repo, annotation.screenshot_id)
             consensus_service = ConsensusService()
             await consensus_service.analyze_consensus(db, annotation.screenshot_id)
 
@@ -346,9 +320,8 @@ async def update_annotation(
 
 
 @router.delete("/{annotation_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_annotation(annotation_id: int, db: DatabaseSession, current_user: CurrentUser):
-    result = await db.execute(select(Annotation).where(Annotation.id == annotation_id))
-    annotation = result.scalar_one_or_none()
+async def delete_annotation(annotation_id: int, db: DatabaseSession, current_user: CurrentUser, repo: AnnotationRepo, screenshot_repo: ScreenshotRepo):
+    annotation = await repo.get_by_id(annotation_id)
 
     if not annotation:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Annotation not found")
@@ -367,7 +340,7 @@ async def delete_annotation(annotation_id: int, db: DatabaseSession, current_use
 
     try:
         # Use row lock to prevent race condition when decrementing annotation count
-        screenshot = await get_screenshot_for_update(db, screenshot_id)
+        screenshot = await get_screenshot_for_update(screenshot_repo, screenshot_id)
 
         # Create audit log BEFORE deleting (to capture annotation reference)
         await create_audit_log(

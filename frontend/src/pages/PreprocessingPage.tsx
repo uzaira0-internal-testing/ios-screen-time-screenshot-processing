@@ -100,7 +100,7 @@ export const PreprocessingPage = () => {
 
   // Sync active stage and group to URL
   const syncToUrl = useCallback(() => {
-    setSearchParams((prev) => {
+    setSearchParams((prev: URLSearchParams) => {
       const next = new URLSearchParams(prev);
       next.set("stage", activeStage);
       if (selectedGroupId) {
@@ -245,10 +245,11 @@ export const PreprocessingPage = () => {
               </div>
             ) : (
               <>
-                {activeStage === "device_detection" && <DeviceDetectionTab />}
-                {activeStage === "cropping" && <CroppingTab />}
-                {activeStage === "phi_detection" && <PHIDetectionTab />}
-                {activeStage === "phi_redaction" && <PHIRedactionTab />}
+                {/* Keep tabs mounted but hidden to preserve scroll/sort state and avoid remount cost */}
+                <div className={activeStage === "device_detection" ? "" : "hidden"}><DeviceDetectionTab /></div>
+                <div className={activeStage === "cropping" ? "" : "hidden"}><CroppingTab /></div>
+                <div className={activeStage === "phi_detection" ? "" : "hidden"}><PHIDetectionTab /></div>
+                <div className={activeStage === "phi_redaction" ? "" : "hidden"}><PHIRedactionTab /></div>
               </>
             )}
           </div>

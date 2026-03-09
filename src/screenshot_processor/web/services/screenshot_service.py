@@ -5,36 +5,31 @@ Extracts business logic from routes into a testable service layer.
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import cv2
-from sqlalchemy import String, and_, cast, func, or_, select
+from sqlalchemy import String, cast, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
 from screenshot_processor.core.image_utils import convert_dark_mode
 from screenshot_processor.core.ocr import find_screenshot_total_usage
 from screenshot_processor.web.database.models import Screenshot
-from screenshot_processor.web.repositories import ScreenshotRepository
-
-if TYPE_CHECKING:
-    pass
+from screenshot_processor.web.repositories import NavigationResult, ScreenshotRepository
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class NavigationResult:
-    """Result of navigation query."""
-
-    screenshot: Screenshot | None
-    current_index: int
-    total_in_filter: int
-    has_next: bool
-    has_prev: bool
+def _sync_extract_ocr_total(file_path: str) -> str | None:
+    """CPU-bound OCR extraction — runs in a thread to avoid blocking the event loop."""
+    img = cv2.imread(file_path)
+    if img is None:
+        return None
+    img = convert_dark_mode(img)
+    total, _ = find_screenshot_total_usage(img)
+    return total.strip() if total and total.strip() else None
 
 
 class ScreenshotService:
@@ -74,21 +69,20 @@ class ScreenshotService:
         try:
             file_path = screenshot.file_path
             if not Path(file_path).exists():
-                logger.warning("Screenshot file not found", extra={"screenshot_id": screenshot.id, "file_path": file_path})
+                logger.warning(
+                    "Screenshot file not found", extra={"screenshot_id": screenshot.id, "file_path": file_path}
+                )
                 return False
 
-            img = cv2.imread(file_path)
-            if img is None:
-                logger.warning("Could not read screenshot image", extra={"screenshot_id": screenshot.id, "file_path": file_path})
-                return False
+            # Run CPU-bound OCR in a thread to avoid blocking the async event loop
+            total = await asyncio.to_thread(_sync_extract_ocr_total, file_path)
 
-            img = convert_dark_mode(img)
-            total, _ = find_screenshot_total_usage(img)
-
-            if total and total.strip():
-                screenshot.extracted_total = total.strip()
+            if total:
+                screenshot.extracted_total = total
                 await self.db.commit()
-                logger.info("Auto-extracted OCR total", extra={"screenshot_id": screenshot.id, "extracted_total": total.strip()})
+                logger.info(
+                    "Auto-extracted OCR total", extra={"screenshot_id": screenshot.id, "extracted_total": total}
+                )
                 return True
 
         except Exception as e:
@@ -120,7 +114,9 @@ class ScreenshotService:
                 screenshot.extracted_total = total.strip()
                 await self.db.commit()
                 await self.db.refresh(screenshot)
-                logger.info("Recalculated OCR total", extra={"screenshot_id": screenshot.id, "extracted_total": total.strip()})
+                logger.info(
+                    "Recalculated OCR total", extra={"screenshot_id": screenshot.id, "extracted_total": total.strip()}
+                )
                 return True, total.strip(), "OCR total recalculated successfully"
             else:
                 return False, None, "No total found in image"
@@ -228,65 +224,4 @@ class ScreenshotService:
                 )
             )
 
-        # Get total count
-        count_stmt = select(func.count(Screenshot.id))
-        if conditions:
-            count_stmt = count_stmt.where(and_(*conditions))
-        result = await self.db.execute(count_stmt)
-        total_in_filter = result.scalar_one()
-
-        # Get target screenshot based on direction
-        if direction == "next":
-            stmt = select(Screenshot).where(Screenshot.id > screenshot_id)
-            if conditions:
-                stmt = stmt.where(and_(*conditions))
-            stmt = stmt.order_by(Screenshot.id.asc()).limit(1)
-        elif direction == "prev":
-            stmt = select(Screenshot).where(Screenshot.id < screenshot_id)
-            if conditions:
-                stmt = stmt.where(and_(*conditions))
-            stmt = stmt.order_by(Screenshot.id.desc()).limit(1)
-        else:
-            stmt = select(Screenshot).where(Screenshot.id == screenshot_id)
-            if conditions:
-                stmt = stmt.where(and_(*conditions))
-
-        result = await self.db.execute(stmt)
-        screenshot = result.scalar_one_or_none()
-
-        if not screenshot:
-            return NavigationResult(
-                screenshot=None,
-                current_index=0,
-                total_in_filter=total_in_filter,
-                has_next=False,
-                has_prev=False,
-            )
-
-        # Calculate current index
-        index_stmt = select(func.count(Screenshot.id)).where(Screenshot.id < screenshot.id)
-        if conditions:
-            index_stmt = index_stmt.where(and_(*conditions))
-        result = await self.db.execute(index_stmt)
-        current_index = result.scalar_one() + 1
-
-        # Check for next/prev
-        next_stmt = select(func.count(Screenshot.id)).where(Screenshot.id > screenshot.id)
-        if conditions:
-            next_stmt = next_stmt.where(and_(*conditions))
-        result = await self.db.execute(next_stmt)
-        has_next = result.scalar_one() > 0
-
-        prev_stmt = select(func.count(Screenshot.id)).where(Screenshot.id < screenshot.id)
-        if conditions:
-            prev_stmt = prev_stmt.where(and_(*conditions))
-        result = await self.db.execute(prev_stmt)
-        has_prev = result.scalar_one() > 0
-
-        return NavigationResult(
-            screenshot=screenshot,
-            current_index=current_index,
-            total_in_filter=total_in_filter,
-            has_next=has_next,
-            has_prev=has_prev,
-        )
+        return await self.repo.navigate_with_filters(screenshot_id, direction, conditions)

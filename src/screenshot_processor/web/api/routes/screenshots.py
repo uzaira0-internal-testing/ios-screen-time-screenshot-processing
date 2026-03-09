@@ -14,7 +14,7 @@ from fastapi import APIRouter, Body, File, Form, Header, HTTPException, Query, R
 from fastapi.responses import FileResponse
 from fastapi_pagination import PaginatedResponse
 from pydantic import BaseModel
-from sqlalchemy import String, cast, delete, func, select, update
+from sqlalchemy import String, cast
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from screenshot_processor.core.image_utils import convert_dark_mode
@@ -23,7 +23,6 @@ from screenshot_processor.web.api.dependencies import CurrentUser, DatabaseSessi
 from screenshot_processor.web.config import get_settings
 from screenshot_processor.web.rate_limiting import limiter
 from screenshot_processor.web.database import (
-    Annotation,
     AnnotationStatus,
     ApplyPHIRedactionRequest,
     ApplyPHIRedactionResponse,
@@ -35,7 +34,6 @@ from screenshot_processor.web.database import (
     BrowserUploadRequest,
     BrowserUploadItemResult,
     BrowserUploadResponse,
-    ConsensusResult,
     Group,
     GroupRead,
     InvalidateFromStageRequest,
@@ -66,10 +64,9 @@ from screenshot_processor.web.database import (
     StagePreprocessResponse,
     StatsResponse,
     UploadErrorCode,
-    UserQueueState,
 )
 from screenshot_processor.web.services import QueueService, reprocess_screenshot
-from screenshot_processor.web.repositories import ScreenshotRepository
+from screenshot_processor.web.repositories import ScreenshotRepo, ScreenshotRepository
 
 logger = logging.getLogger(__name__)
 
@@ -81,18 +78,16 @@ router = APIRouter(prefix="/screenshots", tags=["Screenshots"])
 # ============================================================================
 
 
-async def get_screenshot_or_404(db: AsyncSession, screenshot_id: int) -> Screenshot:
+async def get_screenshot_or_404(repo: ScreenshotRepository, screenshot_id: int) -> Screenshot:
     """Get screenshot by ID or raise 404."""
-    repo = ScreenshotRepository(db)
     screenshot = await repo.get_by_id(screenshot_id)
     if not screenshot:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Screenshot not found")
     return screenshot
 
 
-async def get_screenshot_for_update(db: AsyncSession, screenshot_id: int) -> Screenshot:
+async def get_screenshot_for_update(repo: ScreenshotRepository, screenshot_id: int) -> Screenshot:
     """Get screenshot with row lock for safe concurrent updates."""
-    repo = ScreenshotRepository(db)
     screenshot = await repo.get_by_id_for_update(screenshot_id)
     if not screenshot:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Screenshot not found")
@@ -100,56 +95,19 @@ async def get_screenshot_for_update(db: AsyncSession, screenshot_id: int) -> Scr
 
 
 async def ensure_ocr_total(screenshot: Screenshot, db: AsyncSession) -> None:
-    """
-    Extract and save OCR total if screenshot is missing it.
-    Only applies to screen_time type screenshots.
-    """
-    # IMPORTANT: Never modify verified screenshots - they are frozen
-    if screenshot.verified_by_user_ids and len(screenshot.verified_by_user_ids) > 0:
-        return
+    """Extract and save OCR total if screenshot is missing it."""
+    from screenshot_processor.web.services.screenshot_service import ScreenshotService
 
-    # Skip if not screen_time or already has a total
-    if screenshot.image_type != "screen_time":
-        return
-    if screenshot.extracted_total and screenshot.extracted_total.strip():
-        return
-
-    try:
-        file_path = screenshot.file_path
-        if not Path(file_path).exists():
-            logger.warning("Screenshot file not found", extra={"screenshot_id": screenshot.id, "file_path": file_path})
-            return
-
-        # Read and process the image
-        img = cv2.imread(file_path)
-        if img is None:
-            logger.warning("Could not read screenshot image", extra={"screenshot_id": screenshot.id, "file_path": file_path})
-            return
-
-        # Convert dark mode if needed
-        img = convert_dark_mode(img)
-
-        # Extract the total using OCR
-        total, _ = find_screenshot_total_usage(img)
-
-        if total and total.strip():
-            screenshot.extracted_total = total.strip()
-            await db.commit()
-            logger.info("Auto-extracted OCR total", extra={"screenshot_id": screenshot.id, "extracted_total": total.strip()})
-
-    except Exception as e:
-        logger.error("Error auto-extracting OCR total", extra={"screenshot_id": screenshot.id, "error": str(e)})
+    await ScreenshotService(db).ensure_ocr_total(screenshot)
 
 
-async def enrich_screenshot_with_usernames(screenshot: Screenshot, db: AsyncSession) -> ScreenshotRead:
+async def enrich_screenshot_with_usernames(screenshot: Screenshot, repo: ScreenshotRepository) -> ScreenshotRead:
     """Convert a Screenshot model to ScreenshotRead and populate verified_by_usernames."""
-    repo = ScreenshotRepository(db)
     return await repo.enrich_with_usernames(screenshot)
 
 
-async def enrich_screenshots_with_usernames(screenshots: list[Screenshot], db: AsyncSession) -> list[ScreenshotRead]:
+async def enrich_screenshots_with_usernames(screenshots: list[Screenshot], repo: ScreenshotRepository) -> list[ScreenshotRead]:
     """Convert a list of Screenshot models to ScreenshotRead with verified_by_usernames populated."""
-    repo = ScreenshotRepository(db)
     return await repo.enrich_many_with_usernames(screenshots)
 
 
@@ -159,16 +117,14 @@ async def enrich_screenshots_with_usernames(screenshots: list[Screenshot], db: A
 
 
 @router.get("/groups", response_model=list[GroupRead], tags=["Groups"])
-async def list_groups(db: DatabaseSession):
+async def list_groups(repo: ScreenshotRepo):
     """List all groups with screenshot counts by processing_status."""
-    repo = ScreenshotRepository(db)
     return await repo.list_groups()
 
 
 @router.get("/groups/{group_id}", response_model=GroupRead, tags=["Groups"])
-async def get_group(group_id: str, db: DatabaseSession):
+async def get_group(group_id: str, repo: ScreenshotRepo):
     """Get a single group by ID with screenshot counts."""
-    repo = ScreenshotRepository(db)
     group = await repo.get_group(group_id)
     if not group:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
@@ -179,6 +135,7 @@ async def get_group(group_id: str, db: DatabaseSession):
 async def get_next_screenshot(
     current_user: CurrentUser,
     db: DatabaseSession,
+    repo: ScreenshotRepo,
     group: str | None = Query(None, description="Filter by group ID"),
     processing_status: str | None = Query(
         None, description="Filter by processing status (pending, completed, failed, skipped)"
@@ -207,7 +164,7 @@ async def get_next_screenshot(
     await ensure_ocr_total(screenshot, db)
 
     return NextScreenshotResponse(
-        screenshot=await enrich_screenshot_with_usernames(screenshot, db),
+        screenshot=await enrich_screenshot_with_usernames(screenshot, repo),
         queue_position=1,
         total_remaining=stats["total_remaining"],
         message=None,
@@ -215,17 +172,16 @@ async def get_next_screenshot(
 
 
 @router.get("/disputed", response_model=list[ScreenshotRead])
-async def get_disputed_screenshots(current_user: CurrentUser, db: DatabaseSession):
+async def get_disputed_screenshots(current_user: CurrentUser, db: DatabaseSession, repo: ScreenshotRepo):
     queue_service = QueueService()
     screenshots = await queue_service.get_disputed_screenshots(db, current_user.id)
 
-    return await enrich_screenshots_with_usernames(screenshots, db)
+    return await enrich_screenshots_with_usernames(screenshots, repo)
 
 
 @router.get("/stats", response_model=StatsResponse)
-async def get_screenshot_stats(db: DatabaseSession, current_user: CurrentUser):
+async def get_screenshot_stats(repo: ScreenshotRepo, current_user: CurrentUser):
     """Get screenshot statistics using consolidated queries."""
-    repo = ScreenshotRepository(db)
     stats = await repo.get_stats()
 
     avg_annotations = stats.total_annotations / stats.total if stats.total > 0 else 0.0
@@ -248,20 +204,23 @@ async def get_screenshot_stats(db: DatabaseSession, current_user: CurrentUser):
 
 @router.get("/list", response_model=PaginatedResponse[ScreenshotRead])
 async def list_screenshots_paginated(
-    db: DatabaseSession,
+    repo: ScreenshotRepo,
     current_user: CurrentUser,
     page: int = Query(1, ge=1, description="Page number (1-indexed)"),
     page_size: int = Query(50, ge=1, le=5000, description="Items per page"),
     group_id: str | None = Query(None, description="Filter by group ID"),
     processing_status: str | None = Query(None, description="Filter by processing status"),
-    verified_by_me: bool | None = Query(None, description="Filter by current user's verification (True=verified by me, False=not verified by me)"),
-    verified_by_others: bool | None = Query(None, description="Filter for screenshots verified by others but not current user (True only)"),
+    verified_by_me: bool | None = Query(
+        None, description="Filter by current user's verification (True=verified by me, False=not verified by me)"
+    ),
+    verified_by_others: bool | None = Query(
+        None, description="Filter for screenshots verified by others but not current user (True only)"
+    ),
     search: str | None = Query(None, description="Search by ID or participant ID"),
     sort_by: str = Query("id", description="Sort field: id, uploaded_at, processing_status"),
     sort_order: str = Query("asc", description="Sort order: asc, desc"),
 ):
     """List screenshots with comprehensive filtering and pagination."""
-    repo = ScreenshotRepository(db)
     result = await repo.list_with_filters(
         page=page,
         page_size=page_size,
@@ -285,7 +244,7 @@ async def list_screenshots_paginated(
 
 @router.get("/preprocessing-summary", response_model=PreprocessingSummary)
 async def get_preprocessing_summary(
-    db: DatabaseSession,
+    repo: ScreenshotRepo,
     current_user: CurrentUser,
     group_id: str = Query(..., description="Group ID"),
 ):
@@ -294,10 +253,7 @@ async def get_preprocessing_summary(
         STAGE_ORDER,
         get_stage_counts,
     )
-
-    stmt = select(Screenshot).where(Screenshot.group_id == group_id)
-    result = await db.execute(stmt)
-    screenshots = list(result.scalars().all())
+    screenshots = await repo.get_by_group(group_id)
 
     stage_summaries = {}
     for stage in STAGE_ORDER:
@@ -308,9 +264,8 @@ async def get_preprocessing_summary(
 
 
 @router.get("/{screenshot_id}", response_model=ScreenshotDetail)
-async def get_screenshot(screenshot_id: int, db: DatabaseSession, current_user: CurrentUser):
-    repo = ScreenshotRepository(db)
-    screenshot = await get_screenshot_or_404(db, screenshot_id)
+async def get_screenshot(screenshot_id: int, repo: ScreenshotRepo, current_user: CurrentUser):
+    screenshot = await get_screenshot_or_404(repo, screenshot_id)
 
     annotations_count = await repo.get_annotation_count(screenshot_id)
     needs_annotations = max(0, screenshot.target_annotations - annotations_count)
@@ -333,12 +288,13 @@ async def update_screenshot(
     screenshot_id: int,
     update_data: ScreenshotUpdate,
     db: DatabaseSession,
+    repo: ScreenshotRepo,
     current_user: CurrentUser,
 ):
     """
     Update a screenshot's metadata (e.g., extracted_title).
     """
-    screenshot = await get_screenshot_or_404(db, screenshot_id)
+    screenshot = await get_screenshot_or_404(repo, screenshot_id)
 
     try:
         # Update only provided fields
@@ -350,7 +306,7 @@ async def update_screenshot(
         await db.refresh(screenshot)
 
         logger.info("Screenshot updated", extra={"screenshot_id": screenshot_id, "username": current_user.username})
-        return await enrich_screenshot_with_usernames(screenshot, db)
+        return await enrich_screenshot_with_usernames(screenshot, repo)
 
     except Exception as e:
         await db.rollback()
@@ -366,42 +322,49 @@ async def update_screenshot(
 
 @router.get("/", response_model=list[ScreenshotRead])
 async def list_screenshots(
-    db: DatabaseSession,
+    repo: ScreenshotRepo,
     current_user: CurrentUser,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     status: str | None = Query(None),
 ):
-    stmt = select(Screenshot)
-
-    if status:
-        stmt = stmt.where(Screenshot.annotation_status == status)
-
-    stmt = stmt.offset(skip).limit(limit).order_by(Screenshot.uploaded_at.desc())
-
-    result = await db.execute(stmt)
-    screenshots = result.scalars().all()
+    screenshots = await repo.list_basic(
+        annotation_status=status,
+        skip=skip,
+        limit=limit,
+    )
 
     return [ScreenshotRead.model_validate(s) for s in screenshots]
 
 
 @router.post("/{screenshot_id}/skip", status_code=status.HTTP_204_NO_CONTENT)
-async def skip_screenshot(screenshot_id: int, db: DatabaseSession, current_user: CurrentUser):
+async def skip_screenshot(screenshot_id: int, db: DatabaseSession, repo: ScreenshotRepo, current_user: CurrentUser):
     """
     Skip a screenshot globally by setting processing_status to 'skipped'.
     This moves it to the skipped category visible on the homepage.
     """
-    screenshot = await get_screenshot_or_404(db, screenshot_id)
+    screenshot = await get_screenshot_or_404(repo, screenshot_id)
 
     old_status = screenshot.processing_status
-    logger.info("Screenshot skip requested", extra={"screenshot_id": screenshot_id, "username": current_user.username, "status": str(old_status)})
+    logger.info(
+        "Screenshot skip requested",
+        extra={"screenshot_id": screenshot_id, "username": current_user.username, "status": str(old_status)},
+    )
 
     # Update the global processing status to skipped
     screenshot.processing_status = ProcessingStatus.SKIPPED
     await db.commit()
     await db.refresh(screenshot)
 
-    logger.info("Screenshot skipped", extra={"screenshot_id": screenshot_id, "username": current_user.username, "old_status": str(old_status), "new_status": str(screenshot.processing_status)})
+    logger.info(
+        "Screenshot skipped",
+        extra={
+            "screenshot_id": screenshot_id,
+            "username": current_user.username,
+            "old_status": str(old_status),
+            "new_status": str(screenshot.processing_status),
+        },
+    )
 
 
 class UnskipResponse(BaseModel):
@@ -412,14 +375,17 @@ class UnskipResponse(BaseModel):
 
 
 @router.post("/{screenshot_id}/unskip", response_model=UnskipResponse)
-async def unskip_screenshot(screenshot_id: int, db: DatabaseSession, current_user: CurrentUser):
+async def unskip_screenshot(screenshot_id: int, db: DatabaseSession, repo: ScreenshotRepo, current_user: CurrentUser):
     """
     Unskip a screenshot by restoring processing_status to 'completed'.
     """
-    screenshot = await get_screenshot_or_404(db, screenshot_id)
+    screenshot = await get_screenshot_or_404(repo, screenshot_id)
 
     old_status = screenshot.processing_status
-    logger.info("Screenshot unskip requested", extra={"screenshot_id": screenshot_id, "username": current_user.username, "status": str(old_status)})
+    logger.info(
+        "Screenshot unskip requested",
+        extra={"screenshot_id": screenshot_id, "username": current_user.username, "status": str(old_status)},
+    )
 
     if screenshot.processing_status != ProcessingStatus.SKIPPED:
         logger.warning("Cannot unskip screenshot", extra={"screenshot_id": screenshot_id, "status": str(old_status)})
@@ -429,7 +395,15 @@ async def unskip_screenshot(screenshot_id: int, db: DatabaseSession, current_use
     screenshot.processing_status = ProcessingStatus.COMPLETED
     await db.commit()
     await db.refresh(screenshot)
-    logger.info("Screenshot unskipped", extra={"screenshot_id": screenshot_id, "username": current_user.username, "old_status": str(old_status), "new_status": str(screenshot.processing_status)})
+    logger.info(
+        "Screenshot unskipped",
+        extra={
+            "screenshot_id": screenshot_id,
+            "username": current_user.username,
+            "old_status": str(old_status),
+            "new_status": str(screenshot.processing_status),
+        },
+    )
 
     return UnskipResponse(success=True, message="Screenshot has been restored to completed status")
 
@@ -447,6 +421,7 @@ class VerifyRequest(BaseModel):
 async def verify_screenshot(
     screenshot_id: int,
     db: DatabaseSession,
+    repo: ScreenshotRepo,
     current_user: CurrentUser,
     request: VerifyRequest | None = None,
 ):
@@ -457,15 +432,21 @@ async def verify_screenshot(
     """
     from sqlalchemy.orm.attributes import flag_modified
 
-    logger.info("Screenshot verify requested", extra={"screenshot_id": screenshot_id, "user_id": current_user.id, "username": current_user.username})
+    logger.info(
+        "Screenshot verify requested",
+        extra={"screenshot_id": screenshot_id, "user_id": current_user.id, "username": current_user.username},
+    )
 
     # Use row lock to prevent race condition when multiple users verify simultaneously
-    screenshot = await get_screenshot_for_update(db, screenshot_id)
+    screenshot = await get_screenshot_for_update(repo, screenshot_id)
 
     try:
         # Initialize list if null - make a copy to avoid mutation issues
         old_verified_ids = list(screenshot.verified_by_user_ids or [])
-        logger.info("Screenshot current verified_by_user_ids", extra={"screenshot_id": screenshot_id, "verified_by_user_ids": old_verified_ids})
+        logger.info(
+            "Screenshot current verified_by_user_ids",
+            extra={"screenshot_id": screenshot_id, "verified_by_user_ids": old_verified_ids},
+        )
 
         # Add user if not already verified
         if current_user.id not in old_verified_ids:
@@ -487,9 +468,17 @@ async def verify_screenshot(
 
         await db.commit()
         await db.refresh(screenshot)
-        logger.info("Screenshot verified", extra={"screenshot_id": screenshot_id, "username": current_user.username, "old_verified_ids": old_verified_ids, "new_verified_ids": screenshot.verified_by_user_ids})
+        logger.info(
+            "Screenshot verified",
+            extra={
+                "screenshot_id": screenshot_id,
+                "username": current_user.username,
+                "old_verified_ids": old_verified_ids,
+                "new_verified_ids": screenshot.verified_by_user_ids,
+            },
+        )
 
-        return await enrich_screenshot_with_usernames(screenshot, db)
+        return await enrich_screenshot_with_usernames(screenshot, repo)
 
     except Exception as e:
         await db.rollback()
@@ -501,21 +490,27 @@ async def verify_screenshot(
 
 
 @router.delete("/{screenshot_id}/verify", response_model=ScreenshotRead)
-async def unverify_screenshot(screenshot_id: int, db: DatabaseSession, current_user: CurrentUser):
+async def unverify_screenshot(screenshot_id: int, db: DatabaseSession, repo: ScreenshotRepo, current_user: CurrentUser):
     """
     Remove verification mark from a screenshot for the current user.
     """
     from sqlalchemy.orm.attributes import flag_modified
 
-    logger.info("Screenshot unverify requested", extra={"screenshot_id": screenshot_id, "user_id": current_user.id, "username": current_user.username})
+    logger.info(
+        "Screenshot unverify requested",
+        extra={"screenshot_id": screenshot_id, "user_id": current_user.id, "username": current_user.username},
+    )
 
     # Use row lock to prevent race condition when multiple users unverify simultaneously
-    screenshot = await get_screenshot_for_update(db, screenshot_id)
+    screenshot = await get_screenshot_for_update(repo, screenshot_id)
 
     try:
         # Remove user from verified list
         old_verified_ids = list(screenshot.verified_by_user_ids or [])
-        logger.info("Screenshot current verified_by_user_ids", extra={"screenshot_id": screenshot_id, "verified_by_user_ids": old_verified_ids})
+        logger.info(
+            "Screenshot current verified_by_user_ids",
+            extra={"screenshot_id": screenshot_id, "verified_by_user_ids": old_verified_ids},
+        )
 
         if current_user.id in old_verified_ids:
             new_verified_ids = [uid for uid in old_verified_ids if uid != current_user.id]
@@ -523,11 +518,26 @@ async def unverify_screenshot(screenshot_id: int, db: DatabaseSession, current_u
             flag_modified(screenshot, "verified_by_user_ids")  # Tell SQLAlchemy the field changed
             await db.commit()
             await db.refresh(screenshot)
-            logger.info("Screenshot unverified", extra={"screenshot_id": screenshot_id, "username": current_user.username, "old_verified_ids": old_verified_ids, "new_verified_ids": screenshot.verified_by_user_ids})
+            logger.info(
+                "Screenshot unverified",
+                extra={
+                    "screenshot_id": screenshot_id,
+                    "username": current_user.username,
+                    "old_verified_ids": old_verified_ids,
+                    "new_verified_ids": screenshot.verified_by_user_ids,
+                },
+            )
         else:
-            logger.warning("User not in verified list", extra={"screenshot_id": screenshot_id, "user_id": current_user.id, "verified_by_user_ids": old_verified_ids})
+            logger.warning(
+                "User not in verified list",
+                extra={
+                    "screenshot_id": screenshot_id,
+                    "user_id": current_user.id,
+                    "verified_by_user_ids": old_verified_ids,
+                },
+            )
 
-        return await enrich_screenshot_with_usernames(screenshot, db)
+        return await enrich_screenshot_with_usernames(screenshot, repo)
 
     except Exception as e:
         await db.rollback()
@@ -552,11 +562,16 @@ class NavigationResponse(BaseModel):
 async def get_screenshot_navigation(
     screenshot_id: int,
     db: DatabaseSession,
+    repo: ScreenshotRepo,
     current_user: CurrentUser,
     group_id: str | None = Query(None, description="Filter by group ID"),
     processing_status: str | None = Query(None, description="Filter by processing status"),
-    verified_by_me: bool | None = Query(None, description="Filter by current user's verification (True=verified by me, False=not verified by me)"),
-    verified_by_others: bool | None = Query(None, description="Filter for screenshots verified by others but not current user (True only)"),
+    verified_by_me: bool | None = Query(
+        None, description="Filter by current user's verification (True=verified by me, False=not verified by me)"
+    ),
+    verified_by_others: bool | None = Query(
+        None, description="Filter for screenshots verified by others but not current user (True only)"
+    ),
     direction: str = Query("current", description="Direction: current, next, prev"),
 ):
     """
@@ -564,6 +579,8 @@ async def get_screenshot_navigation(
     Returns the current, next, or previous screenshot based on direction.
     """
     from sqlalchemy import and_, literal, or_
+
+    from sqlalchemy.dialects.postgresql import JSONB
 
     # Build base conditions for the filtered set
     conditions = []
@@ -574,11 +591,8 @@ async def get_screenshot_navigation(
 
     # Helper to check if user ID is in verified_by_user_ids array
     # Column is JSON type, need to cast both sides to JSONB for @> operator
-    from sqlalchemy.dialects.postgresql import JSONB
     def user_in_verified_list(user_id: int):
-        return cast(Screenshot.verified_by_user_ids, JSONB).op("@>")(
-            cast(literal(f"[{user_id}]"), JSONB)
-        )
+        return cast(Screenshot.verified_by_user_ids, JSONB).op("@>")(cast(literal(f"[{user_id}]"), JSONB))
 
     def has_verifications():
         return and_(
@@ -590,10 +604,8 @@ async def get_screenshot_navigation(
     # User-specific verified filter
     if verified_by_me is not None:
         if verified_by_me is True:
-            # Verified BY ME: my user ID is in the verified_by_user_ids array
             conditions.append(user_in_verified_list(current_user.id))
         else:
-            # NOT verified by me: my user ID is NOT in the array (or array is null/empty)
             conditions.append(
                 or_(
                     ~has_verifications(),
@@ -603,85 +615,35 @@ async def get_screenshot_navigation(
 
     # Verified by others filter (verified by someone, but not by current user)
     if verified_by_others is True:
-        # Has verifications AND current user is NOT in the list
         conditions.append(has_verifications())
         conditions.append(~user_in_verified_list(current_user.id))
 
-    # Get total count in filter
-    count_stmt = select(func.count(Screenshot.id))
-    if conditions:
-        count_stmt = count_stmt.where(and_(*conditions))
-    result = await db.execute(count_stmt)
-    total_in_filter = result.scalar_one()
+    nav_result = await repo.navigate_with_filters(screenshot_id, direction, conditions)
 
-    # Get the target screenshot based on direction
-    if direction == "next":
-        # Get next screenshot after current ID
-        stmt = select(Screenshot).where(Screenshot.id > screenshot_id)
-        if conditions:
-            stmt = stmt.where(and_(*conditions))
-        stmt = stmt.order_by(Screenshot.id.asc()).limit(1)
-    elif direction == "prev":
-        # Get previous screenshot before current ID
-        stmt = select(Screenshot).where(Screenshot.id < screenshot_id)
-        if conditions:
-            stmt = stmt.where(and_(*conditions))
-        stmt = stmt.order_by(Screenshot.id.desc()).limit(1)
-    else:
-        # Get current screenshot
-        stmt = select(Screenshot).where(Screenshot.id == screenshot_id)
-        if conditions:
-            stmt = stmt.where(and_(*conditions))
-
-    result = await db.execute(stmt)
-    screenshot = result.scalar_one_or_none()
-
-    if not screenshot:
-        # If no screenshot found in direction, return null with context
+    if not nav_result.screenshot:
         return NavigationResponse(
             screenshot=None,
-            current_index=0,
-            total_in_filter=total_in_filter,
-            has_next=False,
-            has_prev=False,
+            current_index=nav_result.current_index,
+            total_in_filter=nav_result.total_in_filter,
+            has_next=nav_result.has_next,
+            has_prev=nav_result.has_prev,
         )
 
-    # Calculate current index
-    index_stmt = select(func.count(Screenshot.id)).where(Screenshot.id < screenshot.id)
-    if conditions:
-        index_stmt = index_stmt.where(and_(*conditions))
-    result = await db.execute(index_stmt)
-    current_index = result.scalar_one() + 1  # 1-indexed
-
-    # Check if there's a next screenshot
-    next_stmt = select(func.count(Screenshot.id)).where(Screenshot.id > screenshot.id)
-    if conditions:
-        next_stmt = next_stmt.where(and_(*conditions))
-    result = await db.execute(next_stmt)
-    has_next = result.scalar_one() > 0
-
-    # Check if there's a previous screenshot
-    prev_stmt = select(func.count(Screenshot.id)).where(Screenshot.id < screenshot.id)
-    if conditions:
-        prev_stmt = prev_stmt.where(and_(*conditions))
-    result = await db.execute(prev_stmt)
-    has_prev = result.scalar_one() > 0
-
     # Auto-extract OCR total if missing
-    await ensure_ocr_total(screenshot, db)
+    await ensure_ocr_total(nav_result.screenshot, db)
 
     return NavigationResponse(
-        screenshot=await enrich_screenshot_with_usernames(screenshot, db),
-        current_index=current_index,
-        total_in_filter=total_in_filter,
-        has_next=has_next,
-        has_prev=has_prev,
+        screenshot=await enrich_screenshot_with_usernames(nav_result.screenshot, repo),
+        current_index=nav_result.current_index,
+        total_in_filter=nav_result.total_in_filter,
+        has_next=nav_result.has_next,
+        has_prev=nav_result.has_prev,
     )
 
 
 @router.get("/{screenshot_id}/image")
-async def get_screenshot_image(screenshot_id: int, db: DatabaseSession):
-    screenshot = await get_screenshot_or_404(db, screenshot_id)
+async def get_screenshot_image(screenshot_id: int, repo: ScreenshotRepo):
+    screenshot = await get_screenshot_or_404(repo, screenshot_id)
 
     # Path traversal protection: ensure file is within UPLOAD_DIR
     settings = get_settings()
@@ -693,7 +655,10 @@ async def get_screenshot_image(screenshot_id: int, db: DatabaseSession):
         file_path.relative_to(upload_dir)
     except ValueError:
         # file_path is not relative to upload_dir - path traversal attempt
-        logger.warning("Path traversal attempt detected", extra={"screenshot_id": screenshot_id, "file_path": screenshot.file_path, "upload_dir": str(upload_dir)})
+        logger.warning(
+            "Path traversal attempt detected",
+            extra={"screenshot_id": screenshot_id, "file_path": screenshot.file_path, "upload_dir": str(upload_dir)},
+        )
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
     if not file_path.exists():
@@ -717,12 +682,12 @@ class RecalculateOcrResponse(BaseModel):
 
 
 @router.post("/{screenshot_id}/recalculate-ocr", response_model=RecalculateOcrResponse)
-async def recalculate_ocr_total(screenshot_id: int, db: DatabaseSession, current_user: CurrentUser):
+async def recalculate_ocr_total(screenshot_id: int, db: DatabaseSession, repo: ScreenshotRepo, current_user: CurrentUser):
     """
     Recalculate the OCR total for a specific screenshot.
     Re-runs OCR extraction on the original image to get the total usage time.
     """
-    screenshot = await get_screenshot_or_404(db, screenshot_id)
+    screenshot = await get_screenshot_or_404(repo, screenshot_id)
 
     if screenshot.image_type != "screen_time":
         raise HTTPException(
@@ -758,7 +723,9 @@ async def recalculate_ocr_total(screenshot_id: int, db: DatabaseSession, current
             screenshot.extracted_total = total.strip()
             await db.commit()
             await db.refresh(screenshot)
-            logger.info("Recalculated OCR total", extra={"screenshot_id": screenshot_id, "extracted_total": total.strip()})
+            logger.info(
+                "Recalculated OCR total", extra={"screenshot_id": screenshot_id, "extracted_total": total.strip()}
+            )
             return RecalculateOcrResponse(
                 success=True,
                 extracted_total=total.strip(),
@@ -781,8 +748,8 @@ async def recalculate_ocr_total(screenshot_id: int, db: DatabaseSession, current
 
 
 @router.get("/{screenshot_id}/processing-result", response_model=ProcessingResultResponse)
-async def get_processing_result(screenshot_id: int, db: DatabaseSession, current_user: CurrentUser):
-    screenshot = await get_screenshot_or_404(db, screenshot_id)
+async def get_processing_result(screenshot_id: int, repo: ScreenshotRepo, current_user: CurrentUser):
+    screenshot = await get_screenshot_or_404(repo, screenshot_id)
 
     return ProcessingResultResponse(
         success=screenshot.processing_status not in [ProcessingStatus.PENDING, ProcessingStatus.FAILED],
@@ -801,6 +768,7 @@ async def reprocess_screenshot_endpoint(
     screenshot_id: int,
     reprocess_request: ReprocessRequest,
     db: DatabaseSession,
+    repo: ScreenshotRepo,
     current_user: CurrentUser,
 ):
     """
@@ -811,7 +779,7 @@ async def reprocess_screenshot_endpoint(
     - If processing_method="line_based", uses visual line detection (no OCR for grid)
     - Otherwise, uses "ocr_anchored" method (finds "12 AM" and "60" text anchors)
     """
-    screenshot = await get_screenshot_or_404(db, screenshot_id)
+    screenshot = await get_screenshot_or_404(repo, screenshot_id)
 
     grid_coords = None
     if reprocess_request.grid_upper_left_x is not None and reprocess_request.grid_lower_right_x is not None:
@@ -1072,6 +1040,7 @@ def _validate_callback_url(callback_url: str | None) -> None:
 
 async def _process_single_upload(
     db: AsyncSession,
+    repo: ScreenshotRepository,
     image_data: bytes,
     extension: str,
     dimensions: tuple[int, int],
@@ -1102,11 +1071,22 @@ async def _process_single_upload(
     if not detected_device_type and width > 0 and height > 0:
         detected_device_type = _detect_device_type(width, height)
 
-    # Generate unique filename - use faster hash for deduplication
-    # xxhash would be faster, but hashlib.blake2b is ~2x faster than MD5 and built-in
+    # Generate unique filename and content hash for dedup
+    # Single blake2b call: truncate for filename, full for dedup
     t1 = time.perf_counter()
-    file_hash = hashlib.blake2b(image_data, digest_size=6).hexdigest()
+    content_hash = hashlib.blake2b(image_data, digest_size=32).hexdigest()
+    file_hash = content_hash[:12]
     timings["hash"] = (time.perf_counter() - t1) * 1000
+
+    # Content-hash dedup check
+    existing = await repo.find_by_content_hash(content_hash)
+    if existing:
+        return ScreenshotUploadResponse(
+            success=True,
+            screenshot_id=existing.id,
+            duplicate=True,
+            message="Duplicate image detected",
+        )
 
     if filename:
         safe_filename = sanitize_filename(filename)
@@ -1153,6 +1133,7 @@ async def _process_single_upload(
             original_filepath=original_filepath,
             screenshot_date=screenshot_date,
             processing_metadata={"callback_url": callback_url} if callback_url else None,
+            content_hash=content_hash,
         )
         .on_conflict_do_update(
             index_elements=["file_path"],
@@ -1173,7 +1154,9 @@ async def _process_single_upload(
                 "device_type": detected_device_type,
                 "original_filepath": original_filepath,
                 "screenshot_date": screenshot_date,
-                "processing_metadata": {"callback_url": callback_url, "reprocessed": True} if callback_url else {"reprocessed": True},
+                "processing_metadata": {"callback_url": callback_url, "reprocessed": True}
+                if callback_url
+                else {"reprocessed": True},
             },
         )
         .returning(Screenshot.id)
@@ -1187,36 +1170,14 @@ async def _process_single_upload(
 
         # Check if this was a duplicate by checking for existing annotations
         # (If there are annotations, we need to clear them for a fresh start)
-        from sqlalchemy import func
-        annotation_count_result = await db.execute(
-            select(func.count()).select_from(Annotation).where(Annotation.screenshot_id == screenshot_id)
-        )
-        annotation_count = annotation_count_result.scalar() or 0
+        annotation_count = await repo.get_annotation_count(screenshot_id)
 
         if annotation_count > 0:
             is_duplicate = True
 
             # Clear ALL existing data for fresh start
-            # 1. Clear annotations
-            await db.execute(delete(Annotation).where(Annotation.screenshot_id == screenshot_id))
-
-            # 2. Clear consensus results
-            await db.execute(delete(ConsensusResult).where(ConsensusResult.screenshot_id == screenshot_id))
-
-            # 3. Clear user queue states for this screenshot
-            await db.execute(delete(UserQueueState).where(UserQueueState.screenshot_id == screenshot_id))
-
-            # 4. Reset all screenshot state
-            await db.execute(
-                update(Screenshot)
-                .where(Screenshot.id == screenshot_id)
-                .values(
-                    current_annotation_count=0,
-                    annotation_status=AnnotationStatus.PENDING,
-                    has_consensus=False,
-                    verified_by_user_ids=None,
-                )
-            )
+            await repo.clear_screenshot_related_data([screenshot_id])
+            await repo.reset_screenshot_state([screenshot_id])
             logger.info("Duplicate upload: cleared all data, reprocessing", extra={"screenshot_id": screenshot_id})
 
         await db.commit()
@@ -1286,6 +1247,7 @@ async def upload_screenshot(
     request: Request,
     upload_request: Annotated[ScreenshotUploadRequest, Body()],
     db: DatabaseSession,
+    repo: ScreenshotRepo,
     api_key: str = Header(..., alias="X-API-Key", description="API key for upload authorization"),
 ):
     """
@@ -1350,6 +1312,7 @@ async def upload_screenshot(
     # Process the upload
     return await _process_single_upload(
         db=db,
+        repo=repo,
         image_data=image_data,
         extension=extension,
         dimensions=dimensions,
@@ -1374,6 +1337,7 @@ async def upload_screenshots_batch(
     request: Request,
     batch_request: Annotated[BatchUploadRequest, Body()],
     db: DatabaseSession,
+    repo: ScreenshotRepo,
     api_key: str = Header(..., alias="X-API-Key", description="API key for upload authorization"),
 ):
     """
@@ -1495,8 +1459,9 @@ async def upload_screenshots_batch(
             if not detected_device_type and width > 0 and height > 0:
                 detected_device_type = _detect_device_type(width, height)
 
-            # Generate file path
-            file_hash = hashlib.blake2b(image_data, digest_size=6).hexdigest()
+            # Generate file path (truncate content hash for filename)
+            content_hash = hashlib.blake2b(image_data, digest_size=32).hexdigest()
+            file_hash = content_hash[:12]
             if item.filename:
                 safe_filename = sanitize_filename(item.filename)
                 base_name = Path(safe_filename).stem
@@ -1516,8 +1481,28 @@ async def upload_screenshots_batch(
                     "original_filepath": item.original_filepath,
                     "screenshot_date": item.screenshot_date,
                     "device_type": detected_device_type,
+                    "content_hash": content_hash,
                 }
             )
+
+    # Content-hash dedup: check which content hashes already exist
+    content_hashes = [item["content_hash"] for item in decoded_items]
+    existing_hash_map = await repo.find_existing_by_content_hashes(content_hashes)
+
+    # Filter out content-hash duplicates
+    non_dup_items = []
+    for item_data in decoded_items:
+        ch = item_data["content_hash"]
+        if ch in existing_hash_map:
+            results[item_data["idx"]] = BatchItemResult(
+                index=item_data["idx"],
+                success=True,
+                screenshot_id=existing_hash_map[ch],
+                duplicate=True,
+            )
+        else:
+            non_dup_items.append(item_data)
+    decoded_items = non_dup_items
 
     # Phase 2: Write all files in parallel
     t1 = time.perf_counter()
@@ -1558,10 +1543,7 @@ async def upload_screenshots_batch(
     if items_to_insert:
         # Check which paths already exist (for duplicate detection)
         all_paths = [str(item["file_path"]) for item in items_to_insert]
-        existing_result = await db.execute(
-            select(Screenshot.file_path).where(Screenshot.file_path.in_(all_paths))
-        )
-        duplicate_paths = {row[0] for row in existing_result.fetchall()}
+        duplicate_paths = await repo.find_existing_file_paths(all_paths)
         from sqlalchemy.dialects.postgresql import insert as pg_insert
 
         values = [
@@ -1578,6 +1560,7 @@ async def upload_screenshots_batch(
                 "device_type": item["device_type"],
                 "original_filepath": item["original_filepath"],
                 "screenshot_date": item["screenshot_date"],
+                "content_hash": item["content_hash"],
             }
             for item in items_to_insert
         ]
@@ -1616,23 +1599,12 @@ async def upload_screenshots_batch(
             if duplicate_paths:
                 dup_ids = [inserted_ids[fp] for fp in duplicate_paths]
 
-                # Clear annotations, consensus, queue states for duplicates
-                await db.execute(delete(Annotation).where(Annotation.screenshot_id.in_(dup_ids)))
-                await db.execute(delete(ConsensusResult).where(ConsensusResult.screenshot_id.in_(dup_ids)))
-                await db.execute(delete(UserQueueState).where(UserQueueState.screenshot_id.in_(dup_ids)))
-
-                # Reset screenshot state
-                await db.execute(
-                    update(Screenshot)
-                    .where(Screenshot.id.in_(dup_ids))
-                    .values(
-                        current_annotation_count=0,
-                        annotation_status=AnnotationStatus.PENDING,
-                        has_consensus=False,
-                        verified_by_user_ids=None,
-                    )
+                await repo.clear_screenshot_related_data(dup_ids)
+                await repo.reset_screenshot_state(dup_ids)
+                logger.info(
+                    "Batch upload: cleared all data for duplicates, reprocessing",
+                    extra={"duplicate_count": len(dup_ids)},
                 )
-                logger.info("Batch upload: cleared all data for duplicates, reprocessing", extra={"duplicate_count": len(dup_ids)})
 
             await db.commit()
 
@@ -1679,13 +1651,15 @@ async def upload_screenshots_batch(
                 from screenshot_processor.web.tasks import preprocess_screenshot_task
 
                 task_group = group(
-                    preprocess_screenshot_task.s(sid) for sid in screenshot_ids_to_queue  # type: ignore[attr-defined]
+                    preprocess_screenshot_task.s(sid)
+                    for sid in screenshot_ids_to_queue  # type: ignore[attr-defined]
                 )
             else:
                 from screenshot_processor.web.tasks import process_screenshot_task
 
                 task_group = group(
-                    process_screenshot_task.s(sid) for sid in screenshot_ids_to_queue  # type: ignore[attr-defined]
+                    process_screenshot_task.s(sid)
+                    for sid in screenshot_ids_to_queue  # type: ignore[attr-defined]
                 )
             task_group.apply_async()
         except Exception as e:
@@ -1729,9 +1703,9 @@ async def upload_screenshots_batch(
 
 
 @router.get("/{screenshot_id}/preprocessing", response_model=PreprocessingDetailsResponse)
-async def get_preprocessing_details(screenshot_id: int, db: DatabaseSession, current_user: CurrentUser):
+async def get_preprocessing_details(screenshot_id: int, repo: ScreenshotRepo, current_user: CurrentUser):
     """Get preprocessing details for a screenshot from its processing_metadata."""
-    screenshot = await get_screenshot_or_404(db, screenshot_id)
+    screenshot = await get_screenshot_or_404(repo, screenshot_id)
 
     metadata = screenshot.processing_metadata or {}
     preprocessing = metadata.get("preprocessing")
@@ -1756,11 +1730,11 @@ async def get_preprocessing_details(screenshot_id: int, db: DatabaseSession, cur
 async def preprocess_screenshot(
     screenshot_id: int,
     preprocess_request: PreprocessRequest,
-    db: DatabaseSession,
+    repo: ScreenshotRepo,
     current_user: CurrentUser,
 ):
     """Queue preprocessing task for a single screenshot."""
-    screenshot = await get_screenshot_or_404(db, screenshot_id)
+    await get_screenshot_or_404(repo, screenshot_id)
 
     try:
         from screenshot_processor.web.tasks import preprocess_screenshot_task
@@ -1791,26 +1765,15 @@ async def preprocess_screenshot(
 @router.post("/preprocess-batch", response_model=BatchPreprocessResponse)
 async def preprocess_screenshots_batch(
     batch_request: BatchPreprocessRequest,
-    db: DatabaseSession,
+    repo: ScreenshotRepo,
     current_user: CurrentUser,
 ):
     """Queue preprocessing tasks for multiple screenshots in a group."""
     # Get screenshot IDs to process
-    if batch_request.screenshot_ids:
-        # Verify all IDs belong to the group
-        stmt = select(Screenshot.id).where(
-            Screenshot.id.in_(batch_request.screenshot_ids),
-            Screenshot.group_id == batch_request.group_id,
-        )
-        result = await db.execute(stmt)
-        screenshot_ids = [row[0] for row in result.all()]
-    else:
-        # Get all screenshots in the group
-        stmt = select(Screenshot.id).where(
-            Screenshot.group_id == batch_request.group_id,
-        ).order_by(Screenshot.id)
-        result = await db.execute(stmt)
-        screenshot_ids = [row[0] for row in result.all()]
+    screenshot_ids = await repo.get_ids_by_group(
+        batch_request.group_id,
+        screenshot_ids=batch_request.screenshot_ids,
+    )
 
     if not screenshot_ids:
         raise HTTPException(
@@ -1861,7 +1824,7 @@ _STAGE_ORDER = ["device_detection", "cropping", "phi_detection", "phi_redaction"
 
 
 async def _get_eligible_screenshot_ids(
-    db: AsyncSession,
+    repo: ScreenshotRepository,
     stage: str,
     group_id: str | None,
     screenshot_ids: list[int] | None,
@@ -1872,17 +1835,12 @@ async def _get_eligible_screenshot_ids(
     1. Its status for this stage is pending, invalidated, or failed
     2. ALL prerequisite stages (earlier in the pipeline) are completed
     """
-    if screenshot_ids:
-        stmt = select(Screenshot).where(Screenshot.id.in_(screenshot_ids))
-    elif group_id:
-        stmt = select(Screenshot).where(Screenshot.group_id == group_id)
-    else:
+    screenshots = await repo.get_by_ids_or_group(screenshot_ids=screenshot_ids, group_id=group_id)
+    if not screenshot_ids and not group_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Either screenshot_ids or group_id is required",
         )
-    result = await db.execute(stmt)
-    screenshots = result.scalars().all()
 
     # Determine prerequisite stages
     stage_idx = _STAGE_ORDER.index(stage) if stage in _STAGE_ORDER else 0
@@ -1905,6 +1863,7 @@ async def _get_eligible_screenshot_ids(
 async def reset_stage(
     request: StagePreprocessRequest,
     db: DatabaseSession,
+    repo: ScreenshotRepo,
     current_user: CurrentUser,
 ):
     """Reset a stage to 'pending' for all completed/failed screenshots in a group.
@@ -1927,16 +1886,9 @@ async def reset_stage(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"stage is required and must be one of: {STAGE_ORDER}",
         )
-
-    if request.screenshot_ids:
-        stmt = select(Screenshot).where(Screenshot.id.in_(request.screenshot_ids))
-    elif request.group_id:
-        stmt = select(Screenshot).where(Screenshot.group_id == request.group_id)
-    else:
+    screenshots = await repo.get_by_ids_or_group(screenshot_ids=request.screenshot_ids, group_id=request.group_id)
+    if not request.screenshot_ids and not request.group_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="group_id or screenshot_ids required")
-
-    result = await db.execute(stmt)
-    screenshots = result.scalars().all()
 
     reset_ids = []
     for s in screenshots:
@@ -1953,7 +1905,10 @@ async def reset_stage(
     if reset_ids:
         await db.commit()
 
-    logger.info("Stage reset for screenshots", extra={"stage": stage, "count": len(reset_ids), "username": current_user.username})
+    logger.info(
+        "Stage reset for screenshots",
+        extra={"stage": stage, "count": len(reset_ids), "username": current_user.username},
+    )
     return StagePreprocessResponse(
         queued_count=0,
         screenshot_ids=reset_ids,
@@ -1965,14 +1920,16 @@ async def reset_stage(
 @router.post("/preprocess-stage/device-detection", response_model=StagePreprocessResponse)
 async def run_device_detection_stage(
     request: StagePreprocessRequest,
-    db: DatabaseSession,
+    repo: ScreenshotRepo,
     current_user: CurrentUser,
 ):
     """Queue device detection for a batch of screenshots."""
-    ids = await _get_eligible_screenshot_ids(db, "device_detection", request.group_id, request.screenshot_ids)
+    ids = await _get_eligible_screenshot_ids(repo, "device_detection", request.group_id, request.screenshot_ids)
     if not ids:
         return StagePreprocessResponse(
-            queued_count=0, screenshot_ids=[], stage="device_detection",
+            queued_count=0,
+            screenshot_ids=[],
+            stage="device_detection",
             message="No eligible screenshots for device detection",
         )
 
@@ -1984,7 +1941,9 @@ async def run_device_detection_stage(
 
     logger.info("Device detection queued", extra={"count": len(ids), "username": current_user.username})
     return StagePreprocessResponse(
-        queued_count=len(ids), screenshot_ids=ids, stage="device_detection",
+        queued_count=len(ids),
+        screenshot_ids=ids,
+        stage="device_detection",
         message=f"Device detection queued for {len(ids)} screenshots",
     )
 
@@ -1992,14 +1951,16 @@ async def run_device_detection_stage(
 @router.post("/preprocess-stage/cropping", response_model=StagePreprocessResponse)
 async def run_cropping_stage(
     request: StagePreprocessRequest,
-    db: DatabaseSession,
+    repo: ScreenshotRepo,
     current_user: CurrentUser,
 ):
     """Queue cropping for a batch of screenshots."""
-    ids = await _get_eligible_screenshot_ids(db, "cropping", request.group_id, request.screenshot_ids)
+    ids = await _get_eligible_screenshot_ids(repo, "cropping", request.group_id, request.screenshot_ids)
     if not ids:
         return StagePreprocessResponse(
-            queued_count=0, screenshot_ids=[], stage="cropping",
+            queued_count=0,
+            screenshot_ids=[],
+            stage="cropping",
             message="No eligible screenshots for cropping",
         )
 
@@ -2011,7 +1972,9 @@ async def run_cropping_stage(
 
     logger.info("Cropping queued", extra={"count": len(ids), "username": current_user.username})
     return StagePreprocessResponse(
-        queued_count=len(ids), screenshot_ids=ids, stage="cropping",
+        queued_count=len(ids),
+        screenshot_ids=ids,
+        stage="cropping",
         message=f"Cropping queued for {len(ids)} screenshots",
     )
 
@@ -2019,14 +1982,16 @@ async def run_cropping_stage(
 @router.post("/preprocess-stage/phi-detection", response_model=StagePreprocessResponse)
 async def run_phi_detection_stage(
     request: PHIDetectionStageRequest,
-    db: DatabaseSession,
+    repo: ScreenshotRepo,
     current_user: CurrentUser,
 ):
     """Queue PHI detection for a batch of screenshots."""
-    ids = await _get_eligible_screenshot_ids(db, "phi_detection", request.group_id, request.screenshot_ids)
+    ids = await _get_eligible_screenshot_ids(repo, "phi_detection", request.group_id, request.screenshot_ids)
     if not ids:
         return StagePreprocessResponse(
-            queued_count=0, screenshot_ids=[], stage="phi_detection",
+            queued_count=0,
+            screenshot_ids=[],
+            stage="phi_detection",
             message="No eligible screenshots for PHI detection",
         )
 
@@ -2034,15 +1999,18 @@ async def run_phi_detection_stage(
     from screenshot_processor.web.tasks import phi_detection_task
 
     task_group = celery_group(
-        phi_detection_task.s(sid, preset=request.phi_pipeline_preset,
-                             llm_endpoint=request.llm_endpoint, llm_model=request.llm_model)
+        phi_detection_task.s(
+            sid, preset=request.phi_pipeline_preset, llm_endpoint=request.llm_endpoint, llm_model=request.llm_model
+        )
         for sid in ids
     )
     task_group.apply_async()
 
     logger.info("PHI detection queued", extra={"count": len(ids), "username": current_user.username})
     return StagePreprocessResponse(
-        queued_count=len(ids), screenshot_ids=ids, stage="phi_detection",
+        queued_count=len(ids),
+        screenshot_ids=ids,
+        stage="phi_detection",
         message=f"PHI detection queued for {len(ids)} screenshots",
     )
 
@@ -2050,14 +2018,16 @@ async def run_phi_detection_stage(
 @router.post("/preprocess-stage/phi-redaction", response_model=StagePreprocessResponse)
 async def run_phi_redaction_stage(
     request: PHIRedactionStageRequest,
-    db: DatabaseSession,
+    repo: ScreenshotRepo,
     current_user: CurrentUser,
 ):
     """Queue PHI redaction for a batch of screenshots."""
-    ids = await _get_eligible_screenshot_ids(db, "phi_redaction", request.group_id, request.screenshot_ids)
+    ids = await _get_eligible_screenshot_ids(repo, "phi_redaction", request.group_id, request.screenshot_ids)
     if not ids:
         return StagePreprocessResponse(
-            queued_count=0, screenshot_ids=[], stage="phi_redaction",
+            queued_count=0,
+            screenshot_ids=[],
+            stage="phi_redaction",
             message="No eligible screenshots for PHI redaction",
         )
 
@@ -2069,7 +2039,9 @@ async def run_phi_redaction_stage(
 
     logger.info("PHI redaction queued", extra={"count": len(ids), "username": current_user.username})
     return StagePreprocessResponse(
-        queued_count=len(ids), screenshot_ids=ids, stage="phi_redaction",
+        queued_count=len(ids),
+        screenshot_ids=ids,
+        stage="phi_redaction",
         message=f"PHI redaction queued for {len(ids)} screenshots",
     )
 
@@ -2079,6 +2051,7 @@ async def invalidate_from_stage(
     screenshot_id: int,
     request: InvalidateFromStageRequest,
     db: DatabaseSession,
+    repo: ScreenshotRepo,
     current_user: CurrentUser,
 ):
     """Manually invalidate downstream stages for a screenshot."""
@@ -2091,7 +2064,7 @@ async def invalidate_from_stage(
         update_file_path,
     )
 
-    screenshot = await get_screenshot_or_404(db, screenshot_id)
+    screenshot = await get_screenshot_or_404(repo, screenshot_id)
 
     if request.stage not in STAGE_ORDER:
         raise HTTPException(
@@ -2110,7 +2083,9 @@ async def invalidate_from_stage(
     await db.commit()
 
     return StagePreprocessResponse(
-        queued_count=0, screenshot_ids=[screenshot_id], stage=request.stage,
+        queued_count=0,
+        screenshot_ids=[screenshot_id],
+        stage=request.stage,
         message=f"Downstream stages invalidated from {request.stage}",
     )
 
@@ -2118,11 +2093,11 @@ async def invalidate_from_stage(
 @router.get("/{screenshot_id}/preprocessing-events", response_model=PreprocessingEventLog)
 async def get_preprocessing_events(
     screenshot_id: int,
-    db: DatabaseSession,
+    repo: ScreenshotRepo,
     current_user: CurrentUser,
 ):
     """Get the full preprocessing event log for a screenshot."""
-    screenshot = await get_screenshot_or_404(db, screenshot_id)
+    screenshot = await get_screenshot_or_404(repo, screenshot_id)
 
     pp = (screenshot.processing_metadata or {}).get("preprocessing", {})
     return PreprocessingEventLog(
@@ -2144,6 +2119,7 @@ async def upload_browser(
     request: Request,
     current_user: CurrentUser,
     db: DatabaseSession,
+    repo: ScreenshotRepo,
     metadata: str = Form(..., description="JSON string of BrowserUploadRequest"),
     files: list[UploadFile] = File(..., description="Image files"),
 ):
@@ -2202,12 +2178,23 @@ async def upload_browser(
             elif file_data[:2] == b"\xff\xd8":
                 ext = ".jpg"
             else:
-                results.append(BrowserUploadItemResult(index=i, success=False, error="Unsupported format (PNG/JPEG only)"))
+                results.append(
+                    BrowserUploadItemResult(index=i, success=False, error="Unsupported format (PNG/JPEG only)")
+                )
                 failed += 1
                 continue
 
-            # Compute hash for unique filename
-            file_hash = hashlib.blake2b(file_data, digest_size=6).hexdigest()
+            # Compute hash for unique filename and content dedup
+            content_hash = hashlib.blake2b(file_data, digest_size=32).hexdigest()
+            file_hash = content_hash[:12]
+
+            # Content-hash dedup check
+            existing = await repo.find_by_content_hash(content_hash)
+            if existing:
+                results.append(BrowserUploadItemResult(index=i, success=True, screenshot_id=existing.id))
+                successful += 1
+                continue
+
             safe_name = sanitize_filename(item.filename)
             base_name = Path(safe_name).stem
             final_filename = f"{meta.group_id}/{item.participant_id}/{base_name}_{file_hash}{ext}"
@@ -2241,6 +2228,7 @@ async def upload_browser(
                         original_filepath=item.original_filepath,
                         screenshot_date=item.screenshot_date,
                         uploaded_by_id=current_user.id,
+                        content_hash=content_hash,
                     )
                     .on_conflict_do_update(
                         index_elements=["file_path"],
@@ -2259,7 +2247,8 @@ async def upload_browser(
 
                 # Initialize preprocessing metadata (no Celery tasks)
                 from sqlalchemy.orm.attributes import flag_modified as _flag_modified
-                screenshot = await get_screenshot_or_404(db, screenshot_id)
+
+                screenshot = await get_screenshot_or_404(repo, screenshot_id)
                 init_preprocessing_metadata(screenshot)
                 _flag_modified(screenshot, "processing_metadata")
                 await db.flush()
@@ -2290,10 +2279,10 @@ async def upload_browser(
 @router.get("/{screenshot_id}/original-image")
 async def get_original_image(
     screenshot_id: int,
-    db: DatabaseSession,
+    repo: ScreenshotRepo,
 ):
     """Serve the immutable original image (base_file_path) for crop editing."""
-    screenshot = await get_screenshot_or_404(db, screenshot_id)
+    screenshot = await get_screenshot_or_404(repo, screenshot_id)
 
     pp = (screenshot.processing_metadata or {}).get("preprocessing", {})
     base_path = pp.get("base_file_path", screenshot.file_path)
@@ -2319,7 +2308,7 @@ async def get_original_image(
 @router.get("/{screenshot_id}/stage-image")
 async def get_stage_image(
     screenshot_id: int,
-    db: DatabaseSession,
+    repo: ScreenshotRepo,
     stage: str = Query(..., description="Stage whose output to serve (e.g. 'cropping')"),
 ):
     """Serve the output image of a specific preprocessing stage.
@@ -2335,7 +2324,7 @@ async def get_stage_image(
             detail=f"Invalid stage '{stage}'. Must be one of: {', '.join(sorted(VALID_STAGES))}",
         )
 
-    screenshot = await get_screenshot_or_404(db, screenshot_id)
+    screenshot = await get_screenshot_or_404(repo, screenshot_id)
 
     pp = (screenshot.processing_metadata or {}).get("preprocessing", {})
     base_path = pp.get("base_file_path", screenshot.file_path)
@@ -2377,6 +2366,7 @@ async def manual_crop(
     screenshot_id: int,
     crop_request: ManualCropRequest,
     db: DatabaseSession,
+    repo: ScreenshotRepo,
     current_user: CurrentUser,
 ):
     """
@@ -2393,7 +2383,7 @@ async def manual_crop(
         init_preprocessing_metadata,
     )
 
-    screenshot = await get_screenshot_for_update(db, screenshot_id)
+    screenshot = await get_screenshot_for_update(repo, screenshot_id)
     pp = init_preprocessing_metadata(screenshot)
     base_path = pp.get("base_file_path", screenshot.file_path)
 
@@ -2420,7 +2410,7 @@ async def manual_crop(
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     def _crop_and_save() -> tuple[int, int]:
-        cropped = img[crop_request.top:crop_request.bottom, crop_request.left:crop_request.right]
+        cropped = img[crop_request.top : crop_request.bottom, crop_request.left : crop_request.right]
         cv2.imwrite(str(output_path), cropped)
         return cropped.shape[1], cropped.shape[0]  # w, h
 
@@ -2449,6 +2439,7 @@ async def manual_crop(
     )
 
     from sqlalchemy.orm.attributes import flag_modified
+
     flag_modified(screenshot, "processing_metadata")
     await db.commit()
 
@@ -2470,11 +2461,11 @@ async def manual_crop(
 @router.get("/{screenshot_id}/phi-regions", response_model=PHIRegionsResponse)
 async def get_phi_regions(
     screenshot_id: int,
-    db: DatabaseSession,
+    repo: ScreenshotRepo,
     current_user: CurrentUser,
 ):
     """Get current PHI regions from the phi_detection event."""
-    screenshot = await get_screenshot_or_404(db, screenshot_id)
+    screenshot = await get_screenshot_or_404(repo, screenshot_id)
 
     pp = (screenshot.processing_metadata or {}).get("preprocessing", {})
     current_events = pp.get("current_events", {})
@@ -2497,28 +2488,32 @@ async def get_phi_regions(
             # Normalize from various formats (auto-detection vs manual)
             bbox = r.get("bbox", {})
             if isinstance(bbox, dict):
-                regions.append(PHIRegionRect(
-                    x=int(bbox.get("x", r.get("x", 0))),
-                    y=int(bbox.get("y", r.get("y", 0))),
-                    w=max(1, int(bbox.get("width", bbox.get("w", r.get("w", 1))))),
-                    h=max(1, int(bbox.get("height", bbox.get("h", r.get("h", 1))))),
-                    label=r.get("label", r.get("type", r.get("entity_type", "OTHER"))),
-                    source=r.get("source", event.get("source", "auto")),
-                    confidence=float(r.get("confidence", r.get("score", 0.0))),
-                    text=r.get("text", ""),
-                ))
+                regions.append(
+                    PHIRegionRect(
+                        x=int(bbox.get("x", r.get("x", 0))),
+                        y=int(bbox.get("y", r.get("y", 0))),
+                        w=max(1, int(bbox.get("width", bbox.get("w", r.get("w", 1))))),
+                        h=max(1, int(bbox.get("height", bbox.get("h", r.get("h", 1))))),
+                        label=r.get("label", r.get("type", r.get("entity_type", "OTHER"))),
+                        source=r.get("source", event.get("source", "auto")),
+                        confidence=float(r.get("confidence", r.get("score", 0.0))),
+                        text=r.get("text", ""),
+                    )
+                )
             else:
                 # Already in flat format
-                regions.append(PHIRegionRect(
-                    x=int(r.get("x", 0)),
-                    y=int(r.get("y", 0)),
-                    w=max(1, int(r.get("w", 1))),
-                    h=max(1, int(r.get("h", 1))),
-                    label=r.get("label", "OTHER"),
-                    source=r.get("source", "auto"),
-                    confidence=float(r.get("confidence", 0.0)),
-                    text=r.get("text", ""),
-                ))
+                regions.append(
+                    PHIRegionRect(
+                        x=int(r.get("x", 0)),
+                        y=int(r.get("y", 0)),
+                        w=max(1, int(r.get("w", 1))),
+                        h=max(1, int(r.get("h", 1))),
+                        label=r.get("label", "OTHER"),
+                        source=r.get("source", "auto"),
+                        confidence=float(r.get("confidence", 0.0)),
+                        text=r.get("text", ""),
+                    )
+                )
 
     return PHIRegionsResponse(
         regions=regions,
@@ -2532,6 +2527,7 @@ async def save_phi_regions(
     screenshot_id: int,
     request_body: ManualPHIRegionsRequest,
     db: DatabaseSession,
+    repo: ScreenshotRepo,
     current_user: CurrentUser,
 ):
     """Save manually-adjusted PHI regions. Invalidates phi_redaction downstream."""
@@ -2543,7 +2539,7 @@ async def save_phi_regions(
         init_preprocessing_metadata,
     )
 
-    screenshot = await get_screenshot_for_update(db, screenshot_id)
+    screenshot = await get_screenshot_for_update(repo, screenshot_id)
     init_preprocessing_metadata(screenshot)
 
     input_file = get_current_input_file(screenshot, "phi_detection")
@@ -2584,6 +2580,7 @@ async def apply_redaction(
     screenshot_id: int,
     request_body: ApplyPHIRedactionRequest,
     db: DatabaseSession,
+    repo: ScreenshotRepo,
     current_user: CurrentUser,
 ):
     """Apply PHI redaction to confirmed regions."""
@@ -2598,7 +2595,7 @@ async def apply_redaction(
         redact_phi,
     )
 
-    screenshot = await get_screenshot_for_update(db, screenshot_id)
+    screenshot = await get_screenshot_for_update(repo, screenshot_id)
     pp = init_preprocessing_metadata(screenshot)
 
     input_file = get_current_input_file(screenshot, "phi_redaction")
@@ -2677,7 +2674,7 @@ async def apply_redaction(
 
 @router.get("/export/csv", tags=["Export"])
 async def export_consensus_csv(
-    db: DatabaseSession,
+    repo: ScreenshotRepo,
     current_user: CurrentUser,
     group_id: str | None = Query(None, description="Filter by group ID"),
     verified_only: bool = Query(False, description="Only export screenshots verified by at least one user"),
@@ -2701,7 +2698,6 @@ async def export_consensus_csv(
     from datetime import datetime, timezone
 
     from fastapi.responses import StreamingResponse
-    from sqlalchemy import and_
 
     logger.info(
         f"User {current_user.username} exported consensus data "
@@ -2727,15 +2723,7 @@ async def export_consensus_csv(
     if processing_status:
         conditions.append(Screenshot.processing_status == processing_status)
 
-    stmt = select(Screenshot, ConsensusResult).outerjoin(
-        ConsensusResult, Screenshot.id == ConsensusResult.screenshot_id
-    )
-    if conditions:
-        stmt = stmt.where(and_(*conditions))
-    stmt = stmt.order_by(Screenshot.uploaded_at)
-
-    result = await db.execute(stmt)
-    rows = result.all()
+    rows = await repo.get_screenshots_with_consensus(conditions)
 
     output = io.StringIO()
     csv_writer = csv.writer(output)

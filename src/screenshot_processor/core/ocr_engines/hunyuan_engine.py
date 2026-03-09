@@ -215,6 +215,10 @@ class HunyuanOCREngine:
 
         self._is_available: bool | None = None  # Lazy check
 
+        # Persistent HTTP client for connection reuse (avoids TCP/TLS setup per request)
+        self._client = httpx.Client(timeout=self.timeout)
+        self._health_client = httpx.Client(timeout=5)
+
         logger.info(f"HunyuanOCR engine initialized: {self.base_url} (rate limit: {rate}/s)")
 
     @classmethod
@@ -234,26 +238,25 @@ class HunyuanOCREngine:
     def _check_availability(self) -> bool:
         """Check if the HunyuanOCR API is reachable."""
         try:
-            with httpx.Client(timeout=5) as client:
-                # Try health endpoint first
-                try:
-                    response = client.get(f"{self.base_url}/health")
-                    if response.status_code == 200:
-                        logger.info("HunyuanOCR API health check passed")
-                        return True
-                except httpx.HTTPError:
-                    pass
-
-                # Fallback: try a minimal OCR request
-                # 1x1 white PNG
-                minimal_png = base64.b64decode(
-                    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
-                )
-                files = [("images", ("test.png", minimal_png, "image/png"))]
-                response = client.post(f"{self.base_url}/ocr", files=files)
+            # Try health endpoint first
+            try:
+                response = self._health_client.get(f"{self.base_url}/health")
                 if response.status_code == 200:
-                    logger.info("HunyuanOCR API is available (OCR test passed)")
+                    logger.info("HunyuanOCR API health check passed")
                     return True
+            except httpx.HTTPError:
+                pass
+
+            # Fallback: try a minimal OCR request
+            # 1x1 white PNG
+            minimal_png = base64.b64decode(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
+            )
+            files = [("images", ("test.png", minimal_png, "image/png"))]
+            response = self._health_client.post(f"{self.base_url}/ocr", files=files)
+            if response.status_code == 200:
+                logger.info("HunyuanOCR API is available (OCR test passed)")
+                return True
 
             return False
 
@@ -287,14 +290,13 @@ class HunyuanOCREngine:
                 # Wait for rate limit before each attempt
                 self._wait_for_rate_limit()
 
-                with httpx.Client(timeout=self.timeout) as client:
-                    response = client.post(
-                        f"{self.base_url}/ocr",
-                        files=files,
-                        params=params if params else None,
-                    )
-                    response.raise_for_status()
-                    return response.json()
+                response = self._client.post(
+                    f"{self.base_url}/ocr",
+                    files=files,
+                    params=params if params else None,
+                )
+                response.raise_for_status()
+                return response.json()
 
             except httpx.HTTPStatusError as e:
                 if 400 <= e.response.status_code < 500:
@@ -328,22 +330,21 @@ class HunyuanOCREngine:
                 # Wait for rate limit before each attempt
                 self._wait_for_rate_limit()
 
-                with httpx.Client(timeout=self.timeout) as client:
-                    response = client.post(
-                        f"{self.base_url}/ocr",
-                        files=files,
-                        params=params if params else None,
-                    )
-                    response.raise_for_status()
-                    data = response.json()
+                response = self._client.post(
+                    f"{self.base_url}/ocr",
+                    files=files,
+                    params=params if params else None,
+                )
+                response.raise_for_status()
+                data = response.json()
 
-                    # API returns single dict for one image, {"results": [...]} for multiple
-                    if isinstance(data, dict) and "results" in data:
-                        return data["results"]
-                    elif isinstance(data, list):
-                        return data
-                    else:
-                        return [data]
+                # API returns single dict for one image, {"results": [...]} for multiple
+                if isinstance(data, dict) and "results" in data:
+                    return data["results"]
+                elif isinstance(data, list):
+                    return data
+                else:
+                    return [data]
 
             except httpx.HTTPStatusError as e:
                 if 400 <= e.response.status_code < 500:
@@ -503,6 +504,17 @@ class HunyuanOCREngine:
             "HunyuanOCR"
         """
         return "HunyuanOCR"
+
+    def close(self) -> None:
+        """Close the persistent HTTP clients."""
+        self._client.close()
+        self._health_client.close()
+
+    def __del__(self) -> None:
+        try:
+            self.close()
+        except Exception:
+            pass
 
     @classmethod
     def reset_rate_limiter(cls) -> None:

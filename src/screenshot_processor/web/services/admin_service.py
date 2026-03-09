@@ -1,6 +1,7 @@
 """Admin operations service.
 
 Extracts admin business logic from routes into a testable service layer.
+Database queries are delegated to AdminRepository.
 """
 
 from __future__ import annotations
@@ -8,25 +9,13 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import cv2
-from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from screenshot_processor.core.image_utils import convert_dark_mode
 from screenshot_processor.core.ocr import find_screenshot_total_usage
-from screenshot_processor.web.database.models import (
-    Annotation,
-    AnnotationStatus,
-    Group,
-    Screenshot,
-    User,
-    UserQueueState,
-)
-
-if TYPE_CHECKING:
-    pass
+from screenshot_processor.web.repositories.admin_repository import AdminRepository
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +24,7 @@ logger = logging.getLogger(__name__)
 class UserStats:
     """User with annotation statistics."""
 
-    user: User
+    user: object  # User model instance
     annotations_count: int
     avg_time_spent_seconds: float
 
@@ -71,10 +60,13 @@ class AdminService:
     - Test data reset
     - Group deletion
     - Bulk OCR recalculation
+
+    Database queries are delegated to AdminRepository.
     """
 
     def __init__(self, db: AsyncSession):
         self.db = db
+        self.repo = AdminRepository(db)
 
     # =========================================================================
     # User Management
@@ -82,51 +74,32 @@ class AdminService:
 
     async def get_all_users_with_stats(self) -> list[UserStats]:
         """Get all users with their annotation statistics."""
-        stmt = (
-            select(
-                User,
-                func.count(Annotation.id).label("annotations_count"),
-                func.coalesce(func.avg(Annotation.time_spent_seconds), 0).label("avg_time"),
-            )
-            .outerjoin(Annotation, Annotation.user_id == User.id)
-            .group_by(User.id)
-            .order_by(User.created_at.desc())
-        )
-        result = await self.db.execute(stmt)
-        rows = result.all()
+        rows = await self.repo.get_users_with_stats()
 
         return [
             UserStats(
-                user=row.User,
+                user=row.user,
                 annotations_count=row.annotations_count,
-                avg_time_spent_seconds=round(float(row.avg_time), 2),
+                avg_time_spent_seconds=row.avg_time_spent_seconds,
             )
             for row in rows
         ]
 
-    async def get_user_by_id(self, user_id: int) -> User | None:
+    async def get_user_by_id(self, user_id: int):
         """Get user by ID."""
-        result = await self.db.execute(select(User).where(User.id == user_id))
-        return result.scalar_one_or_none()
+        return await self.repo.get_user_by_id(user_id)
 
     async def update_user(
         self,
-        user: User,
+        user,
         is_active: bool | None = None,
         role: str | None = None,
-    ) -> User:
+    ):
         """Update user attributes."""
-        if is_active is not None:
-            user.is_active = is_active
+        if role is not None and role not in ["annotator", "admin"]:
+            raise ValueError("Invalid role")
 
-        if role is not None:
-            if role not in ["annotator", "admin"]:
-                raise ValueError("Invalid role")
-            user.role = role
-
-        await self.db.commit()
-        await self.db.refresh(user)
-        return user
+        return await self.repo.update_user(user, is_active=is_active, role=role)
 
     # =========================================================================
     # Test Data Reset
@@ -134,68 +107,34 @@ class AdminService:
 
     async def reset_test_data(self) -> None:
         """Reset all test data for e2e testing."""
-        # Clear all user queue states
-        await self.db.execute(delete(UserQueueState))
-
-        # Clear all annotations
-        await self.db.execute(delete(Annotation))
-
-        # Reset screenshot annotation counts
-        result = await self.db.execute(select(Screenshot))
-        screenshots = result.scalars().all()
-        for screenshot in screenshots:
-            screenshot.current_annotation_count = 0
-            screenshot.annotation_status = AnnotationStatus.PENDING
-            screenshot.has_consensus = False
-            screenshot.verified_by_user_ids = None
-
-        await self.db.commit()
+        await self.repo.reset_test_data()
 
     # =========================================================================
     # Group Management
     # =========================================================================
 
-    async def get_group_by_id(self, group_id: str) -> Group | None:
+    async def get_group_by_id(self, group_id: str):
         """Get group by ID."""
-        result = await self.db.execute(select(Group).where(Group.id == group_id))
-        return result.scalar_one_or_none()
+        return await self.repo.get_group_by_id(group_id)
 
     async def delete_group(self, group_id: str) -> DeleteGroupResult:
         """Delete a group and all its screenshots (hard delete)."""
         # Check if group exists
-        group = await self.get_group_by_id(group_id)
+        group = await self.repo.get_group_by_id(group_id)
         if not group:
             raise ValueError(f"Group '{group_id}' not found")
 
-        # Get all screenshot IDs in this group
-        screenshots_result = await self.db.execute(
-            select(Screenshot.id).where(Screenshot.group_id == group_id)
-        )
-        screenshot_ids = [row[0] for row in screenshots_result.fetchall()]
+        # Get screenshot IDs
+        screenshot_ids = await self.repo.get_screenshot_ids_for_group(group_id)
 
-        screenshots_count = len(screenshot_ids)
-        annotations_count = 0
-
-        if screenshot_ids:
-            # Delete all annotations for these screenshots
-            annotations_result = await self.db.execute(
-                delete(Annotation).where(Annotation.screenshot_id.in_(screenshot_ids))
-            )
-            annotations_count = annotations_result.rowcount
-
-            # Delete all screenshots in this group
-            await self.db.execute(delete(Screenshot).where(Screenshot.group_id == group_id))
-
-        # Delete the group itself
-        await self.db.execute(delete(Group).where(Group.id == group_id))
-
-        await self.db.commit()
+        # Cascade delete
+        counts = await self.repo.delete_group_cascade(group_id, screenshot_ids)
 
         return DeleteGroupResult(
             success=True,
             group_id=group_id,
-            screenshots_deleted=screenshots_count,
-            annotations_deleted=annotations_count,
+            screenshots_deleted=counts.screenshots_deleted,
+            annotations_deleted=counts.annotations_deleted,
             message=f"Group '{group_id}' deleted successfully",
         )
 
@@ -209,22 +148,9 @@ class AdminService:
         group_id: str | None = None,
     ) -> RecalculateOcrResult:
         """Recalculate OCR totals for screenshots missing extracted_total."""
-        # Find screenshots missing extracted_total
-        query = select(Screenshot).where(
-            Screenshot.image_type == "screen_time",
-            or_(
-                Screenshot.extracted_total.is_(None),
-                Screenshot.extracted_total == "",
-            ),
+        screenshots = await self.repo.get_screenshots_missing_ocr_total(
+            group_id=group_id, limit=limit
         )
-
-        if group_id:
-            query = query.where(Screenshot.group_id == group_id)
-
-        query = query.limit(limit)
-
-        result = await self.db.execute(query)
-        screenshots = result.scalars().all()
 
         total_missing = len(screenshots)
         processed = 0
@@ -260,7 +186,7 @@ class AdminService:
                 logger.error("Error extracting OCR total", extra={"screenshot_id": screenshot.id, "error": str(e)})
                 failed += 1
 
-        await self.db.commit()
+        await self.repo.db.commit()
 
         return RecalculateOcrResult(
             success=True,
@@ -281,14 +207,6 @@ class AdminService:
         limit: int = 1000,
     ) -> list[int]:
         """Get screenshot IDs that need reprocessing."""
-        query = select(Screenshot.id).where(
-            Screenshot.image_type == "screen_time",
+        return await self.repo.get_screenshot_ids_for_reprocess(
+            group_id=group_id, limit=limit
         )
-
-        if group_id:
-            query = query.where(Screenshot.group_id == group_id)
-
-        query = query.limit(limit)
-
-        result = await self.db.execute(query)
-        return [row[0] for row in result.fetchall()]

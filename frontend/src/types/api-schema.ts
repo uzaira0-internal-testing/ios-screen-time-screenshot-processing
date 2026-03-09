@@ -795,6 +795,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/screenshots/{screenshot_id}/stage-image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Stage Image
+         * @description Serve the output image of a specific preprocessing stage.
+         *
+         *     Walks the event log to find the current event for the given stage and
+         *     serves its output_file.  Falls back to the stage's input_file, then to
+         *     base_file_path.
+         */
+        get: operations["get_stage_image_api_v1_screenshots__screenshot_id__stage_image_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/screenshots/{screenshot_id}/manual-crop": {
         parameters: {
             query?: never;
@@ -2823,6 +2847,8 @@ export interface components {
             processing_metadata?: {
                 [key: string]: unknown;
             } | null;
+            /** Content Hash */
+            content_hash?: string | null;
             /**
              * Annotations Count
              * @default 0
@@ -2944,6 +2970,8 @@ export interface components {
             processing_metadata?: {
                 [key: string]: unknown;
             } | null;
+            /** Content Hash */
+            content_hash?: string | null;
             /**
              * Processing Time Seconds
              * @description Time in seconds related to processing:
@@ -4669,6 +4697,40 @@ export interface operations {
     get_original_image_api_v1_screenshots__screenshot_id__original_image_get: {
         parameters: {
             query?: never;
+            header?: never;
+            path: {
+                screenshot_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_stage_image_api_v1_screenshots__screenshot_id__stage_image_get: {
+        parameters: {
+            query: {
+                /** @description Stage whose output to serve (e.g. 'cropping') */
+                stage: string;
+            };
             header?: never;
             path: {
                 screenshot_id: number;

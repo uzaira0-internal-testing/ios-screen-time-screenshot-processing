@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useEffect, useRef } from "react";
 import type { GridCoordinates } from "@/core";
+import type { ProcessingStatus } from "@/types";
 import {
   useScreenshotService,
   useAnnotationService,
@@ -22,7 +23,7 @@ const storeInstances = new Map<string, StoreEntry>();
 // Cleanup delay to allow for quick re-mounts (e.g., React strict mode)
 const CLEANUP_DELAY_MS = 5000;
 
-export const useAnnotation = (groupId?: string, processingStatus?: string) => {
+export const useAnnotation = (groupId?: string, processingStatus?: ProcessingStatus) => {
   const screenshotService = useScreenshotService();
   const annotationService = useAnnotationService();
   const consensusService = useConsensusService();

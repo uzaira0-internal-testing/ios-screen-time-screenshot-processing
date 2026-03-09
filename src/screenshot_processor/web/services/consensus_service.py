@@ -3,14 +3,10 @@ from __future__ import annotations
 import os
 import statistics
 from enum import Enum
-from typing import TYPE_CHECKING
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
-if TYPE_CHECKING:
-    pass
+from ..repositories.consensus_repository import ConsensusRepository
 
 
 class ConsensusStrategy(str, Enum):
@@ -67,18 +63,11 @@ class ConsensusService:
         screenshot_id: int,
         strategy: ConsensusStrategy = ConsensusStrategy.MEDIAN,
     ) -> dict | None:
-        from ..database.models import ConsensusResult, Screenshot
+        repo = ConsensusRepository(db)
 
         # Use SELECT FOR UPDATE to lock the screenshot row and prevent race conditions
         # when multiple annotations are submitted concurrently
-        stmt = (
-            select(Screenshot)
-            .options(selectinload(Screenshot.annotations))
-            .where(Screenshot.id == screenshot_id)
-            .with_for_update()
-        )
-        result = await db.execute(stmt)
-        screenshot = result.scalar_one_or_none()
+        screenshot = await repo.get_screenshot_with_annotations_for_update(screenshot_id)
 
         if not screenshot:
             return None
@@ -133,9 +122,7 @@ class ConsensusService:
 
         has_consensus = len(disagreements) == 0
 
-        existing_consensus_stmt = select(ConsensusResult).where(ConsensusResult.screenshot_id == screenshot_id)
-        existing_result = await db.execute(existing_consensus_stmt)
-        existing_consensus = existing_result.scalar_one_or_none()
+        existing_consensus = await repo.get_consensus_result(screenshot_id)
 
         disagreement_details = {
             "total_disagreements": len(disagreements),
@@ -148,7 +135,9 @@ class ConsensusService:
             existing_consensus.disagreement_details = disagreement_details
             existing_consensus.consensus_values = consensus_values if has_consensus else None
         else:
-            new_consensus = ConsensusResult(
+            from ..database.models import ConsensusResult as ConsensusResultModel
+
+            new_consensus = ConsensusResultModel(
                 screenshot_id=screenshot_id,
                 has_consensus=has_consensus,
                 disagreement_details=disagreement_details,
@@ -172,27 +161,12 @@ class ConsensusService:
 
     @staticmethod
     async def get_consensus_summary(db: AsyncSession) -> dict:
-        from sqlalchemy import func
+        repo = ConsensusRepository(db)
+        counts = await repo.get_consensus_counts()
 
-        from ..database.models import ConsensusResult, Screenshot
-
-        total_with_consensus_stmt = select(func.count(ConsensusResult.id)).where(
-            ConsensusResult.has_consensus == True  # noqa: E712 - SQLAlchemy requires ==
-        )
-        result = await db.execute(total_with_consensus_stmt)
-        total_with_consensus = result.scalar_one()
-
-        total_with_disagreements_stmt = select(func.count(ConsensusResult.id)).where(
-            ConsensusResult.has_consensus == False  # noqa: E712 - SQLAlchemy requires ==
-        )
-        result = await db.execute(total_with_disagreements_stmt)
-        total_with_disagreements = result.scalar_one()
-
-        total_annotations_stmt = select(func.count(Screenshot.id)).where(
-            Screenshot.current_annotation_count >= Screenshot.target_annotations
-        )
-        result = await db.execute(total_annotations_stmt)
-        total_completed = result.scalar_one()
+        total_with_consensus = counts["total_with_consensus"]
+        total_with_disagreements = counts["total_with_disagreements"]
+        total_completed = counts["total_completed"]
 
         return {
             "total_completed_screenshots": total_completed,

@@ -23,7 +23,7 @@ import cv2
 from .image_processor import process_image
 from .image_utils import convert_dark_mode
 from .models import BatteryRow, ImageType, ProcessingResult, ScreenTimeRow
-from .ocr import find_screenshot_title, find_screenshot_total_usage
+from .ocr import find_title_and_total
 from .queue_models import ProcessingMetadata, ProcessingMethod, ProcessingTag
 
 if TYPE_CHECKING:
@@ -72,9 +72,9 @@ class ProcessingPipeline:
 
             img = convert_dark_mode(img)
 
-            # ========== Stage 1: Daily Screenshot Detection ==========
-            logger.debug(f"Stage 1: Checking for daily screenshot - {image_path}")
-            title, title_y_position = find_screenshot_title(img)
+            # ========== Stage 1+2: Title & Total Extraction (single Tesseract call) ==========
+            logger.debug(f"Stage 1+2: Extracting title and total - {image_path}")
+            title, title_y_position, total_str, total_image_path = find_title_and_total(img)
 
             if title and title.strip().lower() == "daily total":
                 logger.info(f"Detected daily screenshot: {image_path}")
@@ -91,10 +91,6 @@ class ProcessingPipeline:
                     row_data=None,
                     metadata=metadata,
                 )
-
-            # ========== Stage 2: OCR Total Detection ==========
-            logger.debug(f"Stage 2: Attempting OCR total detection - {image_path}")
-            total_str, total_image_path = find_screenshot_total_usage(img)
             ocr_total_minutes = self._parse_time_to_minutes(total_str) if total_str else None
 
             if ocr_total_minutes is None or ocr_total_minutes == 0:

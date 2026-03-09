@@ -279,16 +279,7 @@ export const api = {
 
   // Annotations
   annotations: {
-    async create(annotation: {
-      screenshot_id: number;
-      hourly_values: Record<string, any>;
-      extracted_title?: string;
-      extracted_total?: string;
-      grid_upper_left?: { x: number; y: number };
-      grid_lower_right?: { x: number; y: number };
-      time_spent_seconds?: number;
-      notes?: string;
-    }) {
+    async create(annotation: components["schemas"]["AnnotationCreate"]) {
       const { data, error } = await apiClient.POST("/api/v1/annotations/", {
         body: annotation,
       });

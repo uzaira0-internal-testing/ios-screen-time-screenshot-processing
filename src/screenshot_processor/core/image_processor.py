@@ -24,7 +24,7 @@ from .config import OCRConfig
 from .exceptions import ImageProcessingError
 from .grid_anchors import find_grid_anchors_and_calculate_roi
 from .image_utils import adjust_contrast_brightness, convert_dark_mode, remove_all_but
-from .ocr import find_screenshot_title, find_screenshot_total_usage, get_text
+from .ocr import find_screenshot_title, find_screenshot_total_usage, find_title_and_total, get_text
 from .ocr_integration import adjust_anchor_offsets, perform_ocr, prepare_image_chunks
 from .roi import calculate_roi, calculate_roi_from_clicks
 
@@ -121,9 +121,9 @@ def process_image_with_grid(
         Tuple of (filename, graph_filename, row, title, total, total_image_path)
     """
     try:
-        img = load_and_validate_image(filename)
-        img_copy = img.copy()
-        img = adjust_contrast_brightness(img, contrast=2.0, brightness=-220)
+        raw_img = load_and_validate_image(filename)
+        img_copy = raw_img.copy()
+        img = adjust_contrast_brightness(raw_img.copy(), contrast=2.0, brightness=-220)
 
         snap_func = snap_to_grid if snap_to_grid else None
 
@@ -144,11 +144,12 @@ def process_image_with_grid(
             total = "N/A"
             total_image_path = None
         else:
-            logger.debug("Extracting title...")
-            title, _ = find_screenshot_title(img_copy, ocr_config)
-            total, total_image_path = find_screenshot_total_usage(img_copy, ocr_config)
+            logger.debug("Extracting title and total...")
+            title, _, total, total_image_path = find_title_and_total(img_copy, ocr_config)
 
-        filename, row, graph_filename = save_image(filename, roi_x, roi_y, roi_width, roi_height, is_battery)
+        filename, row, graph_filename = save_image(
+            filename, roi_x, roi_y, roi_width, roi_height, is_battery, preloaded_img=raw_img
+        )
 
     except ImageProcessingError as e:
         logger.error(f"Image processing failed: {e}")
@@ -175,7 +176,7 @@ def process_image(
         Tuple of (filename, graph_filename, row, title, total, total_image_path, grid_coords)
     """
     img = load_and_validate_image(filename)
-    return apply_processing(filename, img, is_battery, snap_to_grid, ocr_config)
+    return apply_processing(filename, img.copy(), is_battery, snap_to_grid, ocr_config, raw_img=img)
 
 
 def apply_processing(
@@ -184,6 +185,7 @@ def apply_processing(
     is_battery: bool,
     snap_to_grid: Callable | None,
     ocr_config: OCRConfig | None = None,
+    raw_img: np.ndarray | None = None,
 ) -> tuple[str, str, list, str, str, str | None, dict | None]:
     """Apply processing pipeline to a loaded image.
 
@@ -221,10 +223,11 @@ def apply_processing(
         title = find_time(img_copy, roi_x, roi_y, roi_width, roi_height)
         total, total_image_path = "N/A", None
     else:
-        title, _ = find_screenshot_title(img, ocr_config)
-        total, total_image_path = find_screenshot_total_usage(img, ocr_config)
+        title, _, total, total_image_path = find_title_and_total(img, ocr_config)
 
-    filename, row, graph_filename = save_image(filename, roi_x, roi_y, roi_width, roi_height, is_battery)
+    filename, row, graph_filename = save_image(
+        filename, roi_x, roi_y, roi_width, roi_height, is_battery, preloaded_img=raw_img
+    )
     return filename, graph_filename, row, title, total, total_image_path, grid_coords
 
 
@@ -247,6 +250,7 @@ def save_image(
     roi_width: int,
     roi_height: int,
     is_battery: bool,
+    preloaded_img: np.ndarray | None = None,
 ) -> tuple[str | None, list, str | None]:
     """Extract bar values and optionally save debug images.
 
@@ -257,12 +261,13 @@ def save_image(
         roi_width: Width of ROI
         roi_height: Height of ROI
         is_battery: Whether this is a battery screenshot
+        preloaded_img: Pre-loaded dark-mode-converted image (avoids re-reading from disk)
 
     Returns:
         Tuple of (selection_save_path, row values, graph_save_path)
     """
     logger.debug("Preparing to extract grid")
-    img = load_and_validate_image(filename)
+    img = preloaded_img if preloaded_img is not None else load_and_validate_image(filename)
     img_copy = img.copy()
 
     if is_battery:

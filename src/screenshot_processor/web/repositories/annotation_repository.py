@@ -6,7 +6,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from screenshot_processor.web.database.models import Annotation, Screenshot
+from screenshot_processor.web.database.models import Annotation
 
 
 class AnnotationRepository:
@@ -19,6 +19,13 @@ class AnnotationRepository:
         """Get annotation by ID."""
         result = await self.db.execute(
             select(Annotation).where(Annotation.id == annotation_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_by_id_for_update(self, annotation_id: int) -> Annotation | None:
+        """Get annotation by ID with row lock for safe concurrent updates."""
+        result = await self.db.execute(
+            select(Annotation).where(Annotation.id == annotation_id).with_for_update()
         )
         return result.scalar_one_or_none()
 
@@ -92,11 +99,3 @@ class AnnotationRepository:
         """Delete an annotation."""
         await self.db.delete(annotation)
 
-    async def get_screenshot_for_update(self, screenshot_id: int) -> Screenshot | None:
-        """Get screenshot with row lock for safe concurrent updates."""
-        result = await self.db.execute(
-            select(Screenshot)
-            .where(Screenshot.id == screenshot_id)
-            .with_for_update()
-        )
-        return result.scalar_one_or_none()
