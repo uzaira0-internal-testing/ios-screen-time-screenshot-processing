@@ -1,12 +1,12 @@
 import { ReactNode } from "react";
 import clsx from "clsx";
-import { config } from "@/config";
 
 interface ActionButtonsProps {
   onSkip: () => void;
   onSave: () => void;
   isLoading?: boolean;
   canSave?: boolean;
+  saveLabel?: string;
   shortcuts?: ReactNode;
 }
 
@@ -15,10 +15,9 @@ export const ActionButtons = ({
   onSave,
   isLoading = false,
   canSave = false,
+  saveLabel = "Save (Enter)",
   shortcuts,
 }: ActionButtonsProps) => {
-  const saveLabel = config.isLocalMode ? "Save (Enter)" : "Submit (Enter)";
-
   return (
     <div className="space-y-2">
       <div className="flex flex-col gap-2">

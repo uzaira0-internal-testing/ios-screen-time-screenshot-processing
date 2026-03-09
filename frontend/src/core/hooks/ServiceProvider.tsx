@@ -14,8 +14,9 @@ export const ServiceContext = createContext<ServiceContainer | null>(null);
 // Module-level singleton to survive React StrictMode unmount/remount cycles
 let globalContainer: ServiceContainer | null = null;
 let globalConfig: AppConfig | null = null;
+let bootstrapPromise: Promise<ServiceContainer> | null = null;
 
-function getOrCreateContainer(config: AppConfig): ServiceContainer {
+function getOrCreateContainer(config: AppConfig): Promise<ServiceContainer> {
   // If we have a container and the config matches, reuse it
   if (
     globalContainer &&
@@ -26,8 +27,11 @@ function getOrCreateContainer(config: AppConfig): ServiceContainer {
     if (runtimeConfig.isDev) {
       console.log("[ServiceProvider] Reusing existing global container");
     }
-    return globalContainer;
+    return Promise.resolve(globalContainer);
   }
+
+  // If bootstrap is already in progress for this config, reuse the promise
+  if (bootstrapPromise) return bootstrapPromise;
 
   // Otherwise create a new one
   if (runtimeConfig.isDev) {
@@ -36,9 +40,13 @@ function getOrCreateContainer(config: AppConfig): ServiceContainer {
       config.mode,
     );
   }
-  globalContainer = bootstrapServices(config);
-  globalConfig = config;
-  return globalContainer;
+  bootstrapPromise = bootstrapServices(config).then((container) => {
+    globalContainer = container;
+    globalConfig = config;
+    bootstrapPromise = null;
+    return container;
+  });
+  return bootstrapPromise;
 }
 
 interface ServiceProviderProps {
@@ -52,9 +60,9 @@ export const ServiceProvider: React.FC<ServiceProviderProps> = ({
 }) => {
   // Create config once
   const [effectiveConfig] = useState(() => config || createConfig());
-
-  // Get or create the container (uses module-level singleton)
-  const container = getOrCreateContainer(effectiveConfig);
+  const [container, setContainer] = useState<ServiceContainer | null>(
+    globalContainer,
+  );
 
   // Track mount count for debugging
   const mountCountRef = useRef(0);
@@ -65,10 +73,11 @@ export const ServiceProvider: React.FC<ServiceProviderProps> = ({
       console.log("[ServiceProvider] Mounted, count:", mountCountRef.current);
     }
 
-    // Module-level singleton should live for the entire page lifetime.
-    // Never destroy on React unmount — StrictMode double-mounts would
-    // clear services between unmount and re-mount, causing "Service not
-    // registered" errors for any component that renders in between.
+    // Bootstrap services (async for WASM/Tauri code-splitting)
+    if (!container) {
+      getOrCreateContainer(effectiveConfig).then(setContainer);
+    }
+
     return () => {
       if (runtimeConfig.isDev) {
         console.log(
@@ -79,6 +88,10 @@ export const ServiceProvider: React.FC<ServiceProviderProps> = ({
       }
     };
   }, []);
+
+  // Show nothing until services are ready (typically <1ms for server mode,
+  // slightly longer for WASM due to dynamic import)
+  if (!container) return null;
 
   return (
     <ServiceContext.Provider value={container}>

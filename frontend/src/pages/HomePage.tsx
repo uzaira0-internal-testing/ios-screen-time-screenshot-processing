@@ -11,7 +11,6 @@ import type { Group, ImageType } from "@/types";
 import type { GroupVerificationSummary, VerificationTier } from "@/core/interfaces";
 import toast from "react-hot-toast";
 import { config } from "@/config";
-import { api } from "@/services/apiClient";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Card } from "@/components/ui/Card";
@@ -74,7 +73,8 @@ export const HomePage = () => {
 
       if (loaded > 0) {
         toast.success(`Loaded ${loaded} screenshot${loaded > 1 ? "s" : ""}`);
-        loadGroups(false);
+        // Refresh groups inline instead of calling loadGroups to avoid stale closure
+        screenshotService.getGroups().then((g) => setGroups(g ?? []));
       }
       if (failed > 0) {
         toast.error(`${failed} file${failed > 1 ? "s" : ""} failed (duplicates or errors)`);
@@ -136,13 +136,15 @@ export const HomePage = () => {
     loadGroups(true);
     loadVerificationTiers();
 
-    // Poll for updates every 5 seconds
-    const interval = setInterval(() => {
-      loadGroups(false);
-      loadVerificationTiers();
-    }, 5000);
-
-    return () => clearInterval(interval);
+    // Poll for updates in server mode (other users may add data).
+    // Skip in local mode — data only changes from user actions.
+    if (!config.isLocalMode) {
+      const interval = setInterval(() => {
+        loadGroups(false);
+        loadVerificationTiers();
+      }, 5000);
+      return () => clearInterval(interval);
+    }
   }, []);
 
   const handleGroupClick = (groupId: string, processingStatus?: string) => {
@@ -202,11 +204,12 @@ export const HomePage = () => {
     }
   };
 
-  // Delete group is server-only — uses api directly (admin feature)
+  // Delete group is server-only — lazy-import api to avoid bundling in WASM mode
   const handleDeleteGroup = async (group: Group) => {
     if (!features.admin) return;
     setIsDeleting(true);
     try {
+      const { api } = await import("@/services/apiClient");
       const result = await api.admin.deleteGroup(group.id);
       toast.success(
         `Deleted "${group.name}" (${result.screenshots_deleted} screenshots, ${result.annotations_deleted} annotations)`,

@@ -7,21 +7,23 @@ import { APIScreenshotService } from "../implementations/server/APIScreenshotSer
 import { APIAnnotationService } from "../implementations/server/APIAnnotationService";
 import { APIConsensusService } from "../implementations/server/APIConsensusService";
 import { APIStorageService } from "../implementations/server/APIStorageService";
-import { bootstrapTauriServices } from "./bootstrapTauri";
-import { bootstrapWasmServices } from "./bootstrapWasm";
 
 /**
  * Bootstrap services based on application mode.
  *
- * - Server mode: API-based services (when apiBaseUrl is configured)
- * - WASM mode: Local-first services (when apiBaseUrl is absent)
+ * Uses dynamic import() for WASM/Tauri so their dependencies (Dexie,
+ * Tesseract.js, Web Workers) are code-split from the server bundle.
  */
-export function bootstrapServices(config: AppConfig): ServiceContainer {
+export async function bootstrapServices(
+  config: AppConfig,
+): Promise<ServiceContainer> {
   if (config.mode === "tauri") {
+    const { bootstrapTauriServices } = await import("./bootstrapTauri");
     return bootstrapTauriServices(config);
   }
 
   if (config.mode === "wasm") {
+    const { bootstrapWasmServices } = await import("./bootstrapWasm");
     return bootstrapWasmServices(config);
   }
 

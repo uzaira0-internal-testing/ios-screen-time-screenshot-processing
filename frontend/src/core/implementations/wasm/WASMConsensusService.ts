@@ -85,8 +85,12 @@ export class WASMConsensusService implements IConsensusService {
         ? await db.screenshots.filter((s) => !s.group_id).toArray()
         : await db.screenshots.where("group_id").equals(groupId).toArray();
 
-    const allAnnotations = await db.annotations.toArray();
-    const annotationsByScreenshot = groupAnnotationsByScreenshot(allAnnotations);
+    const screenshotIds = screenshots.map((s) => s.id!);
+    const groupAnnotations = await db.annotations
+      .where("screenshot_id")
+      .anyOf(screenshotIds)
+      .toArray();
+    const annotationsByScreenshot = groupAnnotationsByScreenshot(groupAnnotations);
 
     const results: ScreenshotTierItem[] = [];
 
