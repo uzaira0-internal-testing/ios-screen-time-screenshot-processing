@@ -9,7 +9,7 @@ test.describe("Verification Workflow", () => {
   });
 
   async function ensureScreenshotLoaded(page: import("@playwright/test").Page) {
-    await page.goto("/annotate");
+    await page.goto("annotate");
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
 
@@ -40,7 +40,7 @@ test.describe("Verification Workflow", () => {
   });
 
   test("should filter by verified status", async ({ page }) => {
-    await page.goto("/annotate?verified_by_me=true");
+    await page.goto("annotate?verified_by_me=true");
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
     const url = page.url();
@@ -48,7 +48,7 @@ test.describe("Verification Workflow", () => {
   });
 
   test("should filter by unverified status", async ({ page }) => {
-    await page.goto("/annotate?verified_by_me=false");
+    await page.goto("annotate?verified_by_me=false");
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
     const url = page.url();

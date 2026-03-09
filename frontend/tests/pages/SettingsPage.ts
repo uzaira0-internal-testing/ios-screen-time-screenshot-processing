@@ -35,7 +35,7 @@ export class SettingsPage {
    * Navigate to settings page
    */
   async goto() {
-    await this.page.goto("/settings");
+    await this.page.goto("settings");
     await this.page.waitForLoadState("domcontentloaded");
   }
 
@@ -109,7 +109,7 @@ export class SettingsPage {
     // The URL will be like "http://127.0.0.1:5175/" - check pathname
     await this.page.waitForFunction(() => {
       const path = window.location.pathname;
-      return path === "/" || path === "/home";
+      return path.endsWith("/") || path.endsWith("/home");
     }, { timeout: 10000 });
   }
 

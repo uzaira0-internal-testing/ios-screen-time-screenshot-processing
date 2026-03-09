@@ -9,7 +9,7 @@ import { test, expect } from "@playwright/test";
 test.describe("Capture Screenshots for Analysis", () => {
   test("capture all major pages", async ({ page }) => {
     // 1. Home page - wait for groups to load
-    await page.goto("/");
+    await page.goto(".");
     await page.waitForLoadState("networkidle");
     // Wait for groups section and data to load
     await page.waitForSelector('[data-testid="groups-section"]', { timeout: 10000 });
@@ -20,7 +20,7 @@ test.describe("Capture Screenshots for Analysis", () => {
     });
 
     // 2. Annotation page - wait for workspace or empty state
-    await page.goto("/annotate");
+    await page.goto("annotate");
     await page.waitForLoadState("domcontentloaded");
     // Wait for either workspace or empty state to appear
     await Promise.race([
@@ -46,7 +46,7 @@ test.describe("Capture Screenshots for Analysis", () => {
     }
 
     // 4. Settings page
-    await page.goto("/settings");
+    await page.goto("settings");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(1000);
     await page.screenshot({
@@ -55,7 +55,7 @@ test.describe("Capture Screenshots for Analysis", () => {
     });
 
     // 5. Consensus page
-    await page.goto("/consensus");
+    await page.goto("consensus");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(2000);
     await page.screenshot({
@@ -64,7 +64,7 @@ test.describe("Capture Screenshots for Analysis", () => {
     });
 
     // 6. Admin page (as testuser - shows access denied)
-    await page.goto("/admin");
+    await page.goto("admin");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
     await page.screenshot({

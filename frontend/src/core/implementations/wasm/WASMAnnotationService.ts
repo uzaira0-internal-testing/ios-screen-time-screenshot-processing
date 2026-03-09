@@ -36,10 +36,22 @@ export class WASMAnnotationService implements IAnnotationService {
   }
 
   async update(
-    _id: number,
-    _data: Partial<AnnotationCreate>,
+    id: number,
+    data: Partial<AnnotationCreate>,
   ): Promise<Annotation> {
-    throw new Error("WASMAnnotationService.update: Not implemented yet");
+    const updates = {
+      ...data,
+      updated_at: new Date().toISOString(),
+    };
+
+    const updated = await db.annotations.update(id, updates);
+    if (updated === 0) {
+      throw new Error(`Annotation with ID ${id} not found`);
+    }
+
+    // Fetch the updated record to return the full annotation
+    const annotation = await db.annotations.get(id);
+    return annotation!;
   }
 
   async getByScreenshot(screenshotId: number): Promise<Annotation[]> {

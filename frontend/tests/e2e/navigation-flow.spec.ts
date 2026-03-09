@@ -16,7 +16,7 @@ import { SettingsPage } from "../pages/SettingsPage";
  */
 test.describe("Navigation Flow", () => {
   test("should navigate from home to annotate page", async ({ page }) => {
-    await page.goto("/");
+    await page.goto(".");
     await page.waitForLoadState("domcontentloaded");
 
     // Click annotate all button or link
@@ -28,7 +28,7 @@ test.describe("Navigation Flow", () => {
   });
 
   test("should navigate from home to settings page", async ({ page }) => {
-    await page.goto("/");
+    await page.goto(".");
     await page.waitForLoadState("domcontentloaded");
 
     // Look for settings link in header or navigation
@@ -44,23 +44,23 @@ test.describe("Navigation Flow", () => {
     await settingsPage.goto();
 
     await settingsPage.navigateBack();
-    // Verify navigation completed by checking pathname
+    // Verify navigation completed by checking pathname (base path may be present)
     await page.waitForFunction(() => {
       const path = window.location.pathname;
-      return path === "/" || path === "/home";
+      return path.endsWith("/") || path.endsWith("/home");
     }, { timeout: 10000 });
   });
 
   test("should preserve group filter in navigation", async ({ page }) => {
     // Navigate with group filter
-    await page.goto("/annotate?group=test-group");
+    await page.goto("annotate?group=test-group");
     await page.waitForLoadState("domcontentloaded");
 
     // URL should contain group parameter
     expect(page.url()).toContain("group=test-group");
 
     // Navigate away and back
-    await page.goto("/");
+    await page.goto(".");
     await page.goBack();
 
     // Group filter should be preserved
@@ -70,7 +70,7 @@ test.describe("Navigation Flow", () => {
   test("should preserve processing status filter in navigation", async ({
     page,
   }) => {
-    await page.goto("/annotate?processing_status=completed");
+    await page.goto("annotate?processing_status=completed");
     await page.waitForLoadState("domcontentloaded");
 
     expect(page.url()).toContain("processing_status=completed");
@@ -78,15 +78,15 @@ test.describe("Navigation Flow", () => {
 
   test("should handle browser back button correctly", async ({ page }) => {
     // Start at home
-    await page.goto("/");
+    await page.goto(".");
     await page.waitForLoadState("domcontentloaded");
     const initialUrl = page.url();
 
     // Navigate forward a couple times
-    await page.goto("/annotate");
+    await page.goto("annotate");
     await page.waitForLoadState("domcontentloaded");
 
-    await page.goto("/settings");
+    await page.goto("settings");
     await page.waitForLoadState("domcontentloaded");
     expect(page.url()).toContain("/settings");
 
@@ -98,17 +98,17 @@ test.describe("Navigation Flow", () => {
     // depending on how the app handles SPA routing)
     // Just verify we're on a valid app route
     const pathname = new URL(page.url()).pathname;
-    expect(pathname).toMatch(/^\/(annotate|settings|home)?$/);
+    expect(pathname).toMatch(/\/(annotate|settings|home)?$/);
   });
 
   test("should handle browser forward button correctly", async ({ page }) => {
-    await page.goto("/");
+    await page.goto(".");
     await page.waitForLoadState("domcontentloaded");
 
-    await page.goto("/annotate");
+    await page.goto("annotate");
     await page.waitForLoadState("domcontentloaded");
 
-    await page.goto("/settings");
+    await page.goto("settings");
     await page.waitForLoadState("domcontentloaded");
 
     await page.goBack();
@@ -181,7 +181,7 @@ test.describe("Navigation Flow", () => {
     page,
   }) => {
     // Navigate directly to a screenshot ID (if it exists)
-    await page.goto("/annotate?id=1");
+    await page.goto("annotate?id=1");
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
 
@@ -205,7 +205,7 @@ test.describe("Navigation Flow", () => {
     const context = await browser.newContext({ storageState: undefined });
     const page = await context.newPage();
 
-    await page.goto("/annotate");
+    await page.goto("annotate");
     await page.waitForLoadState("domcontentloaded");
 
     // Should either show login or redirect
@@ -243,7 +243,7 @@ test.describe("Navigation Flow", () => {
   test("should show active state for current navigation item", async ({
     page,
   }) => {
-    await page.goto("/annotate");
+    await page.goto("annotate");
     await page.waitForLoadState("domcontentloaded");
 
     // Look for navigation items
@@ -268,7 +268,7 @@ test.describe("Navigation Flow", () => {
   test("should navigate between screenshots within annotation page", async ({
     page,
   }) => {
-    await page.goto("/annotate");
+    await page.goto("annotate");
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
 
@@ -306,7 +306,7 @@ test.describe("Navigation Flow", () => {
   test("should update URL when navigating between screenshots", async ({
     page,
   }) => {
-    await page.goto("/annotate");
+    await page.goto("annotate");
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
 
@@ -334,7 +334,7 @@ test.describe("Navigation Flow", () => {
   });
 
   test("should handle 404 for non-existent routes", async ({ page }) => {
-    await page.goto("/non-existent-page-xyz");
+    await page.goto("non-existent-page-xyz");
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(1000); // Allow SPA routing to settle
 
@@ -356,7 +356,7 @@ test.describe("Navigation Flow", () => {
   test("should preserve scroll position on back navigation", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto(".");
     await page.waitForLoadState("domcontentloaded");
 
     // Scroll down
@@ -364,7 +364,7 @@ test.describe("Navigation Flow", () => {
     const scrollBefore = await page.evaluate(() => window.scrollY);
 
     // Navigate away
-    await page.goto("/settings");
+    await page.goto("settings");
 
     // Go back
     await page.goBack();
@@ -380,7 +380,7 @@ test.describe("Navigation Flow", () => {
   }) => {
     // Set mobile viewport
     await page.setViewportSize({ width: 375, height: 667 });
-    await page.goto("/");
+    await page.goto(".");
     await page.waitForLoadState("domcontentloaded");
 
     // Look for hamburger menu or mobile nav
@@ -394,7 +394,7 @@ test.describe("Navigation Flow", () => {
   });
 
   test("should handle page refresh gracefully", async ({ page }) => {
-    await page.goto("/annotate?group=test");
+    await page.goto("annotate?group=test");
     await page.waitForLoadState("domcontentloaded");
 
     // Refresh

@@ -4,7 +4,7 @@ test.describe("Export Functionality", () => {
   test("should show export button on home page", async ({
     authenticatedPage,
   }) => {
-    await authenticatedPage.goto("/");
+    await authenticatedPage.goto(".");
     await authenticatedPage.waitForLoadState("networkidle");
 
     // Look for export button or link
@@ -33,7 +33,7 @@ test.describe("Export Functionality", () => {
   test("should trigger download when export is clicked", async ({
     authenticatedPage,
   }) => {
-    await authenticatedPage.goto("/");
+    await authenticatedPage.goto(".");
     await authenticatedPage.waitForLoadState("networkidle");
 
     // Look for Export CSV button (simplified export - CSV only)
@@ -87,7 +87,7 @@ test.describe("Export Functionality", () => {
   test("should handle export with no data gracefully", async ({
     authenticatedPage,
   }) => {
-    await authenticatedPage.goto("/");
+    await authenticatedPage.goto(".");
     await authenticatedPage.waitForLoadState("networkidle");
 
     const exportButton = authenticatedPage
@@ -117,7 +117,7 @@ test.describe("Export Functionality", () => {
   test("should export CSV directly without dialog", async ({
     authenticatedPage,
   }) => {
-    await authenticatedPage.goto("/");
+    await authenticatedPage.goto(".");
     await authenticatedPage.waitForLoadState("networkidle");
 
     const exportButton = authenticatedPage

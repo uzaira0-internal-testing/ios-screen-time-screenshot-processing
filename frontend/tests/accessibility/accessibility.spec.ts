@@ -281,7 +281,7 @@ test.describe("Accessibility Tests", () => {
       await loginPage.goto();
       await loginPage.login("admin");
 
-      await page.goto("/admin");
+      await page.goto("admin");
       await page.waitForLoadState("networkidle");
 
       // Exclude known issues that don't affect usability
@@ -296,7 +296,7 @@ test.describe("Accessibility Tests", () => {
       await loginPage.goto();
       await loginPage.login("admin");
 
-      await page.goto("/admin");
+      await page.goto("admin");
       await page.waitForLoadState("networkidle");
 
       const table = page.getByTestId("user-table");
@@ -326,7 +326,7 @@ test.describe("Accessibility Tests", () => {
       await loginPage.goto();
       await loginPage.login("admin");
 
-      await page.goto("/admin");
+      await page.goto("admin");
       await page.waitForLoadState("networkidle");
 
       // Check for action buttons with accessible names
@@ -368,7 +368,7 @@ test.describe("Accessibility Tests", () => {
       await loginPage.goto();
       await loginPage.login("testuser");
 
-      await page.goto("/");
+      await page.goto(".");
       await page.waitForLoadState("networkidle");
 
       const homePage = new HomePage(page);

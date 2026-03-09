@@ -390,13 +390,13 @@ test.describe("Admin dispute resolution", () => {
 test.describe("Group card navigation to consensus", () => {
   test("clicking Once tier in group card navigates to consensus with correct filters", async ({ page }) => {
     // Login
-    await page.goto("/login");
+    await page.goto("login");
     await page.getByPlaceholder("Username").fill("nav_test_user");
     await page.getByRole("button", { name: /continue/i }).click();
-    await page.waitForURL("/annotate**");
+    await page.waitForURL("**/annotate**");
 
     // Go to home page
-    await page.goto("/");
+    await page.goto(".");
     await page.waitForTimeout(2000);
 
     // Find a group card with verified screenshots
@@ -414,12 +414,12 @@ test.describe("Group card navigation to consensus", () => {
   });
 
   test("clicking Multiple tier in group card navigates correctly", async ({ page }) => {
-    await page.goto("/login");
+    await page.goto("login");
     await page.getByPlaceholder("Username").fill("nav_test_user_2");
     await page.getByRole("button", { name: /continue/i }).click();
-    await page.waitForURL("/annotate**");
+    await page.waitForURL("**/annotate**");
 
-    await page.goto("/");
+    await page.goto(".");
     await page.waitForTimeout(2000);
 
     const multipleButton = page.getByTestId("tier-verified-multiple").first();
@@ -434,12 +434,12 @@ test.describe("Group card navigation to consensus", () => {
   });
 
   test("clicking Disputed tier in group card navigates correctly", async ({ page }) => {
-    await page.goto("/login");
+    await page.goto("login");
     await page.getByPlaceholder("Username").fill("nav_test_user_3");
     await page.getByRole("button", { name: /continue/i }).click();
-    await page.waitForURL("/annotate**");
+    await page.waitForURL("**/annotate**");
 
-    await page.goto("/");
+    await page.goto(".");
     await page.waitForTimeout(2000);
 
     const disputedButton = page.getByTestId("tier-disputed").first();
@@ -458,13 +458,13 @@ test.describe("Verification badge colors", () => {
   // Skip badge tests since they require screenshots from upload setup which may fail
   test.skip("badge shows green when verified by current user", async ({ page }) => {
     // Login
-    await page.goto("/login");
+    await page.goto("login");
     await page.getByPlaceholder("Username").fill("badge_test_user");
     await page.getByRole("button", { name: /continue/i }).click();
-    await page.waitForURL("/annotate**");
+    await page.waitForURL("**/annotate**");
 
     // Navigate to a verified screenshot and wait for it to load
-    await page.goto("/annotate");
+    await page.goto("annotate");
     await page.getByTestId("screenshot-selector").waitFor({ state: "visible", timeout: 30000 });
 
     // Verify the screenshot
@@ -496,12 +496,12 @@ test.describe("Verification badge colors", () => {
     const otherContext = await browser.newContext();
     const otherPage = await otherContext.newPage();
 
-    await otherPage.goto("/login");
+    await otherPage.goto("login");
     await otherPage.getByPlaceholder("Username").fill("other_verifier");
     await otherPage.getByRole("button", { name: /continue/i }).click();
-    await otherPage.waitForURL("/annotate**");
+    await otherPage.waitForURL("**/annotate**");
 
-    await otherPage.goto("/annotate");
+    await otherPage.goto("annotate");
     await otherPage.getByTestId("screenshot-selector").waitFor({ state: "visible", timeout: 30000 });
 
     // Get the screenshot ID
@@ -524,10 +524,10 @@ test.describe("Verification badge colors", () => {
     await otherContext.close();
 
     // Now login as a different user
-    await page.goto("/login");
+    await page.goto("login");
     await page.getByPlaceholder("Username").fill("yellow_badge_viewer");
     await page.getByRole("button", { name: /continue/i }).click();
-    await page.waitForURL("/annotate**");
+    await page.waitForURL("**/annotate**");
 
     // Navigate to the same screenshot
     if (screenshotId) {

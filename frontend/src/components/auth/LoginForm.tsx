@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/services/apiClient";
 import { config } from "@/config";
+import { useSyncStore } from "@/core/implementations/wasm/sync";
 import toast from "react-hot-toast";
 
 export const LoginForm = () => {
@@ -11,6 +12,12 @@ export const LoginForm = () => {
   const [passwordRequired, setPasswordRequired] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingPassword, setIsCheckingPassword] = useState(!config.isLocalMode);
+
+  // Sync toggle state (local mode only)
+  const [connectToServer, setConnectToServer] = useState(false);
+  const [serverUrl, setServerUrl] = useState("");
+  const [sitePassword, setSitePassword] = useState("");
+
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -31,12 +38,44 @@ export const LoginForm = () => {
       });
   }, []);
 
+  // Load persisted sync config on mount (local mode only)
+  useEffect(() => {
+    if (!config.isLocalMode) return;
+    useSyncStore.getState().initConfig().then(() => {
+      const { serverUrl: savedUrl, sitePassword: savedPw } = useSyncStore.getState();
+      if (savedUrl) {
+        setConnectToServer(true);
+        setServerUrl(savedUrl);
+        setSitePassword(savedPw);
+      }
+    });
+  }, []);
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
     if (config.isLocalMode) {
       const name = username.trim() || "User";
       login(1, name, undefined, "admin");
+
+      // Handle sync configuration via store (single write path)
+      if (connectToServer && serverUrl.trim()) {
+        const store = useSyncStore.getState();
+        store.setServerUrl(serverUrl.trim());
+        store.setUsername(name);
+        if (sitePassword) store.setSitePassword(sitePassword);
+        await store.configureNow();
+
+        // Fire-and-forget health check
+        store.checkHealth().then((result) => {
+          if (result.ok) {
+            toast.success("Connected to server");
+          } else {
+            toast.error(`Server: ${result.error || "unreachable"}`);
+          }
+        });
+      }
+
       toast.success(`Welcome, ${name}!`);
       navigate("/");
       return;
@@ -72,7 +111,7 @@ export const LoginForm = () => {
   };
 
   const isFormValid = config.isLocalMode
-    ? true
+    ? connectToServer ? !!serverUrl.trim() : true
     : username.trim() && (!passwordRequired || password);
 
   const subtitle = config.isLocalMode
@@ -133,6 +172,64 @@ export const LoginForm = () => {
                     className="appearance-none rounded-md relative block w-full px-3 py-2 border border-slate-300 dark:border-slate-600 placeholder-slate-500 text-slate-900 dark:text-slate-100 dark:bg-slate-800 focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
                     placeholder="Access Password"
                   />
+                </div>
+              )}
+
+              {/* Server sync toggle (local/desktop mode only) */}
+              {config.isLocalMode && (
+                <div className="border border-slate-200 dark:border-slate-700 rounded-md p-4 space-y-3">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={connectToServer}
+                      onChange={(e) => setConnectToServer(e.target.checked)}
+                      className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-slate-300 dark:border-slate-600 rounded"
+                    />
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                      Connect to Server (optional)
+                    </span>
+                  </label>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 ml-7">
+                    Sync local data to a server for multi-user consensus
+                  </p>
+
+                  {connectToServer && (
+                    <div className="ml-7 space-y-3">
+                      <div>
+                        <label
+                          htmlFor="server-url"
+                          className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1"
+                        >
+                          Server API URL
+                        </label>
+                        <input
+                          id="server-url"
+                          type="url"
+                          required
+                          value={serverUrl}
+                          onChange={(e) => setServerUrl(e.target.value)}
+                          className="appearance-none rounded-md relative block w-full px-3 py-2 border border-slate-300 dark:border-slate-600 placeholder-slate-500 text-slate-900 dark:text-slate-100 dark:bg-slate-800 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                          placeholder="http://localhost:8002/api/v1"
+                        />
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="site-password"
+                          className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1"
+                        >
+                          Site Password (optional)
+                        </label>
+                        <input
+                          id="site-password"
+                          type="password"
+                          value={sitePassword}
+                          onChange={(e) => setSitePassword(e.target.value)}
+                          className="appearance-none rounded-md relative block w-full px-3 py-2 border border-slate-300 dark:border-slate-600 placeholder-slate-500 text-slate-900 dark:text-slate-100 dark:bg-slate-800 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                          placeholder="Leave blank if not required"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

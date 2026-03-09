@@ -96,7 +96,7 @@ test.describe("Settings Page", () => {
     // Wait for navigation to home - check pathname since URL includes host
     await page.waitForFunction(() => {
       const path = window.location.pathname;
-      return path === "/" || path === "/home";
+      return path.endsWith("/") || path.endsWith("/home");
     }, { timeout: 10000 });
   });
 

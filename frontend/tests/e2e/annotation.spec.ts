@@ -74,7 +74,7 @@ test.describe("Annotation Page", () => {
   }
 
   test("should load annotation workspace", async ({ page }) => {
-    await page.goto("/annotate");
+    await page.goto("annotate");
     const state = await waitForAnnotationPageState(page);
 
     // Either shows workspace with content, "no screenshots" message, or still loading
@@ -86,7 +86,7 @@ test.describe("Annotation Page", () => {
   test("should display annotation workspace elements when screenshots exist", async ({
     page,
   }) => {
-    await page.goto("/annotate");
+    await page.goto("annotate");
     const state = await waitForAnnotationPageState(page);
 
     if (state.hasNoScreenshots || state.isLoading) {
@@ -101,7 +101,7 @@ test.describe("Annotation Page", () => {
   test("should allow editing hourly values when screenshot is loaded", async ({
     page,
   }) => {
-    await page.goto("/annotate");
+    await page.goto("annotate");
     const state = await waitForAnnotationPageState(page);
 
     if (state.hasNoScreenshots || state.isLoading || !state.hasWorkspace) {
@@ -132,7 +132,7 @@ test.describe("Annotation Page", () => {
   test("should update bar total when hourly values change", async ({
     page,
   }) => {
-    await page.goto("/annotate");
+    await page.goto("annotate");
     const state = await waitForAnnotationPageState(page);
 
     if (state.hasNoScreenshots || state.isLoading || !state.hasWorkspace) {
@@ -164,7 +164,7 @@ test.describe("Annotation Page", () => {
   });
 
   test("should show auto-save status", async ({ page }) => {
-    await page.goto("/annotate");
+    await page.goto("annotate");
     const state = await waitForAnnotationPageState(page);
 
     if (state.hasNoScreenshots || state.isLoading || !state.hasWorkspace) {
@@ -192,7 +192,7 @@ test.describe("Annotation Page", () => {
   test("should have skip button when screenshot is loaded", async ({
     page,
   }) => {
-    await page.goto("/annotate");
+    await page.goto("annotate");
     const state = await waitForAnnotationPageState(page);
 
     if (state.hasNoScreenshots || state.isLoading || !state.hasWorkspace) {
@@ -208,7 +208,7 @@ test.describe("Annotation Page", () => {
   test("should have verify button when screenshot is loaded", async ({
     page,
   }) => {
-    await page.goto("/annotate");
+    await page.goto("annotate");
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for page to stabilize
@@ -241,7 +241,7 @@ test.describe("Annotation Page", () => {
   });
 
   test("should have navigation buttons", async ({ page }) => {
-    await page.goto("/annotate");
+    await page.goto("annotate");
     const state = await waitForAnnotationPageState(page);
 
     if (state.hasNoScreenshots || state.isLoading || !state.hasWorkspace) {
@@ -262,7 +262,7 @@ test.describe("Annotation Page", () => {
   });
 
   test("should display OCR total when available", async ({ page }) => {
-    await page.goto("/annotate");
+    await page.goto("annotate");
     const state = await waitForAnnotationPageState(page);
 
     if (state.hasNoScreenshots || state.isLoading || !state.hasWorkspace) {
@@ -281,7 +281,7 @@ test.describe("Annotation Page", () => {
   });
 
   test("should display bar total", async ({ page }) => {
-    await page.goto("/annotate");
+    await page.goto("annotate");
     const state = await waitForAnnotationPageState(page);
 
     if (state.hasNoScreenshots || state.isLoading || !state.hasWorkspace) {
@@ -295,7 +295,7 @@ test.describe("Annotation Page", () => {
   });
 
   test("should handle keyboard shortcuts", async ({ page }) => {
-    await page.goto("/annotate");
+    await page.goto("annotate");
     const state = await waitForAnnotationPageState(page);
 
     if (state.hasNoScreenshots || state.isLoading || !state.hasWorkspace) {
@@ -313,7 +313,7 @@ test.describe("Annotation Page", () => {
 
   test("should apply group filter from URL parameters", async ({ page }) => {
     // Navigate with group filter
-    await page.goto("/annotate?group=test-group");
+    await page.goto("annotate?group=test-group");
     const state = await waitForAnnotationPageState(page);
 
     // Either shows workspace, no screenshots message, or loading - all valid
@@ -326,7 +326,7 @@ test.describe("Annotation Page", () => {
     page,
   }) => {
     // Navigate with processing status filter
-    await page.goto("/annotate?processing_status=pending");
+    await page.goto("annotate?processing_status=pending");
     const state = await waitForAnnotationPageState(page);
 
     // Either shows workspace, no screenshots message, or loading - all valid

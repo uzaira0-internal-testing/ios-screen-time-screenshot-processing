@@ -37,7 +37,7 @@ export class HomePage {
    * Navigate to home page
    */
   async goto() {
-    await this.page.goto("/");
+    await this.page.goto(".");
     await this.heading.waitFor({ state: "visible" });
   }
 

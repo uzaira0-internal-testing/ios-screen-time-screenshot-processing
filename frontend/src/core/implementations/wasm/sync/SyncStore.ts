@@ -1,9 +1,16 @@
 import { create } from "zustand";
 import { syncService } from "./SyncService";
+import type { SyncConfig, HealthCheckResult } from "./SyncService";
 
 export interface SyncError {
   message: string;
   timestamp: string;
+}
+
+export interface SyncResult {
+  screenshots: number;
+  annotations: number;
+  pulled: number;
 }
 
 interface SyncState {
@@ -14,11 +21,19 @@ interface SyncState {
   pendingDownloads: number;
   serverUrl: string;
   username: string;
+  sitePassword: string;
+  configLoaded: boolean;
+  lastSyncResult: SyncResult | null;
   errors: SyncError[];
 
   // Actions
   setServerUrl: (url: string) => void;
   setUsername: (username: string) => void;
+  setSitePassword: (password: string) => void;
+  initConfig: () => Promise<void>;
+  configureNow: () => Promise<void>;
+  checkHealth: () => Promise<HealthCheckResult>;
+  disconnect: () => Promise<void>;
   syncNow: () => Promise<void>;
   refreshPendingCounts: () => Promise<void>;
   clearErrors: () => void;
@@ -32,6 +47,37 @@ export const useSyncStore = create<SyncState>((set, get) => {
     window.addEventListener("offline", updateOnline);
   }
 
+  let persistTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const buildConfig = (): SyncConfig | null => {
+    const { serverUrl, username, sitePassword } = get();
+    if (!serverUrl || !username) return null;
+    return { serverUrl, username, sitePassword: sitePassword || undefined };
+  };
+
+  const flushPersistTimer = () => {
+    if (persistTimer) {
+      clearTimeout(persistTimer);
+      persistTimer = null;
+    }
+  };
+
+  const debouncedPersist = () => {
+    flushPersistTimer();
+    persistTimer = setTimeout(() => {
+      const config = buildConfig();
+      if (config) {
+        syncService.configure(config);
+        syncService.saveConfig(config);
+      }
+    }, 500);
+  };
+
+  const setField = (patch: Partial<SyncState>) => {
+    set(patch);
+    debouncedPersist();
+  };
+
   return {
     isOnline: typeof navigator !== "undefined" ? navigator.onLine : true,
     isSyncing: false,
@@ -40,27 +86,71 @@ export const useSyncStore = create<SyncState>((set, get) => {
     pendingDownloads: 0,
     serverUrl: "",
     username: "",
+    sitePassword: "",
+    configLoaded: false,
+    lastSyncResult: null,
     errors: [],
 
-    setServerUrl: (url: string) => {
-      set({ serverUrl: url });
-      const { username } = get();
-      if (url && username) {
-        syncService.configure({ serverUrl: url, username });
+    setServerUrl: (url: string) => setField({ serverUrl: url }),
+    setUsername: (username: string) => setField({ username }),
+    setSitePassword: (password: string) => setField({ sitePassword: password }),
+
+    initConfig: async () => {
+      try {
+        const config = await syncService.loadConfig();
+        if (config) {
+          set({
+            serverUrl: config.serverUrl,
+            username: config.username,
+            sitePassword: config.sitePassword || "",
+            configLoaded: true,
+          });
+        } else {
+          set({ configLoaded: true });
+        }
+      } catch {
+        set({ configLoaded: true });
       }
     },
 
-    setUsername: (username: string) => {
-      set({ username });
-      const { serverUrl } = get();
-      if (serverUrl && username) {
-        syncService.configure({ serverUrl, username });
+    configureNow: async () => {
+      flushPersistTimer();
+      const config = buildConfig();
+      if (config) {
+        syncService.configure(config);
+        await syncService.saveConfig(config);
       }
+    },
+
+    checkHealth: async (): Promise<HealthCheckResult> => {
+      const config = buildConfig();
+      if (!config) {
+        return { ok: false, error: "Server URL and username are required" };
+      }
+      syncService.configure(config);
+      return syncService.checkServerHealth();
+    },
+
+    disconnect: async () => {
+      flushPersistTimer();
+      await syncService.clearConfig();
+      set({
+        serverUrl: "",
+        username: "",
+        sitePassword: "",
+        lastSyncAt: null,
+        lastSyncResult: null,
+        pendingUploads: 0,
+        pendingDownloads: 0,
+        errors: [],
+      });
     },
 
     syncNow: async () => {
-      const { serverUrl, username } = get();
-      if (!serverUrl || !username) {
+      flushPersistTimer();
+
+      const config = buildConfig();
+      if (!config) {
         set({
           errors: [
             ...get().errors,
@@ -73,17 +163,17 @@ export const useSyncStore = create<SyncState>((set, get) => {
         return;
       }
 
-      syncService.configure({ serverUrl, username });
-      set({ isSyncing: true, errors: [] });
+      syncService.configure(config);
+      set({ isSyncing: true, errors: [], lastSyncResult: null });
 
       try {
-        const isHealthy = await syncService.checkServerHealth();
-        if (!isHealthy) {
+        const health = await syncService.checkServerHealth();
+        if (!health.ok) {
           set({
             isSyncing: false,
             errors: [
               {
-                message: "Cannot reach server. Check URL and try again.",
+                message: health.error || "Cannot reach server",
                 timestamp: new Date().toISOString(),
               },
             ],
@@ -108,6 +198,11 @@ export const useSyncStore = create<SyncState>((set, get) => {
         set({
           isSyncing: false,
           lastSyncAt: new Date().toISOString(),
+          lastSyncResult: {
+            screenshots: result.pushed.screenshots,
+            annotations: result.pushed.annotations,
+            pulled: result.pulled.annotations,
+          },
           errors: syncErrors,
         });
 

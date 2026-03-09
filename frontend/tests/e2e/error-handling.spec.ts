@@ -21,7 +21,7 @@ test.describe("Error Handling", () => {
       });
     });
 
-    await page.goto("/annotate");
+    await page.goto("annotate");
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
 
@@ -43,7 +43,7 @@ test.describe("Error Handling", () => {
       });
     });
 
-    await page.goto("/annotate?id=999999");
+    await page.goto("annotate?id=999999");
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
 
@@ -63,7 +63,7 @@ test.describe("Error Handling", () => {
       });
     });
 
-    await page.goto("/annotate");
+    await page.goto("annotate");
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
 
@@ -92,7 +92,7 @@ test.describe("Error Handling", () => {
       route.abort("timedout");
     });
 
-    await page.goto("/annotate");
+    await page.goto("annotate");
 
     // Should show loading or timeout message
     const loading = page.getByText(/loading|connecting/i);
@@ -106,7 +106,7 @@ test.describe("Error Handling", () => {
   });
 
   test("should handle network disconnection", async ({ page }) => {
-    await page.goto("/annotate");
+    await page.goto("annotate");
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
 
@@ -135,7 +135,7 @@ test.describe("Error Handling", () => {
       });
     });
 
-    await page.goto("/annotate");
+    await page.goto("annotate");
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
 
@@ -157,7 +157,7 @@ test.describe("Error Handling", () => {
       });
     });
 
-    await page.goto("/annotate");
+    await page.goto("annotate");
     await page.waitForTimeout(2000);
 
     // Clear route interception
@@ -186,7 +186,7 @@ test.describe("Error Handling", () => {
       });
     });
 
-    await page.goto("/annotate");
+    await page.goto("annotate");
     await page.waitForTimeout(2000);
 
     // Look for retry button
@@ -197,7 +197,7 @@ test.describe("Error Handling", () => {
   });
 
   test("should handle form validation errors", async ({ page }) => {
-    await page.goto("/annotate");
+    await page.goto("annotate");
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
 
@@ -234,7 +234,7 @@ test.describe("Error Handling", () => {
   });
 
   test("should handle session expiry", async ({ page }) => {
-    await page.goto("/annotate");
+    await page.goto("annotate");
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
 
@@ -269,7 +269,7 @@ test.describe("Error Handling", () => {
       (window as any).__testErrorBoundary = true;
     });
 
-    await page.goto("/annotate");
+    await page.goto("annotate");
     await page.waitForLoadState("domcontentloaded");
 
     // Error boundary should be in place (not crashing the whole app)
@@ -285,7 +285,7 @@ test.describe("Error Handling", () => {
       route.abort("failed");
     });
 
-    await page.goto("/annotate");
+    await page.goto("annotate");
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
 
@@ -308,7 +308,7 @@ test.describe("Error Handling", () => {
       });
     });
 
-    await page.goto("/annotate");
+    await page.goto("annotate");
     await page.waitForTimeout(2000);
 
     // Should show rate limit message
@@ -319,7 +319,7 @@ test.describe("Error Handling", () => {
   });
 
   test("should preserve unsaved changes on error", async ({ page }) => {
-    await page.goto("/annotate");
+    await page.goto("annotate");
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
 
@@ -356,7 +356,7 @@ test.describe("Error Handling", () => {
       });
     });
 
-    await page.goto("/annotate?id=invalid");
+    await page.goto("annotate?id=invalid");
     await page.waitForTimeout(2000);
 
     // Should show the actual error message, not generic
@@ -372,7 +372,7 @@ test.describe("Error Handling", () => {
       route.abort("failed");
     });
 
-    await page.goto("/annotate");
+    await page.goto("annotate");
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
 
@@ -401,7 +401,7 @@ test.describe("Error Handling", () => {
       }
     });
 
-    await page.goto("/annotate");
+    await page.goto("annotate");
     await page.waitForTimeout(2000);
 
     const hour0Input = page.getByTestId("hour-input-0");

@@ -14,6 +14,8 @@ import {
   Loader2,
   X,
   Monitor,
+  Unplug,
+  CheckCircle2,
 } from "lucide-react";
 import { useSyncStore } from "@/core/implementations/wasm/sync";
 import { useThemeStore, THEME_OPTIONS } from "@/store/themeStore";
@@ -28,17 +30,30 @@ function SyncSection() {
     pendingUploads,
     serverUrl,
     username,
+    sitePassword,
+    lastSyncResult,
     errors,
     setServerUrl,
     setUsername,
+    setSitePassword,
     syncNow,
+    disconnect,
+    initConfig,
     clearErrors,
     refreshPendingCounts,
   } = useSyncStore();
 
+  const [showDisconnectConfirm, setShowDisconnectConfirm] = React.useState(false);
+
   React.useEffect(() => {
-    refreshPendingCounts();
-  }, [refreshPendingCounts]);
+    initConfig().then(() => refreshPendingCounts());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleDisconnect = async () => {
+    await disconnect();
+    setShowDisconnectConfirm(false);
+  };
 
   return (
     <Card padding="lg">
@@ -100,7 +115,24 @@ function SyncSection() {
           />
         </div>
 
-        <div className="flex items-center gap-4">
+        <div>
+          <label
+            htmlFor="sync-site-password"
+            className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+          >
+            Site Password (optional)
+          </label>
+          <input
+            id="sync-site-password"
+            type="password"
+            placeholder="Leave blank if not required"
+            value={sitePassword}
+            onChange={(e) => setSitePassword(e.target.value)}
+            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm bg-white dark:bg-slate-700 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+          />
+        </div>
+
+        <div className="flex items-center gap-3 flex-wrap">
           <button
             onClick={syncNow}
             disabled={isSyncing || !serverUrl || !username}
@@ -114,6 +146,39 @@ function SyncSection() {
             {isSyncing ? "Syncing..." : "Sync Now"}
           </button>
 
+          {serverUrl && (
+            <>
+              {showDisconnectConfirm ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-slate-600 dark:text-slate-400">
+                    Clear sync config?
+                  </span>
+                  <button
+                    onClick={handleDisconnect}
+                    className="px-3 py-1.5 text-sm font-medium text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors focus-ring"
+                  >
+                    Yes, disconnect
+                  </button>
+                  <button
+                    onClick={() => setShowDisconnectConfirm(false)}
+                    className="px-3 py-1.5 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors focus-ring"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowDisconnectConfirm(true)}
+                  disabled={isSyncing}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-700 dark:text-red-400 bg-white dark:bg-slate-800 border border-red-200 dark:border-red-800 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-ring"
+                >
+                  <Unplug className="w-4 h-4" />
+                  Disconnect
+                </button>
+              )}
+            </>
+          )}
+
           <div className="text-sm text-slate-600 dark:text-slate-400 space-x-4">
             {pendingUploads > 0 && (
               <span>{pendingUploads} pending upload{pendingUploads !== 1 ? "s" : ""}</span>
@@ -125,6 +190,23 @@ function SyncSection() {
             )}
           </div>
         </div>
+
+        {/* Sync results */}
+        {lastSyncResult && (
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md p-3">
+            <span className="flex items-center gap-1 text-sm font-medium text-green-800 dark:text-green-300 mb-1">
+              <CheckCircle2 className="w-4 h-4" /> Sync Complete
+            </span>
+            <p className="text-sm text-green-700 dark:text-green-300">
+              Pushed {lastSyncResult.screenshots} screenshot{lastSyncResult.screenshots !== 1 ? "s" : ""}
+              {", "}
+              {lastSyncResult.annotations} annotation{lastSyncResult.annotations !== 1 ? "s" : ""}
+              {lastSyncResult.pulled > 0 && (
+                <>{". "}Pulled {lastSyncResult.pulled} remote annotation{lastSyncResult.pulled !== 1 ? "s" : ""}</>
+              )}
+            </p>
+          </div>
+        )}
 
         {errors.length > 0 && (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3">

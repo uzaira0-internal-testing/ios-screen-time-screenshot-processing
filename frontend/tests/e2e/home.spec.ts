@@ -131,7 +131,7 @@ test.describe("Home Page", () => {
       localStorage.clear();
     });
 
-    await page.goto("/");
+    await page.goto(".");
     await page.waitForLoadState("networkidle");
 
     // Should show "Login" link somewhere for unauthenticated users
@@ -158,7 +158,7 @@ test.describe("Home Page", () => {
     await homePage.goto();
     await homePage.clickAnnotateAll();
 
-    await expect(authenticatedPage).toHaveURL("/annotate");
+    await expect(authenticatedPage).toHaveURL(/\/annotate/);
   });
 
   test("should display progress bar for groups", async ({

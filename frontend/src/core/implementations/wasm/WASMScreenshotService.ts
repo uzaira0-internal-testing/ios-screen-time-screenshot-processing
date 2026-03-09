@@ -15,10 +15,13 @@ import type { IStorageService } from "@/core/interfaces";
 import type { IProcessingService, ProcessingProgress } from "@/core/interfaces";
 import { db } from "./storage/database";
 import { createObjectURL } from "./storage/opfsBlobStorage";
+import { computeContentHash } from "./utils/contentHash";
+import { useAuthStore } from "@/store/authStore";
 
 export class WASMScreenshotService implements IScreenshotService {
   private storageService: IStorageService;
   private processingService: IProcessingService;
+  private processingInProgress = new Set<number>();
 
   constructor(
     storageService: IStorageService,
@@ -77,12 +80,25 @@ export class WASMScreenshotService implements IScreenshotService {
   }
 
   async upload(file: File, imageType: ImageType): Promise<Screenshot> {
-    const blob = new Blob([file], { type: file.type });
+    // File extends Blob — no need to copy
     const uploadedAt = new Date().toISOString();
+
+    // Content-hash dedup: compute SHA-256 and check for existing screenshot
+    // Returns null in non-secure contexts where crypto.subtle is unavailable
+    const contentHash = await computeContentHash(file);
+    if (contentHash !== null) {
+      const existing = await db.screenshots
+        .where("content_hash")
+        .equals(contentHash)
+        .first();
+      if (existing) {
+        throw new Error(`Duplicate image: this file has already been uploaded as screenshot #${existing.id}`);
+      }
+    }
 
     // Create screenshot record without ID (let IndexedDB auto-increment)
     // Omit id by using Partial and type assertion
-    const screenshotData: Omit<Screenshot, "id"> & { id?: number } = {
+    const screenshotData: Omit<Screenshot, "id"> & { id?: number; content_hash?: string } = {
       file_path: file.name,
       image_type: imageType,
       uploaded_at: uploadedAt,
@@ -113,13 +129,15 @@ export class WASMScreenshotService implements IScreenshotService {
       // Computed readonly properties (provided as null for WASM mode)
       processing_time_seconds: null,
       alignment_score_status: null,
+      // Content hash for dedup (null when crypto.subtle unavailable)
+      content_hash: contentHash ?? undefined,
     };
 
     // Save to IndexedDB - this will assign a unique auto-incremented ID
     const id = await this.storageService.saveScreenshot(
       screenshotData as Screenshot,
     );
-    await this.storageService.saveImageBlob(id, blob);
+    await this.storageService.saveImageBlob(id, file);
 
     const screenshot: Screenshot = { ...screenshotData, id };
 
@@ -345,6 +363,14 @@ export class WASMScreenshotService implements IScreenshotService {
   }
 
   async processIfNeeded(screenshot: Screenshot): Promise<Screenshot> {
+    // Skip if already being processed (e.g., by autoProcess after upload)
+    if (this.processingInProgress.has(screenshot.id)) {
+      console.log(
+        `[WASMScreenshotService.processIfNeeded] Screenshot ${screenshot.id} already being processed, returning as-is`,
+      );
+      return screenshot;
+    }
+
     // IMPORTANT: Never reprocess verified screenshots - they are frozen
     const isVerified =
       screenshot.verified_by_user_ids &&
@@ -536,6 +562,13 @@ export class WASMScreenshotService implements IScreenshotService {
   }
 
   private async autoProcess(screenshot: Screenshot): Promise<void> {
+    // Prevent concurrent processing of the same screenshot
+    if (this.processingInProgress.has(screenshot.id)) {
+      console.log(`[WASMScreenshotService.autoProcess] Screenshot ${screenshot.id} already being processed, skipping`);
+      return;
+    }
+    this.processingInProgress.add(screenshot.id);
+
     try {
       const imageBlob = await this.storageService.getImageBlob(screenshot.id);
 
@@ -572,6 +605,8 @@ export class WASMScreenshotService implements IScreenshotService {
       await this.storageService.updateScreenshot(screenshot.id, {
         processing_status: "failed",
       });
+    } finally {
+      this.processingInProgress.delete(screenshot.id);
     }
   }
 
@@ -587,6 +622,7 @@ export class WASMScreenshotService implements IScreenshotService {
       group_id: params.group_id,
       processing_status: params.processing_status,
       verified_by_me: params.verified_by_me,
+      verified_by_others: params.verified_by_others,
       search: params.search,
       sort_by: sortBy,
       sort_order: sortOrder,
@@ -606,6 +642,7 @@ export class WASMScreenshotService implements IScreenshotService {
       group_id: params.group_id,
       processing_status: params.processing_status,
       verified_by_me: params.verified_by_me,
+      verified_by_others: params.verified_by_others,
       direction: params.direction,
     });
 
@@ -618,14 +655,25 @@ export class WASMScreenshotService implements IScreenshotService {
   ): Promise<Screenshot> {
     const screenshot = await this.getById(screenshotId);
     const verifiedIds = screenshot.verified_by_user_ids || [];
+    const verifiedUsernames = screenshot.verified_by_usernames || [];
 
     const updates: Partial<Screenshot> = {};
 
-    // Use local user ID = 1 for WASM mode
-    if (!verifiedIds.includes(1)) {
-      verifiedIds.push(1);
+    // Use local user ID and username for WASM mode
+    const userId = useAuthStore.getState().userId ?? 1;
+    const username = useAuthStore.getState().username ?? "local";
+
+    if (!verifiedIds.includes(userId)) {
+      verifiedIds.push(userId);
       updates.verified_by_user_ids = verifiedIds;
     }
+    if (!verifiedUsernames.includes(username)) {
+      verifiedUsernames.push(username);
+      updates.verified_by_usernames = verifiedUsernames;
+    }
+
+    // Mark as verified
+    updates.annotation_status = "verified";
 
     // Save grid coordinates if provided (freeze grid at verification time)
     if (gridCoords) {
@@ -643,22 +691,34 @@ export class WASMScreenshotService implements IScreenshotService {
       ...screenshot,
       ...updates,
       verified_by_user_ids: verifiedIds,
+      verified_by_usernames: verifiedUsernames,
     };
   }
 
   async unverify(screenshotId: number): Promise<Screenshot> {
     const screenshot = await this.getById(screenshotId);
-    let verifiedIds = screenshot.verified_by_user_ids || [];
+    const userId = useAuthStore.getState().userId ?? 1;
+    const username = useAuthStore.getState().username ?? "local";
 
-    // Use local user ID = 1 for WASM mode
-    verifiedIds = verifiedIds.filter((id) => id !== 1);
+    let verifiedIds = screenshot.verified_by_user_ids || [];
+    let verifiedUsernames = screenshot.verified_by_usernames || [];
+
+    verifiedIds = verifiedIds.filter((id) => id !== userId);
+    verifiedUsernames = verifiedUsernames.filter((u) => u !== username);
+
+    const hasVerifiers = verifiedIds.length > 0;
     await this.storageService.updateScreenshot(screenshotId, {
-      verified_by_user_ids: verifiedIds.length > 0 ? verifiedIds : null,
+      verified_by_user_ids: hasVerifiers ? verifiedIds : null,
+      verified_by_usernames: hasVerifiers ? verifiedUsernames : null,
+      // Revert to "annotated" if no verifiers remain
+      annotation_status: hasVerifiers ? "verified" : "annotated",
     });
 
     return {
       ...screenshot,
-      verified_by_user_ids: verifiedIds.length > 0 ? verifiedIds : null,
+      verified_by_user_ids: hasVerifiers ? verifiedIds : null,
+      verified_by_usernames: hasVerifiers ? verifiedUsernames : null,
+      annotation_status: hasVerifiers ? "verified" : "annotated",
     };
   }
 
