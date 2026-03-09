@@ -59,14 +59,34 @@ function applyVerificationFilter<TKey extends IndexableType>(
 
 export class IndexedDBStorageService implements IStorageService {
   private persistenceRequested = false;
+  private dbReady: Promise<void>;
+  private dbOpenFailed = false;
 
   constructor() {
-    db.open().catch((error) => {
-      console.error("Failed to open IndexedDB:", error);
-    });
+    this.dbReady = db.open().then(
+      () => {},
+      (error) => {
+        this.dbOpenFailed = true;
+        console.error("Failed to open IndexedDB:", error);
+        throw new Error(
+          `IndexedDB unavailable: ${error instanceof Error ? error.message : String(error)}. ` +
+            "Local storage mode requires IndexedDB. Check that you are not in private browsing mode.",
+        );
+      },
+    );
 
     // Request persistent storage to prevent browser from evicting data
     this.requestPersistentStorage();
+  }
+
+  /** Ensure the database is open before performing operations. */
+  private async ensureDB(): Promise<void> {
+    if (this.dbOpenFailed) {
+      throw new Error(
+        "IndexedDB is not available. Local storage mode cannot function without it.",
+      );
+    }
+    await this.dbReady;
   }
 
   /**
@@ -109,6 +129,7 @@ export class IndexedDBStorageService implements IStorageService {
   }
 
   async saveScreenshot(screenshot: Screenshot): Promise<number> {
+    await this.ensureDB();
     try {
       const id = await db.screenshots.add(screenshot);
       return id;
@@ -119,6 +140,7 @@ export class IndexedDBStorageService implements IStorageService {
   }
 
   async getScreenshot(id: number): Promise<Screenshot | null> {
+    await this.ensureDB();
     try {
       const screenshot = await db.screenshots.get(id);
       return screenshot || null;
@@ -133,6 +155,7 @@ export class IndexedDBStorageService implements IStorageService {
     group_id?: string;
     processing_status?: string;
   }): Promise<Screenshot[]> {
+    await this.ensureDB();
     try {
       // Use compound index if both annotation_status and group_id are provided
       if (filter?.annotation_status && filter?.group_id) {

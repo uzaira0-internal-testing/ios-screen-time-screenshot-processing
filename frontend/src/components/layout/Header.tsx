@@ -23,7 +23,7 @@ export const Header = () => {
   const isAnnotatePage = location.pathname === "/annotate";
 
   const navLinks = [
-    { to: "/upload", label: "Upload" },
+    ...(features.preprocessing ? [{ to: "/upload", label: "Upload" }] : []),
     ...(features.preprocessing ? [{ to: "/preprocessing", label: "Preprocessing" }] : []),
     { to: "/", label: "Annotate" },
     { to: "/consensus", label: "Consensus" },

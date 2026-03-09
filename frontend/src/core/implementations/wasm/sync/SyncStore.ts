@@ -108,7 +108,8 @@ export const useSyncStore = create<SyncState>((set, get) => {
         } else {
           set({ configLoaded: true });
         }
-      } catch {
+      } catch (error) {
+        console.error("[SyncStore] Failed to load sync config:", error);
         set({ configLoaded: true });
       }
     },
@@ -229,8 +230,8 @@ export const useSyncStore = create<SyncState>((set, get) => {
           pendingUploads: counts.pendingUploads,
           pendingDownloads: counts.pendingDownloads,
         });
-      } catch {
-        // Silently fail - counts are informational
+      } catch (error) {
+        console.warn("[SyncStore] Failed to refresh pending counts:", error);
       }
     },
 

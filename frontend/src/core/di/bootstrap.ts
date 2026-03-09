@@ -7,6 +7,8 @@ import { APIScreenshotService } from "../implementations/server/APIScreenshotSer
 import { APIAnnotationService } from "../implementations/server/APIAnnotationService";
 import { APIConsensusService } from "../implementations/server/APIConsensusService";
 import { APIStorageService } from "../implementations/server/APIStorageService";
+import { bootstrapTauriServices } from "./bootstrapTauri";
+import { bootstrapWasmServices } from "./bootstrapWasm";
 
 /**
  * Bootstrap services based on application mode.
@@ -16,16 +18,10 @@ import { APIStorageService } from "../implementations/server/APIStorageService";
  */
 export function bootstrapServices(config: AppConfig): ServiceContainer {
   if (config.mode === "tauri") {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { bootstrapTauriServices } = require("./bootstrapTauri");
     return bootstrapTauriServices(config);
   }
 
   if (config.mode === "wasm") {
-    // TODO: Convert to dynamic import() for proper code-splitting once
-    // ServiceProvider supports async initialization
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { bootstrapWasmServices } = require("./bootstrapWasm");
     return bootstrapWasmServices(config);
   }
 

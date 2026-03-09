@@ -373,7 +373,7 @@ export const SettingsPage: React.FC = () => {
             <p>
               <strong>Browser:</strong> {navigator.userAgent.split(" ").pop()}
             </p>
-            {config.apiBaseUrl && (
+            {config.hasApi && (
               <p>
                 <strong>API Endpoint:</strong> {config.apiBaseUrl}
               </p>

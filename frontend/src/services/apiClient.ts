@@ -59,9 +59,10 @@ apiClient.use({
   },
   onResponse({ response }) {
     // Handle 401 responses by clearing auth state
+    // Only in server mode — WASM/Tauri mode has no server to 401
     // Only logout if not already on login page (prevents redirect loops)
     // and if we're not checking auth status (prevents logout during initial auth check)
-    if (response.status === 401) {
+    if (response.status === 401 && !config.isLocalMode) {
       const isLoginPage = window.location.pathname.endsWith("/login");
       const isAuthStatusCheck = response.url.includes("/auth/status");
 

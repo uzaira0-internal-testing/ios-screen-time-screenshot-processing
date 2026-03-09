@@ -121,12 +121,16 @@ export const AppRouter: React.FC = () => {
           </ProtectedRoute>
         }
       />
-      {/* Upload */}
+      {/* Upload (server only — WASM mode uploads via HomePage drag-and-drop) */}
       <Route
         path="/upload"
         element={
           <ProtectedRoute>
-            <UploadPage />
+            {features.preprocessing ? (
+              <UploadPage />
+            ) : (
+              <Navigate to="/" replace />
+            )}
           </ProtectedRoute>
         }
       />
