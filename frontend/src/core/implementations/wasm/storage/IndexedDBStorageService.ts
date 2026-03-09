@@ -187,6 +187,8 @@ export class IndexedDBStorageService implements IStorageService {
 
   async deleteScreenshot(id: number): Promise<void> {
     try {
+      // Delete IndexedDB records atomically, then clean up OPFS blob separately
+      // (OPFS is outside IndexedDB transaction scope)
       await db.transaction(
         "rw",
         db.screenshots,
@@ -194,12 +196,13 @@ export class IndexedDBStorageService implements IStorageService {
         db.imageBlobs,
         async () => {
           await db.screenshots.delete(id);
-
           await db.annotations.where("screenshot_id").equals(id).delete();
-
-          await deleteImageBlob(id);
+          // Delete IndexedDB fallback blob (if any) inside transaction
+          await db.imageBlobs.delete(id);
         },
       );
+      // Delete OPFS blob outside transaction — best-effort cleanup
+      await deleteImageBlob(id);
     } catch (error) {
       console.error("Failed to delete screenshot:", error);
       throw error;

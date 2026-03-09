@@ -2,6 +2,7 @@ import type { Annotation, AnnotationCreate } from "@/types";
 import type { IAnnotationService } from "@/core/interfaces";
 import type { IStorageService } from "@/core/interfaces";
 import { db } from "./storage/database";
+import { useAuthStore } from "@/store/authStore";
 
 export class WASMAnnotationService implements IAnnotationService {
   private storageService: IStorageService;
@@ -15,7 +16,7 @@ export class WASMAnnotationService implements IAnnotationService {
     const annotation: Annotation = {
       id: Date.now(),
       screenshot_id: data.screenshot_id,
-      user_id: 1,
+      user_id: useAuthStore.getState().userId ?? 1,
       grid_upper_left: data.grid_upper_left ?? null,
       grid_lower_right: data.grid_lower_right ?? null,
       hourly_values: data.hourly_values,

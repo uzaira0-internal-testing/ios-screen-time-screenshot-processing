@@ -14,7 +14,13 @@ export class WASMConsensusService implements IConsensusService {
       await this.storageService.getAnnotationsByScreenshot(screenshotId);
 
     if (annotations.length === 0) {
-      throw new Error("No annotations found for screenshot");
+      return {
+        screenshot_id: screenshotId,
+        total_annotations: 0,
+        consensus_data: {},
+        disagreements: [],
+        agreement_percentage: 100,
+      };
     }
 
     const consensusData: HourlyData = {};
