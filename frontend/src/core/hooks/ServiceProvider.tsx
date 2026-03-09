@@ -40,12 +40,17 @@ function getOrCreateContainer(config: AppConfig): Promise<ServiceContainer> {
       config.mode,
     );
   }
-  bootstrapPromise = bootstrapServices(config).then((container) => {
-    globalContainer = container;
-    globalConfig = config;
-    bootstrapPromise = null;
-    return container;
-  });
+  bootstrapPromise = bootstrapServices(config)
+    .then((container) => {
+      globalContainer = container;
+      globalConfig = config;
+      bootstrapPromise = null;
+      return container;
+    })
+    .catch((err) => {
+      bootstrapPromise = null; // Allow retry on next mount
+      throw err;
+    });
   return bootstrapPromise;
 }
 
@@ -63,6 +68,7 @@ export const ServiceProvider: React.FC<ServiceProviderProps> = ({
   const [container, setContainer] = useState<ServiceContainer | null>(
     globalContainer,
   );
+  const [error, setError] = useState<string | null>(null);
 
   // Track mount count for debugging
   const mountCountRef = useRef(0);
@@ -75,7 +81,16 @@ export const ServiceProvider: React.FC<ServiceProviderProps> = ({
 
     // Bootstrap services (async for WASM/Tauri code-splitting)
     if (!container) {
-      getOrCreateContainer(effectiveConfig).then(setContainer);
+      getOrCreateContainer(effectiveConfig)
+        .then(setContainer)
+        .catch((err) => {
+          console.error("[ServiceProvider] Bootstrap failed:", err);
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Failed to initialize application services",
+          );
+        });
     }
 
     return () => {
@@ -88,6 +103,24 @@ export const ServiceProvider: React.FC<ServiceProviderProps> = ({
       }
     };
   }, []);
+
+  if (error) {
+    return (
+      <div role="alert" className="flex items-center justify-center min-h-screen p-8">
+        <div className="max-w-md text-center space-y-4">
+          <h1 className="text-xl font-semibold text-red-600">Application failed to start</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400">{error}</p>
+          <button
+            type="button"
+            className="px-4 py-2 text-sm bg-slate-100 dark:bg-slate-700 rounded-md hover:bg-slate-200 dark:hover:bg-slate-600"
+            onClick={() => window.location.reload()}
+          >
+            Reload
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Show nothing until services are ready (typically <1ms for server mode,
   // slightly longer for WASM due to dynamic import)
