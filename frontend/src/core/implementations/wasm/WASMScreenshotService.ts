@@ -80,7 +80,11 @@ export class WASMScreenshotService implements IScreenshotService {
     return screenshots.slice(skip, skip + limit);
   }
 
-  async upload(file: File, imageType: ImageType): Promise<Screenshot> {
+  async upload(
+    file: File,
+    imageType: ImageType,
+    options?: { groupId?: string },
+  ): Promise<Screenshot> {
     // File extends Blob — no need to copy
     const uploadedAt = new Date().toISOString();
 
@@ -123,7 +127,7 @@ export class WASMScreenshotService implements IScreenshotService {
       alignment_score: null,
       // API upload metadata
       participant_id: null,
-      group_id: null,
+      group_id: options?.groupId ?? null,
       source_id: null,
       device_type: null,
       verified_by_user_ids: null,

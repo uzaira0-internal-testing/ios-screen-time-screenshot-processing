@@ -24,7 +24,11 @@ export interface IScreenshotService {
 
   getAll(status?: string, skip?: number, limit?: number): Promise<Screenshot[]>;
 
-  upload(file: File, imageType: ImageType): Promise<Screenshot>;
+  upload(
+    file: File,
+    imageType: ImageType,
+    options?: { groupId?: string },
+  ): Promise<Screenshot>;
 
   /**
    * Get URL for displaying a screenshot image.

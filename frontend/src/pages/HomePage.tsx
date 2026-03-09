@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router";
 import { Layout } from "@/components/layout/Layout";
 import { useAuth } from "@/hooks/useAuth";
@@ -7,7 +7,7 @@ import {
   useConsensusService,
   useFeatures,
 } from "@/core/hooks/useServices";
-import type { Group } from "@/types";
+import type { Group, ImageType } from "@/types";
 import type { GroupVerificationSummary, VerificationTier } from "@/core/interfaces";
 import toast from "react-hot-toast";
 import { config } from "@/config";
@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Card } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Download, Trash2, FolderOpen } from "lucide-react";
+import { Download, Trash2, ImagePlus } from "lucide-react";
 
 // Map group ID to verification tier data
 type VerificationTiersMap = Record<string, GroupVerificationSummary>;
@@ -36,6 +36,71 @@ export const HomePage = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<Group | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+  const [imageType, setImageType] = useState<ImageType>("screen_time");
+  const [groupName, setGroupName] = useState("");
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLoadFiles = useCallback(
+    async (files: FileList | File[]) => {
+      const imageFiles = Array.from(files).filter((f) =>
+        f.type.startsWith("image/"),
+      );
+      if (imageFiles.length === 0) {
+        toast.error("No image files selected");
+        return;
+      }
+      const groupId = groupName.trim() || undefined;
+
+      setIsLoadingFiles(true);
+      let loaded = 0;
+      let failed = 0;
+
+      for (const file of imageFiles) {
+        try {
+          await screenshotService.upload(file, imageType, { groupId });
+          loaded++;
+        } catch (error) {
+          failed++;
+          const msg = error instanceof Error ? error.message : String(error);
+          if (!msg.includes("Duplicate")) {
+            console.error(`Failed to load ${file.name}:`, error);
+          }
+        }
+      }
+
+      setIsLoadingFiles(false);
+
+      if (loaded > 0) {
+        toast.success(`Loaded ${loaded} screenshot${loaded > 1 ? "s" : ""}`);
+        loadGroups(false);
+      }
+      if (failed > 0) {
+        toast.error(`${failed} file${failed > 1 ? "s" : ""} failed (duplicates or errors)`);
+      }
+    },
+    [screenshotService, imageType, groupName],
+  );
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragOver(false);
+      handleLoadFiles(e.dataTransfer.files);
+    },
+    [handleLoadFiles],
+  );
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  }, []);
 
   const loadGroups = async (showLoading = false) => {
     try {
@@ -170,6 +235,29 @@ export const HomePage = () => {
               Study Groups
             </h2>
             <div className="flex items-center gap-3">
+              {isAuthenticated && (
+                <>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files) handleLoadFiles(e.target.files);
+                      e.target.value = "";
+                    }}
+                  />
+                  <Button
+                    variant="primary"
+                    onClick={() => fileInputRef.current?.click()}
+                    loading={isLoadingFiles}
+                    icon={<ImagePlus className="h-4 w-4" />}
+                  >
+                    {isLoadingFiles ? "Loading..." : config.isLocalMode ? "Load Screenshots" : "Add Screenshots"}
+                  </Button>
+                </>
+              )}
               {isAuthenticated && groups.length > 0 && (
                 <Button
                   variant="secondary"
@@ -213,18 +301,48 @@ export const HomePage = () => {
             </div>
           ) : groups.length === 0 ? (
             <div
-              className="text-center py-12 bg-slate-50 dark:bg-slate-800/50 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600"
+              className={`text-center py-12 rounded-lg border-2 border-dashed transition-colors ${
+                isDragOver
+                  ? "border-primary-500 bg-primary-50 dark:bg-primary-900/20"
+                  : "border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/50"
+              }`}
               data-testid="empty-groups-state"
+              onDrop={isAuthenticated ? handleDrop : undefined}
+              onDragOver={isAuthenticated ? handleDragOver : undefined}
+              onDragLeave={isAuthenticated ? handleDragLeave : undefined}
             >
-              <FolderOpen className="h-12 w-12 text-slate-400 dark:text-slate-500 mx-auto mb-4" />
+              <ImagePlus className="h-12 w-12 text-slate-400 dark:text-slate-500 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
                 No Groups Yet
               </h3>
-              <p className="text-slate-600 dark:text-slate-400 max-w-md mx-auto">
-                {features.groups
-                  ? "Groups are automatically created when screenshots are uploaded via the API."
-                  : "Upload screenshots to get started. Screenshots will be grouped automatically."}
-              </p>
+              {isAuthenticated ? (
+                <div className="max-w-sm mx-auto space-y-3">
+                  <p className="text-slate-600 dark:text-slate-400 text-sm">
+                    Drag and drop screenshots here, or use the button above.
+                  </p>
+                  <div className="flex items-center gap-2 justify-center">
+                    <input
+                      type="text"
+                      value={groupName}
+                      onChange={(e) => setGroupName(e.target.value)}
+                      placeholder="Group name (optional)"
+                      className="text-sm border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 w-44"
+                    />
+                    <select
+                      value={imageType}
+                      onChange={(e) => setImageType(e.target.value as ImageType)}
+                      className="text-sm border border-slate-300 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                    >
+                      <option value="screen_time">Screen Time</option>
+                      <option value="battery">Battery</option>
+                    </select>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-slate-600 dark:text-slate-400">
+                  Log in to load screenshots and start annotating.
+                </p>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

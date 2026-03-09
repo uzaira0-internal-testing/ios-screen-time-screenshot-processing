@@ -47,9 +47,28 @@ export class APIScreenshotService implements IScreenshotService {
     return result?.items ?? [];
   }
 
-  async upload(_file: File, _imageType: ImageType): Promise<Screenshot> {
-    // Upload is handled via API key, not through frontend
-    throw new Error("Upload not supported in server mode frontend");
+  async upload(
+    file: File,
+    imageType: ImageType,
+    options?: { groupId?: string },
+  ): Promise<Screenshot> {
+    const groupId = options?.groupId || "default";
+    const metadata = JSON.stringify({
+      group_id: groupId,
+      image_type: imageType,
+      items: [{ original_filepath: file.name }],
+    });
+
+    const formData = new FormData();
+    formData.append("metadata", metadata);
+    formData.append("files", file);
+
+    const result = await api.preprocessing.uploadBrowser(formData);
+    const item = result?.results?.[0];
+    if (!item?.screenshot_id) {
+      throw new Error("Upload failed: no screenshot ID returned");
+    }
+    return this.getById(item.screenshot_id);
   }
 
   async getImageUrl(screenshotId: number): Promise<string> {
