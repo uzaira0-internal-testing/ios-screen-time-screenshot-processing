@@ -1,5 +1,6 @@
 import type {
   Screenshot,
+  Group,
   GridCoordinates,
   ProcessingResult,
   QueueStats,
@@ -752,4 +753,112 @@ export class WASMScreenshotService implements IScreenshotService {
     return null;
   }
 
+  async getGroups(): Promise<Group[]> {
+    const allScreenshots = await db.screenshots.toArray();
+
+    // Aggregate screenshots by group_id
+    const groupMap = new Map<
+      string,
+      {
+        count: number;
+        image_type: string;
+        created_at: string;
+        processing_pending: number;
+        processing_completed: number;
+        processing_failed: number;
+        processing_skipped: number;
+        processing_deleted: number;
+      }
+    >();
+
+    for (const s of allScreenshots) {
+      const gid = s.group_id || "ungrouped";
+      const existing = groupMap.get(gid) || {
+        count: 0,
+        image_type: s.image_type || "screen_time",
+        created_at: s.uploaded_at || new Date().toISOString(),
+        processing_pending: 0,
+        processing_completed: 0,
+        processing_failed: 0,
+        processing_skipped: 0,
+        processing_deleted: 0,
+      };
+
+      existing.count++;
+      const ps = s.processing_status || "pending";
+      if (ps === "pending" || ps === "processing")
+        existing.processing_pending++;
+      else if (ps === "completed") existing.processing_completed++;
+      else if (ps === "failed") existing.processing_failed++;
+      else if (ps === "skipped") existing.processing_skipped++;
+      else if (ps === "deleted") existing.processing_deleted++;
+
+      // Track earliest created_at
+      if (s.uploaded_at && s.uploaded_at < existing.created_at) {
+        existing.created_at = s.uploaded_at;
+      }
+
+      groupMap.set(gid, existing);
+    }
+
+    return Array.from(groupMap.entries()).map(([id, data]) => ({
+      id,
+      name: id === "ungrouped" ? "Ungrouped" : id,
+      image_type: data.image_type as "battery" | "screen_time",
+      created_at: data.created_at,
+      screenshot_count: data.count,
+      processing_pending: data.processing_pending,
+      processing_completed: data.processing_completed,
+      processing_failed: data.processing_failed,
+      processing_skipped: data.processing_skipped,
+      processing_deleted: data.processing_deleted,
+    }));
+  }
+
+  async exportCSV(): Promise<string> {
+    const allScreenshots = await db.screenshots.toArray();
+    const allAnnotations = await db.annotations.toArray();
+
+    // O(1) lookup by screenshot ID
+    const screenshotMap = new Map(allScreenshots.map((s) => [s.id, s]));
+
+    // Build CSV: screenshot_id, group, participant, title, total, hour_0..hour_23
+    const headers = [
+      "screenshot_id",
+      "group_id",
+      "participant_id",
+      "extracted_title",
+      "extracted_total",
+      ...Array.from({ length: 24 }, (_, i) => `hour_${i}`),
+    ];
+
+    const rows = allAnnotations.map((ann) => {
+      const screenshot = screenshotMap.get(ann.screenshot_id);
+      const hourlyValues = ann.hourly_values || {};
+      return [
+        ann.screenshot_id,
+        screenshot?.group_id || "",
+        screenshot?.participant_id || "",
+        screenshot?.extracted_title || "",
+        screenshot?.extracted_total || "",
+        ...Array.from({ length: 24 }, (_, i) => hourlyValues[i] ?? ""),
+      ];
+    });
+
+    const csvLines = [
+      headers.join(","),
+      ...rows.map((r) =>
+        r
+          .map((v) => {
+            const s = String(v);
+            return s.includes(",") || s.includes('"')
+              ? `"${s.replace(/"/g, '""')}"`
+              : s;
+          })
+          .join(","),
+      ),
+    ];
+
+    return csvLines.join("\n");
+  }
 }

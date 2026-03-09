@@ -2,7 +2,7 @@ import React, {
   createContext,
   useRef,
   useEffect,
-  ReactNode,
+  type ReactNode,
   useState,
 } from "react";
 import { ServiceContainer, bootstrapServices } from "../di";
@@ -65,34 +65,17 @@ export const ServiceProvider: React.FC<ServiceProviderProps> = ({
       console.log("[ServiceProvider] Mounted, count:", mountCountRef.current);
     }
 
-    // Only destroy on actual unmount (not StrictMode remount)
-    // In production, cleanup is important. In dev with StrictMode, we skip cleanup
-    // to avoid the double-mount issue destroying services
+    // Module-level singleton should live for the entire page lifetime.
+    // Never destroy on React unmount — StrictMode double-mounts would
+    // clear services between unmount and re-mount, causing "Service not
+    // registered" errors for any component that renders in between.
     return () => {
       if (runtimeConfig.isDev) {
         console.log(
           "[ServiceProvider] Cleanup called, mount count:",
           mountCountRef.current,
+          "— keeping services alive (module singleton)",
         );
-      }
-      // In development, don't destroy services on unmount because StrictMode
-      // will immediately remount and the services would be gone
-      // In production (no StrictMode), this cleanup is fine
-      if (runtimeConfig.isProd) {
-        if (runtimeConfig.isDev) {
-          console.log("[ServiceProvider] Production mode - destroying services");
-        }
-        if (globalContainer) {
-          globalContainer.destroy();
-          globalContainer = null;
-          globalConfig = null;
-        }
-      } else {
-        if (runtimeConfig.isDev) {
-          console.log(
-            "[ServiceProvider] Dev mode - keeping services for StrictMode compatibility",
-          );
-        }
       }
     };
   }, []);

@@ -1,6 +1,11 @@
 import { api } from "@/services/apiClient";
 import type { Consensus } from "@/types";
-import type { IConsensusService } from "../../interfaces";
+import type {
+  IConsensusService,
+  GroupVerificationSummary,
+  ScreenshotTierItem,
+  VerificationTier,
+} from "../../interfaces";
 
 /**
  * Server-side consensus service using openapi-fetch apiClient.
@@ -13,8 +18,17 @@ export class APIConsensusService implements IConsensusService {
 
   async getForScreenshot(screenshotId: number): Promise<Consensus> {
     const result = await api.consensus.getForScreenshot(screenshotId);
-    // The API response shape may differ from the Consensus interface
-    // Transform as needed
     return result as unknown as Consensus;
+  }
+
+  async getGroupsWithTiers(): Promise<GroupVerificationSummary[]> {
+    return api.consensus.getGroupsWithTiers();
+  }
+
+  async getScreenshotsByTier(
+    groupId: string,
+    tier: VerificationTier,
+  ): Promise<ScreenshotTierItem[]> {
+    return api.consensus.getScreenshotsByTier(groupId, tier);
   }
 }

@@ -2,6 +2,7 @@ import { api } from "@/services/apiClient";
 import { config } from "@/config";
 import type {
   Screenshot,
+  Group,
   GridCoordinates,
   ProcessingResult,
   QueueStats,
@@ -142,5 +143,22 @@ export class APIScreenshotService implements IScreenshotService {
   async recalculateOcr(screenshotId: number): Promise<string | null> {
     const result = await api.screenshots.recalculateOcr(screenshotId);
     return (result as any)?.extracted_total ?? null;
+  }
+
+  async getGroups(): Promise<Group[]> {
+    const groups = await api.groups.list();
+    return (groups ?? []) as Group[];
+  }
+
+  async exportCSV(): Promise<string> {
+    const csvUrl = api.export.getCSVUrl();
+    const response = await fetch(csvUrl, {
+      headers: {
+        "X-Username": localStorage.getItem("username") || "",
+        "X-Site-Password": localStorage.getItem("sitePassword") || "",
+      },
+    });
+    if (!response.ok) throw new Error("Export failed");
+    return response.text();
   }
 }

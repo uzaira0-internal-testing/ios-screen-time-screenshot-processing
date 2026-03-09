@@ -2,7 +2,8 @@
  * Application Router
  *
  * Multi-user collaborative routes with authentication.
- * Some routes (e.g., Preprocessing) are server-mode only.
+ * Feature availability is determined by the DI container's AppFeatures,
+ * not by direct mode checks.
  */
 
 import React from "react";
@@ -12,23 +13,28 @@ import { Routes, Route, Navigate } from "react-router";
 import { HomePage } from "@/pages/HomePage";
 import { LoginPage } from "@/pages/LoginPage";
 import { AnnotationPage } from "@/pages/AnnotationPage";
-import { AdminPage } from "@/pages/AdminPage";
 import { ConsensusPage } from "@/pages/ConsensusPage";
-import { ConsensusComparisonPage } from "@/pages/ConsensusComparisonPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { UploadPage } from "@/pages/UploadPage";
 
-// Lazy-load PreprocessingPage since it's server-only
+// Lazy-load server-only pages
+const AdminPage = React.lazy(() =>
+  import("@/pages/AdminPage").then((m) => ({ default: m.AdminPage })),
+);
+const ConsensusComparisonPage = React.lazy(() =>
+  import("@/pages/ConsensusComparisonPage").then((m) => ({
+    default: m.ConsensusComparisonPage,
+  })),
+);
 const PreprocessingPage = React.lazy(() =>
-  import("@/pages/PreprocessingPage").then((m) => ({ default: m.PreprocessingPage })),
+  import("@/pages/PreprocessingPage").then((m) => ({
+    default: m.PreprocessingPage,
+  })),
 );
 
 // Auth guard
 import { useAuthStore } from "@/store/authStore";
-import { detectMode } from "@/core/config/config";
-
-// Mode is determined once at startup and never changes
-const isServerMode = detectMode() === "server";
+import { useFeatures } from "@/core/hooks/useServices";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -55,7 +61,15 @@ const LoginRoute: React.FC = () => {
   return <LoginPage />;
 };
 
+const ServerOnlyFallback = (
+  <div className="flex items-center justify-center h-96">
+    <span className="inline-block w-6 h-6 border-2 border-slate-300 border-t-primary-600 rounded-full animate-spin" />
+  </div>
+);
+
 export const AppRouter: React.FC = () => {
+  const features = useFeatures();
+
   return (
     <Routes>
       <Route
@@ -83,7 +97,7 @@ export const AppRouter: React.FC = () => {
           </ProtectedRoute>
         }
       />
-      {/* Consensus / Cross-Rater Comparison */}
+      {/* Consensus — basic tier view works in all modes */}
       <Route
         path="/consensus"
         element={
@@ -92,11 +106,18 @@ export const AppRouter: React.FC = () => {
           </ProtectedRoute>
         }
       />
+      {/* Cross-rater comparison — server only (requires multiple real users) */}
       <Route
         path="/consensus/compare/:screenshotId"
         element={
           <ProtectedRoute>
-            <ConsensusComparisonPage />
+            {features.consensusComparison ? (
+              <React.Suspense fallback={ServerOnlyFallback}>
+                <ConsensusComparisonPage />
+              </React.Suspense>
+            ) : (
+              <Navigate to="/consensus" replace />
+            )}
           </ProtectedRoute>
         }
       />
@@ -109,19 +130,13 @@ export const AppRouter: React.FC = () => {
           </ProtectedRoute>
         }
       />
-      {/* Preprocessing Pipeline (server mode only) */}
+      {/* Preprocessing Pipeline (server only) */}
       <Route
         path="/preprocessing"
         element={
           <ProtectedRoute>
-            {isServerMode ? (
-              <React.Suspense
-                fallback={
-                  <div className="flex items-center justify-center h-96">
-                    <span className="inline-block w-6 h-6 border-2 border-slate-300 border-t-primary-600 rounded-full animate-spin" />
-                  </div>
-                }
-              >
+            {features.preprocessing ? (
+              <React.Suspense fallback={ServerOnlyFallback}>
                 <PreprocessingPage />
               </React.Suspense>
             ) : (
@@ -130,14 +145,21 @@ export const AppRouter: React.FC = () => {
           </ProtectedRoute>
         }
       />
-      {/* Legacy routes - redirect to home */}
+      {/* Legacy routes */}
       <Route path="/history" element={<Navigate to="/" replace />} />
       <Route path="/disputed" element={<Navigate to="/consensus" replace />} />
+      {/* Admin (server only) */}
       <Route
         path="/admin"
         element={
           <ProtectedRoute>
-            <AdminPage />
+            {features.admin ? (
+              <React.Suspense fallback={ServerOnlyFallback}>
+                <AdminPage />
+              </React.Suspense>
+            ) : (
+              <Navigate to="/" replace />
+            )}
           </ProtectedRoute>
         }
       />

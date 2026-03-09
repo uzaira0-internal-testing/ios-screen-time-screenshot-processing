@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { PROCESSING_STATUS_LABELS, type ProcessingStatus } from "@/constants/processingStatus";
 import { Menu, X, LogOut } from "lucide-react";
 import { useThemeStore, THEME_OPTIONS, THEME_CYCLE } from "@/store/themeStore";
+import { useFeatures } from "@/core/hooks/useServices";
 
 export const Header = () => {
   const { username, isAuthenticated, isAdmin, logout } = useAuth();
@@ -11,6 +12,7 @@ export const Header = () => {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { mode: themeMode, setMode: setThemeMode } = useThemeStore();
+  const features = useFeatures();
 
   const ThemeIcon = THEME_OPTIONS.find((o) => o.value === themeMode)!.icon;
 
@@ -22,10 +24,10 @@ export const Header = () => {
 
   const navLinks = [
     { to: "/upload", label: "Upload" },
-    { to: "/preprocessing", label: "Preprocessing" },
+    ...(features.preprocessing ? [{ to: "/preprocessing", label: "Preprocessing" }] : []),
     { to: "/", label: "Annotate" },
     { to: "/consensus", label: "Consensus" },
-    ...(isAdmin ? [{ to: "/admin", label: "Admin" }] : []),
+    ...(features.admin && isAdmin ? [{ to: "/admin", label: "Admin" }] : []),
   ];
 
   return (

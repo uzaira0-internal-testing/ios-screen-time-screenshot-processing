@@ -1,5 +1,5 @@
 import { ServiceContainer } from "./Container";
-import { TOKENS } from "./tokens";
+import { TOKENS, type AppFeatures } from "./tokens";
 import type { AppConfig } from "../config";
 import { config as runtimeConfig } from "@/config";
 
@@ -62,6 +62,15 @@ function bootstrapServerServices(config: AppConfig): ServiceContainer {
     TOKENS.STORAGE_SERVICE,
     () => new APIStorageService(),
   );
+
+  // Server mode has all server-dependent features
+  const features: AppFeatures = {
+    groups: true,
+    consensusComparison: true,
+    admin: true,
+    preprocessing: true,
+  };
+  container.register(TOKENS.FEATURES, features);
 
   if (runtimeConfig.isDev) {
     console.log(

@@ -1,28 +1,40 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { Layout } from "@/components/layout/Layout";
-import { api, GroupVerificationSummary, ScreenshotTierItem } from "@/services/apiClient";
+import {
+  useConsensusService,
+  useFeatures,
+} from "@/core/hooks/useServices";
+import type {
+  GroupVerificationSummary,
+  ScreenshotTierItem,
+  VerificationTier,
+} from "@/core/interfaces";
 import toast from "react-hot-toast";
 
-type VerificationTier = "single_verified" | "agreed" | "disputed";
-
-const TIER_CONFIG: Record<VerificationTier, { label: string; color: string; bgColor: string; description: string }> = {
+const TIER_CONFIG: Record<
+  VerificationTier,
+  { label: string; color: string; bgColor: string; description: string }
+> = {
   single_verified: {
     label: "Once",
     color: "text-yellow-700 dark:text-yellow-400",
-    bgColor: "bg-yellow-50 hover:bg-yellow-100 dark:bg-yellow-900/20 dark:hover:bg-yellow-800/30",
+    bgColor:
+      "bg-yellow-50 hover:bg-yellow-100 dark:bg-yellow-900/20 dark:hover:bg-yellow-800/30",
     description: "Verified by 1 user",
   },
   agreed: {
     label: "Multiple",
     color: "text-green-700 dark:text-green-400",
-    bgColor: "bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-800/30",
+    bgColor:
+      "bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-800/30",
     description: "2+ users, all match",
   },
   disputed: {
     label: "Disputed",
     color: "text-red-700 dark:text-red-400",
-    bgColor: "bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-800/30",
+    bgColor:
+      "bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-800/30",
     description: "2+ users, differences found",
   },
 };
@@ -30,11 +42,18 @@ const TIER_CONFIG: Record<VerificationTier, { label: string; color: string; bgCo
 export const ConsensusPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const consensusService = useConsensusService();
+  const features = useFeatures();
+
   const [groups, setGroups] = useState<GroupVerificationSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
-  const [selectedTier, setSelectedTier] = useState<VerificationTier | null>(null);
-  const [tierScreenshots, setTierScreenshots] = useState<ScreenshotTierItem[]>([]);
+  const [selectedTier, setSelectedTier] = useState<VerificationTier | null>(
+    null,
+  );
+  const [tierScreenshots, setTierScreenshots] = useState<ScreenshotTierItem[]>(
+    [],
+  );
   const [loadingScreenshots, setLoadingScreenshots] = useState(false);
 
   // Load groups on mount
@@ -64,7 +83,7 @@ export const ConsensusPage = () => {
   const loadGroups = async () => {
     try {
       setLoading(true);
-      const data = await api.consensus.getGroupsWithTiers();
+      const data = await consensusService.getGroupsWithTiers();
       setGroups(data);
     } catch (error) {
       console.error("Failed to load groups:", error);
@@ -74,10 +93,13 @@ export const ConsensusPage = () => {
     }
   };
 
-  const loadTierScreenshots = async (groupId: string, tier: VerificationTier) => {
+  const loadTierScreenshots = async (
+    groupId: string,
+    tier: VerificationTier,
+  ) => {
     try {
       setLoadingScreenshots(true);
-      const data = await api.consensus.getScreenshotsByTier(groupId, tier);
+      const data = await consensusService.getScreenshotsByTier(groupId, tier);
       setTierScreenshots(data);
     } catch (error) {
       console.error("Failed to load screenshots:", error);
@@ -87,7 +109,11 @@ export const ConsensusPage = () => {
     }
   };
 
-  const handleTierClick = (groupId: string, tier: VerificationTier, count: number) => {
+  const handleTierClick = (
+    groupId: string,
+    tier: VerificationTier,
+    count: number,
+  ) => {
     if (count === 0) return;
 
     // Update URL for deep linking
@@ -101,7 +127,12 @@ export const ConsensusPage = () => {
   };
 
   const handleScreenshotClick = (screenshotId: number) => {
-    navigate(`/consensus/compare/${screenshotId}`);
+    // Cross-rater comparison is server-only; in local mode, navigate to annotate
+    if (features.consensusComparison) {
+      navigate(`/consensus/compare/${screenshotId}`);
+    } else {
+      navigate(`/annotate/${screenshotId}`);
+    }
   };
 
   const handleBackToGroups = () => {
@@ -120,7 +151,7 @@ export const ConsensusPage = () => {
       verified: acc.verified + g.total_verified,
       total: acc.total + g.total_screenshots,
     }),
-    { single: 0, agreed: 0, disputed: 0, verified: 0, total: 0 }
+    { single: 0, agreed: 0, disputed: 0, verified: 0, total: 0 },
   );
 
   return (
@@ -129,9 +160,15 @@ export const ConsensusPage = () => {
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Cross-Rater Consensus</h1>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+              {features.consensusComparison
+                ? "Cross-Rater Consensus"
+                : "Verification Status"}
+            </h1>
             <p className="text-slate-600 dark:text-slate-400 mt-1">
-              Compare verified screenshots across different annotators
+              {features.consensusComparison
+                ? "Compare verified screenshots across different annotators"
+                : "Track annotation and verification progress"}
             </p>
           </div>
           {selectedGroup && selectedTier && (
@@ -139,8 +176,18 @@ export const ConsensusPage = () => {
               onClick={handleBackToGroups}
               className="px-4 py-2 text-slate-600 hover:text-slate-800 flex items-center gap-2"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
               </svg>
               Back to Groups
             </button>
@@ -151,24 +198,44 @@ export const ConsensusPage = () => {
         {!selectedGroup && (
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totals.total}</div>
-              <div className="text-sm text-slate-500 dark:text-slate-400">Total Screenshots</div>
+              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                {totals.total}
+              </div>
+              <div className="text-sm text-slate-500 dark:text-slate-400">
+                Total Screenshots
+              </div>
             </div>
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-primary-600">{totals.verified}</div>
-              <div className="text-sm text-slate-500 dark:text-slate-400">Verified</div>
+              <div className="text-2xl font-bold text-primary-600">
+                {totals.verified}
+              </div>
+              <div className="text-sm text-slate-500 dark:text-slate-400">
+                Verified
+              </div>
             </div>
             <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-yellow-700 dark:text-yellow-400">{totals.single}</div>
-              <div className="text-sm text-slate-500 dark:text-slate-400">Verified Once</div>
+              <div className="text-2xl font-bold text-yellow-700 dark:text-yellow-400">
+                {totals.single}
+              </div>
+              <div className="text-sm text-slate-500 dark:text-slate-400">
+                Verified Once
+              </div>
             </div>
             <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-green-700 dark:text-green-400">{totals.agreed}</div>
-              <div className="text-sm text-slate-500 dark:text-slate-400">Verified Multiple</div>
+              <div className="text-2xl font-bold text-green-700 dark:text-green-400">
+                {totals.agreed}
+              </div>
+              <div className="text-sm text-slate-500 dark:text-slate-400">
+                Verified Multiple
+              </div>
             </div>
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-red-700 dark:text-red-400">{totals.disputed}</div>
-              <div className="text-sm text-slate-500 dark:text-slate-400">Disputed</div>
+              <div className="text-2xl font-bold text-red-700 dark:text-red-400">
+                {totals.disputed}
+              </div>
+              <div className="text-sm text-slate-500 dark:text-slate-400">
+                Disputed
+              </div>
             </div>
           </div>
         )}
@@ -176,7 +243,9 @@ export const ConsensusPage = () => {
         {loading ? (
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
-            <p className="text-slate-500 dark:text-slate-400 mt-2">Loading verification data...</p>
+            <p className="text-slate-500 dark:text-slate-400 mt-2">
+              Loading verification data...
+            </p>
           </div>
         ) : selectedGroup && selectedTier ? (
           /* Screenshot List View */
@@ -184,13 +253,19 @@ export const ConsensusPage = () => {
             <div className="p-4 border-b border-slate-200 dark:border-slate-700">
               <div className="flex items-center gap-3">
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                  {groups.find(g => g.id === selectedGroup)?.name || selectedGroup}
+                  {groups.find((g) => g.id === selectedGroup)?.name ||
+                    selectedGroup}
                 </h2>
-                <span className={`px-3 py-1 rounded-full text-sm font-medium ${TIER_CONFIG[selectedTier].bgColor} ${TIER_CONFIG[selectedTier].color}`}>
-                  {TIER_CONFIG[selectedTier].label} ({tierScreenshots.length})
+                <span
+                  className={`px-3 py-1 rounded-full text-sm font-medium ${TIER_CONFIG[selectedTier].bgColor} ${TIER_CONFIG[selectedTier].color}`}
+                >
+                  {TIER_CONFIG[selectedTier].label} (
+                  {tierScreenshots.length})
                 </span>
               </div>
-              <p className="text-sm text-slate-500 mt-1">{TIER_CONFIG[selectedTier].description}</p>
+              <p className="text-sm text-slate-500 mt-1">
+                {TIER_CONFIG[selectedTier].description}
+              </p>
             </div>
 
             {loadingScreenshots ? (
@@ -209,7 +284,10 @@ export const ConsensusPage = () => {
                     onClick={() => handleScreenshotClick(screenshot.id)}
                     role="button"
                     tabIndex={0}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleScreenshotClick(screenshot.id); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ")
+                        handleScreenshotClick(screenshot.id);
+                    }}
                     className="p-4 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer flex items-center justify-between focus-ring"
                   >
                     <div className="flex-1">
@@ -224,7 +302,9 @@ export const ConsensusPage = () => {
                         )}
                         {screenshot.screenshot_date && (
                           <span className="text-sm text-slate-500">
-                            {new Date(screenshot.screenshot_date).toLocaleDateString()}
+                            {new Date(
+                              screenshot.screenshot_date,
+                            ).toLocaleDateString()}
                           </span>
                         )}
                       </div>
@@ -236,15 +316,26 @@ export const ConsensusPage = () => {
                     </div>
                     <div className="flex items-center gap-4">
                       <span className="text-sm text-slate-500">
-                        {screenshot.verifier_count} verifier{screenshot.verifier_count !== 1 ? "s" : ""}
+                        {screenshot.verifier_count} verifier
+                        {screenshot.verifier_count !== 1 ? "s" : ""}
                       </span>
                       {screenshot.has_differences && (
                         <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full">
                           Has Differences
                         </span>
                       )}
-                      <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      <svg
+                        className="w-5 h-5 text-slate-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5l7 7-7 7"
+                        />
                       </svg>
                     </div>
                   </div>
@@ -256,10 +347,13 @@ export const ConsensusPage = () => {
           /* Empty State */
           <div className="text-center py-12 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
             <div className="text-4xl mb-4">-</div>
-            <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">No Verified Screenshots</h3>
+            <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
+              No Verified Screenshots
+            </h3>
             <p className="text-slate-600 dark:text-slate-400 max-w-md mx-auto">
-              Screenshots will appear here once they have been verified by at least one annotator.
-              Go to the Annotate tab to start verifying screenshots.
+              Screenshots will appear here once they have been verified by
+              at least one annotator. Go to the Annotate tab to start
+              verifying screenshots.
             </p>
           </div>
         ) : (
@@ -283,14 +377,18 @@ export const ConsensusPage = () => {
                           : "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400"
                       }`}
                     >
-                      {group.image_type === "battery" ? "Battery" : "Screen Time"}
+                      {group.image_type === "battery"
+                        ? "Battery"
+                        : "Screen Time"}
                     </span>
                   </div>
                 </div>
 
                 {/* Total Verified */}
                 <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-100 dark:border-slate-700">
-                  <span className="text-sm text-slate-600 dark:text-slate-400">Verified Screenshots</span>
+                  <span className="text-sm text-slate-600 dark:text-slate-400">
+                    Verified Screenshots
+                  </span>
                   <span className="text-lg font-bold text-primary-600">
                     {group.total_verified} / {group.total_screenshots}
                   </span>
@@ -298,24 +396,37 @@ export const ConsensusPage = () => {
 
                 {/* Verification Tiers */}
                 <div className="grid grid-cols-3 gap-2 text-center">
-                  {(["single_verified", "agreed", "disputed"] as const).map((tier) => {
-                    const config = TIER_CONFIG[tier];
+                  {(
+                    ["single_verified", "agreed", "disputed"] as const
+                  ).map((tier) => {
+                    const tierConfig = TIER_CONFIG[tier];
                     const count = group[tier];
                     return (
                       <div
                         key={tier}
-                        onClick={() => handleTierClick(group.id, tier, count)}
+                        onClick={() =>
+                          handleTierClick(group.id, tier, count)
+                        }
                         role="button"
                         tabIndex={count > 0 ? 0 : -1}
-                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleTierClick(group.id, tier, count); }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ")
+                            handleTierClick(group.id, tier, count);
+                        }}
                         className={`rounded p-2 transition-colors focus-ring ${
-                          count > 0 ? `cursor-pointer ${config.bgColor}` : "bg-slate-50 dark:bg-slate-700 opacity-50"
+                          count > 0
+                            ? `cursor-pointer ${tierConfig.bgColor}`
+                            : "bg-slate-50 dark:bg-slate-700 opacity-50"
                         }`}
                       >
-                        <div className={`text-lg font-bold ${count > 0 ? config.color : "text-slate-400"}`}>
+                        <div
+                          className={`text-lg font-bold ${count > 0 ? tierConfig.color : "text-slate-400"}`}
+                        >
                           {count}
                         </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400">{config.label}</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">
+                          {tierConfig.label}
+                        </div>
                       </div>
                     );
                   })}
@@ -328,15 +439,21 @@ export const ConsensusPage = () => {
                       <div className="h-2 flex">
                         <div
                           className="bg-yellow-400 transition-all"
-                          style={{ width: `${(group.single_verified / group.total_verified) * 100}%` }}
+                          style={{
+                            width: `${(group.single_verified / group.total_verified) * 100}%`,
+                          }}
                         ></div>
                         <div
                           className="bg-green-500 transition-all"
-                          style={{ width: `${(group.agreed / group.total_verified) * 100}%` }}
+                          style={{
+                            width: `${(group.agreed / group.total_verified) * 100}%`,
+                          }}
                         ></div>
                         <div
                           className="bg-red-500 transition-all"
-                          style={{ width: `${(group.disputed / group.total_verified) * 100}%` }}
+                          style={{
+                            width: `${(group.disputed / group.total_verified) * 100}%`,
+                          }}
                         ></div>
                       </div>
                     </div>
