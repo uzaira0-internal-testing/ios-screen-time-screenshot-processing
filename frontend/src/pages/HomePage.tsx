@@ -16,7 +16,9 @@ import { Modal } from "@/components/ui/Modal";
 import { Card } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Download, Trash2, FolderOpen } from "lucide-react";
-import { parseRelativePath, isImageFile } from "@/components/preprocessing/UploadDropZone";
+import { parseRelativePath, isImageFile } from "@/utils/filePathParser";
+import { FolderStructureHint } from "@/components/common/FolderStructureHint";
+import { DuplicateScreenshotError } from "@/core/errors";
 
 // Map group ID to verification tier data
 type VerificationTiersMap = Record<string, GroupVerificationSummary>;
@@ -51,40 +53,46 @@ export const HomePage = () => {
       }
 
       setIsLoadingFiles(true);
-      let loaded = 0;
-      let failed = 0;
-      let duplicates = 0;
+      const results = { loaded: 0, failed: 0, duplicates: 0 };
 
-      for (const file of imageFiles) {
-        try {
-          // Parse folder structure: participant_id/date/filename.png
-          const parsed = parseRelativePath(file);
-          // Use group name override if provided, otherwise derive from top-level folder
-          const groupId = groupName.trim() || parsed.participant_id || undefined;
+      // Process in batches to overlap hash computation and IndexedDB writes
+      // without overwhelming memory (each file's ArrayBuffer is live during hash)
+      const BATCH_SIZE = 5;
+      for (let i = 0; i < imageFiles.length; i += BATCH_SIZE) {
+        const batch = imageFiles.slice(i, i + BATCH_SIZE);
+        await Promise.all(
+          batch.map(async (file) => {
+            try {
+              const parsed = parseRelativePath(file);
+              const groupId = groupName.trim() || parsed.root_folder || undefined;
 
-          await screenshotService.addScreenshots(file, imageType, {
-            groupId,
-            participantId: parsed.participant_id !== "unknown" ? parsed.participant_id : undefined,
-            screenshotDate: parsed.screenshot_date || undefined,
-            originalFilepath: parsed.original_filepath,
-          });
-          loaded++;
-        } catch (error) {
-          const msg = error instanceof Error ? error.message : String(error);
-          if (msg.includes("Duplicate")) {
-            duplicates++;
-          } else {
-            failed++;
-            console.error(`Failed to load ${file.name}:`, error);
-          }
-        }
+              await screenshotService.addScreenshots(file, imageType, {
+                groupId,
+                participantId: parsed.participant_id !== "unknown" ? parsed.participant_id : undefined,
+                screenshotDate: parsed.screenshot_date || undefined,
+                originalFilepath: parsed.original_filepath,
+              });
+              results.loaded++;
+            } catch (error) {
+              if (error instanceof DuplicateScreenshotError) {
+                results.duplicates++;
+              } else {
+                results.failed++;
+                console.error(`Failed to load ${file.name}:`, error);
+              }
+            }
+          }),
+        );
       }
 
       setIsLoadingFiles(false);
+      const { loaded, failed, duplicates } = results;
 
       if (loaded > 0) {
         toast.success(`Loaded ${loaded} screenshot${loaded > 1 ? "s" : ""}`);
-        screenshotService.getGroups().then((g) => setGroups(g ?? []));
+        screenshotService.getGroups()
+          .then((g) => setGroups(g ?? []))
+          .catch((err) => { if (config.isDev) console.error("Failed to refresh groups:", err); });
       }
       if (duplicates > 0) {
         toast(`${duplicates} duplicate${duplicates > 1 ? "s" : ""} skipped`, { icon: "⏭️" });
@@ -338,17 +346,7 @@ export const HomePage = () => {
                   <p className="text-slate-600 dark:text-slate-400 text-sm">
                     Drop a folder here or use the button above.
                   </p>
-                  <div className="text-xs text-slate-400 dark:text-slate-500 font-mono bg-slate-100 dark:bg-slate-800/80 rounded px-3 py-2 inline-block">
-                    <div className="text-left">
-                      <div>study_folder/</div>
-                      <div className="ml-4">participant_id/</div>
-                      <div className="ml-8">date_folder/</div>
-                      <div className="ml-12">screenshot.png</div>
-                    </div>
-                  </div>
-                  <p className="text-slate-400 dark:text-slate-500 text-xs">
-                    Date folders: 2024-01-15, 01.15.2024, Day_1_01.02.2025, etc.
-                  </p>
+                  <FolderStructureHint />
                   <div className="flex items-center gap-2 justify-center">
                     <input
                       type="text"

@@ -18,6 +18,7 @@ import { db } from "./storage/database";
 import { createObjectURL } from "./storage/opfsBlobStorage";
 import { computeContentHash } from "./utils/contentHash";
 import { useAuthStore } from "@/store/authStore";
+import { DuplicateScreenshotError } from "@/core/errors";
 
 export class WASMScreenshotService implements IScreenshotService {
   private storageService: IStorageService;
@@ -102,7 +103,7 @@ export class WASMScreenshotService implements IScreenshotService {
         .equals(contentHash)
         .first();
       if (existing) {
-        throw new Error(`Duplicate image: this file has already been uploaded as screenshot #${existing.id}`);
+        throw new DuplicateScreenshotError(existing.id!);
       }
     }
 
@@ -111,7 +112,7 @@ export class WASMScreenshotService implements IScreenshotService {
     const screenshotData: Omit<Screenshot, "id"> & { id?: number; content_hash?: string } = {
       file_path: options?.originalFilepath || file.name,
       image_type: imageType,
-      uploaded_at: options?.screenshotDate || uploadedAt,
+      uploaded_at: uploadedAt,
       uploaded_by_id: null,
       current_annotation_count: 0,
       target_annotations: 1,
@@ -133,6 +134,7 @@ export class WASMScreenshotService implements IScreenshotService {
       // Folder structure metadata
       participant_id: options?.participantId ?? null,
       group_id: options?.groupId ?? null,
+      screenshot_date: options?.screenshotDate ?? null,
       source_id: null,
       device_type: null,
       verified_by_user_ids: null,
