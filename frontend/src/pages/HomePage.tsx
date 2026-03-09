@@ -59,7 +59,7 @@ export const HomePage = () => {
 
       for (const file of imageFiles) {
         try {
-          await screenshotService.upload(file, imageType, { groupId });
+          await screenshotService.addScreenshots(file, imageType, { groupId });
           loaded++;
         } catch (error) {
           failed++;

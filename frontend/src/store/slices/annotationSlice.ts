@@ -67,7 +67,7 @@ export const createAnnotationSlice = (
     });
   },
 
-  submitAnnotation: async (notes?: string) => {
+  saveAnnotation: async (notes?: string) => {
     const { currentScreenshot, currentAnnotation } = get();
 
     if (!currentScreenshot || !currentAnnotation?.grid_coords) {
@@ -108,7 +108,7 @@ export const createAnnotationSlice = (
       const message =
         error.response?.data?.detail ||
         error.message ||
-        "Failed to submit annotation";
+        "Failed to save annotation";
       set({ error: message, isLoading: false });
       throw error;
     }

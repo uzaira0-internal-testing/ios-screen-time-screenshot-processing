@@ -46,7 +46,7 @@ export interface AnnotationSlice {
   setHourlyValues: (data: HourlyData) => void;
   updateHourValue: (hour: number, value: number) => void;
   setExtractedTitle: (title: string) => void;
-  submitAnnotation: (notes?: string) => Promise<void>;
+  saveAnnotation: (notes?: string) => Promise<void>;
   loadConsensus: (screenshotId: number) => Promise<void>;
 }
 

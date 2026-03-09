@@ -80,7 +80,7 @@ export class WASMScreenshotService implements IScreenshotService {
     return screenshots.slice(skip, skip + limit);
   }
 
-  async upload(
+  async addScreenshots(
     file: File,
     imageType: ImageType,
     options?: { groupId?: string },

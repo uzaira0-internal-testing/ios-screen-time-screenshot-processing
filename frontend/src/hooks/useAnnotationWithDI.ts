@@ -101,7 +101,7 @@ export const useAnnotation = (groupId?: string, processingStatus?: ProcessingSta
     setHourlyValues,
     updateHourValue,
     setExtractedTitle,
-    submitAnnotation,
+    saveAnnotation,
     skipScreenshot,
     reprocessWithGrid: storeReprocessWithGrid,
     reprocessWithLineBased: storeReprocessWithLineBased,
@@ -143,8 +143,8 @@ export const useAnnotation = (groupId?: string, processingStatus?: ProcessingSta
         if (config.isDev) {
           console.log("[useAnnotation.handleSubmit] Starting submission...");
         }
-        await submitAnnotation(notes);
-        toast.success("Annotation submitted successfully!");
+        await saveAnnotation(notes);
+        toast.success(config.isLocalMode ? "Annotation saved!" : "Annotation submitted!");
         if (config.isDev) {
           console.log("[useAnnotation.handleSubmit] Loading next screenshot...");
         }
@@ -155,29 +155,29 @@ export const useAnnotation = (groupId?: string, processingStatus?: ProcessingSta
       } catch (err: unknown) {
         console.error("[useAnnotation.handleSubmit] Error:", err);
         const errorMessage =
-          err instanceof Error ? err.message : "Failed to submit annotation";
+          err instanceof Error ? err.message : "Failed to save annotation";
         toastErrorWithRetry({
           message: errorMessage,
           // eslint-disable-next-line react-hooks/immutability
           onRetry: () => handleSubmit(notes),
-          retryLabel: "Retry Submit",
+          retryLabel: "Retry",
         });
       }
     },
-    [submitAnnotation, loadNextScreenshot],
+    [saveAnnotation, loadNextScreenshot],
   );
 
   // Save without navigating (for auto-save)
   const handleSaveOnly = useCallback(
     async (notes?: string) => {
       try {
-        await submitAnnotation(notes);
+        await saveAnnotation(notes);
       } catch (err: unknown) {
         console.error("[useAnnotation.handleSaveOnly] Error:", err);
         throw err;
       }
     },
-    [submitAnnotation],
+    [saveAnnotation],
   );
 
   const handleSkip = useCallback(async () => {

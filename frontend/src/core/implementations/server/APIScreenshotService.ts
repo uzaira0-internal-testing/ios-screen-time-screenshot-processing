@@ -47,7 +47,7 @@ export class APIScreenshotService implements IScreenshotService {
     return result?.items ?? [];
   }
 
-  async upload(
+  async addScreenshots(
     file: File,
     imageType: ImageType,
     options?: { groupId?: string },

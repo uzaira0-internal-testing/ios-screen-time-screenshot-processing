@@ -24,7 +24,7 @@ export interface IScreenshotService {
 
   getAll(status?: string, skip?: number, limit?: number): Promise<Screenshot[]>;
 
-  upload(
+  addScreenshots(
     file: File,
     imageType: ImageType,
     options?: { groupId?: string },
