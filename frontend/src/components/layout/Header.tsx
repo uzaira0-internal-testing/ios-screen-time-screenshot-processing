@@ -5,6 +5,7 @@ import { PROCESSING_STATUS_LABELS, type ProcessingStatus } from "@/constants/pro
 import { Menu, X, LogOut } from "lucide-react";
 import { useThemeStore, THEME_OPTIONS, THEME_CYCLE } from "@/store/themeStore";
 import { useFeatures } from "@/core/hooks/useServices";
+import { config } from "@/config";
 
 export const Header = () => {
   const { username, isAuthenticated, isAdmin, logout } = useAuth();
@@ -24,7 +25,8 @@ export const Header = () => {
 
   const navLinks = [
     { to: "/", label: "Home" },
-    ...(features.preprocessing ? [{ to: "/upload", label: "Upload" }] : []),
+    // Server mode: separate upload page. WASM mode: loading is on Home page.
+    ...(!config.isLocalMode && features.preprocessing ? [{ to: "/upload", label: "Upload" }] : []),
     ...(features.preprocessing ? [{ to: "/preprocessing", label: "Preprocessing" }] : []),
     { to: "/annotate", label: "Annotate" },
     { to: "/consensus", label: "Consensus" },

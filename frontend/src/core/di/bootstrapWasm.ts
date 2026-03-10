@@ -49,14 +49,13 @@ export function bootstrapWasmServices(_config: AppConfig): ServiceContainer {
     return new WASMConsensusService(storage);
   });
 
-  // WASM mode: local processing only, no server-dependent features
-  // WASM mode: groups and basic consensus work locally via IndexedDB.
-  // Server-only features: cross-rater comparison, admin, preprocessing.
+  // WASM mode: local processing via Tesseract.js + IndexedDB.
+  // Server-only features: cross-rater comparison, admin.
   const features: AppFeatures = {
     groups: true,
     consensusComparison: false,
     admin: false,
-    preprocessing: false,
+    preprocessing: true,
   };
   container.register(TOKENS.FEATURES, features);
 

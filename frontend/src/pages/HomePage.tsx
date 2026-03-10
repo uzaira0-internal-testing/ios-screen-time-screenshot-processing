@@ -87,19 +87,30 @@ export const HomePage = () => {
       }
 
       setIsLoadingFiles(false);
+      setLoadProgress({ current: 0, total: 0 });
       const { loaded, failed, duplicates } = results;
 
+      // Always show summary with all counts
+      const parts: string[] = [];
+      if (loaded > 0) parts.push(`${loaded} loaded`);
+      if (duplicates > 0) parts.push(`${duplicates} duplicates skipped`);
+      if (failed > 0) parts.push(`${failed} failed`);
+
+      if (parts.length > 0) {
+        const msg = parts.join(", ");
+        if (failed > 0) {
+          toast.error(msg);
+        } else if (loaded > 0) {
+          toast.success(msg);
+        } else {
+          toast(msg, { icon: "⏭️" });
+        }
+      }
+
       if (loaded > 0) {
-        toast.success(`Loaded ${loaded} screenshot${loaded > 1 ? "s" : ""}`);
         screenshotService.getGroups()
           .then((g) => setGroups(g ?? []))
-          .catch((err) => { if (config.isDev) console.error("Failed to refresh groups:", err); });
-      }
-      if (duplicates > 0) {
-        toast(`${duplicates} duplicate${duplicates > 1 ? "s" : ""} skipped`, { icon: "⏭️" });
-      }
-      if (failed > 0) {
-        toast.error(`${failed} file${failed > 1 ? "s" : ""} failed to load`);
+          .catch((err) => console.error("Failed to refresh groups:", err));
       }
     },
     [screenshotService, imageType, groupName],
