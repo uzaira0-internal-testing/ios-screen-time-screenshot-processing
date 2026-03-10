@@ -63,6 +63,7 @@ export const AnnotationWorkspace = ({
     navigateNext,
     navigatePrev,
     loadScreenshotList,
+    loadMoreScreenshots,
     setVerificationFilter,
     verifyCurrentScreenshot,
     unverifyCurrentScreenshot,
@@ -427,6 +428,7 @@ export const AnnotationWorkspace = ({
                 onNavigatePrev={navigatePrev}
                 onSelectScreenshot={loadById}
                 onSearch={(search) => loadScreenshotList({ search })}
+                onLoadMore={loadMoreScreenshots}
                 isLoading={isLoading}
                 currentUsername={username}
               />

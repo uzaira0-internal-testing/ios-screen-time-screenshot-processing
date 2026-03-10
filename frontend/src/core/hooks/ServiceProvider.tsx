@@ -16,6 +16,17 @@ let globalContainer: ServiceContainer | null = null;
 let globalConfig: AppConfig | null = null;
 let bootstrapPromise: Promise<ServiceContainer> | null = null;
 
+// Clean up worker threads when the tab/window is closed
+if (typeof window !== "undefined") {
+  window.addEventListener("beforeunload", () => {
+    if (globalContainer) {
+      globalContainer.destroy();
+      globalContainer = null;
+      globalConfig = null;
+    }
+  });
+}
+
 function getOrCreateContainer(config: AppConfig): Promise<ServiceContainer> {
   // If we have a container and the config matches, reuse it
   if (

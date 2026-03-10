@@ -3,7 +3,7 @@ import type { IScreenshotService, NavigationParams, ProcessingIssue, Screenshot 
 import type { ProcessingStatus } from "@/types";
 import type { AnnotationState, ScreenshotSlice, UIAnnotation } from "./types";
 import { initialAnnotation } from "./types";
-import { filterToApiParams, isVerifiedByCurrentUser } from "./helpers";
+import { extractGridCoords, filterToApiParams, isVerifiedByCurrentUser } from "./helpers";
 
 export const createScreenshotSlice = (
   screenshotService: IScreenshotService,
@@ -48,20 +48,9 @@ export const createScreenshotSlice = (
         isAutoProcessed = true;
       }
 
-      if (
-        screenshot.grid_upper_left_x !== null &&
-        screenshot.grid_lower_right_x !== null
-      ) {
-        prefilledAnnotation.grid_coords = {
-          upper_left: {
-            x: screenshot.grid_upper_left_x || 0,
-            y: screenshot.grid_upper_left_y || 0,
-          },
-          lower_right: {
-            x: screenshot.grid_lower_right_x || 0,
-            y: screenshot.grid_lower_right_y || 0,
-          },
-        };
+      const gridCoords = extractGridCoords(screenshot);
+      if (gridCoords) {
+        prefilledAnnotation.grid_coords = gridCoords;
       }
 
       if (
@@ -93,20 +82,12 @@ export const createScreenshotSlice = (
 
         // Only set grid coords if not already set (check for undefined, not falsy - x:0 is valid)
         if (
-          processedScreenshot.grid_upper_left_x !== null &&
-          processedScreenshot.grid_lower_right_x !== null &&
           prefilledAnnotation.grid_coords?.upper_left?.x === undefined
         ) {
-          prefilledAnnotation.grid_coords = {
-            upper_left: {
-              x: processedScreenshot.grid_upper_left_x ?? 0,
-              y: processedScreenshot.grid_upper_left_y ?? 0,
-            },
-            lower_right: {
-              x: processedScreenshot.grid_lower_right_x ?? 0,
-              y: processedScreenshot.grid_lower_right_y ?? 0,
-            },
-          };
+          const coords = extractGridCoords(processedScreenshot);
+          if (coords) {
+            prefilledAnnotation.grid_coords = coords;
+          }
         }
       }
 
@@ -194,20 +175,9 @@ export const createScreenshotSlice = (
         isAutoProcessed = true;
       }
 
-      if (
-        screenshot.grid_upper_left_x !== null &&
-        screenshot.grid_lower_right_x !== null
-      ) {
-        prefilledAnnotation.grid_coords = {
-          upper_left: {
-            x: screenshot.grid_upper_left_x || 0,
-            y: screenshot.grid_upper_left_y || 0,
-          },
-          lower_right: {
-            x: screenshot.grid_lower_right_x || 0,
-            y: screenshot.grid_lower_right_y || 0,
-          },
-        };
+      const gridCoords = extractGridCoords(screenshot);
+      if (gridCoords) {
+        prefilledAnnotation.grid_coords = gridCoords;
       }
 
       if (

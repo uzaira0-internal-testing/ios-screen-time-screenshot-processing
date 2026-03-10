@@ -12,18 +12,20 @@ export class WASMAnnotationService implements IAnnotationService {
   }
 
   async create(data: AnnotationCreate): Promise<Annotation> {
-    // AnnotationCreate uses grid_upper_left/grid_lower_right + hourly_values
-    const annotation: Annotation = {
-      id: Date.now(),
+    // Build annotation without id — let IndexedDB auto-increment assign it
+    const now = new Date().toISOString();
+    const annotation = {
       screenshot_id: data.screenshot_id,
       user_id: useAuthStore.getState().userId ?? 1,
       grid_upper_left: data.grid_upper_left ?? null,
       grid_lower_right: data.grid_lower_right ?? null,
       hourly_values: data.hourly_values,
+      extracted_title: data.extracted_title ?? null,
+      extracted_total: data.extracted_total ?? null,
       notes: data.notes ?? null,
       status: "completed",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      created_at: now,
+      updated_at: now,
     } as Annotation;
 
     const id = await this.storageService.saveAnnotation(annotation);

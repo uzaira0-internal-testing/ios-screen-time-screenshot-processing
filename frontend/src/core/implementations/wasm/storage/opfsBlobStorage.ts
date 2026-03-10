@@ -17,6 +17,8 @@ let opfsAvailable: boolean | null = null;
 const MAX_CACHE_SIZE = 50;
 const urlCache = new Map<number, string>();
 const cacheAccessOrder: number[] = [];
+// In-flight requests to prevent duplicate blob URL creation for the same ID
+const inFlight = new Map<number, Promise<string | null>>();
 
 /**
  * Evict oldest entries from cache if over limit
@@ -138,19 +140,34 @@ export async function createObjectURL(
     return cached;
   }
 
-  const resolvedBlob = blob ?? (await retrieveImageBlob(id));
-  if (!resolvedBlob) {
-    return null;
+  // Deduplicate concurrent requests for the same ID to prevent leaked blob URLs.
+  // Skip dedup when an explicit blob is provided — the caller has the data already
+  // and a concurrent no-blob request might resolve to null.
+  if (!blob) {
+    const pending = inFlight.get(id);
+    if (pending) return pending;
   }
 
-  const url = URL.createObjectURL(resolvedBlob);
-  urlCache.set(id, url);
-  touchCache(id);
+  const promise = (async () => {
+    const resolvedBlob = blob ?? (await retrieveImageBlob(id));
+    if (!resolvedBlob) {
+      return null;
+    }
 
-  // Evict old entries if cache is too large
-  evictOldEntries();
+    const url = URL.createObjectURL(resolvedBlob);
+    urlCache.set(id, url);
+    touchCache(id);
+    evictOldEntries();
 
-  return url;
+    return url;
+  })();
+
+  inFlight.set(id, promise);
+  try {
+    return await promise;
+  } finally {
+    inFlight.delete(id);
+  }
 }
 
 export function revokeObjectURL(id: number): void {

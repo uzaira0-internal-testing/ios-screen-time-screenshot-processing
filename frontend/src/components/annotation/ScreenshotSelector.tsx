@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import type { Screenshot, ScreenshotListResponse } from "@/core/models";
 import { PROCESSING_STATUS_LABELS, type ProcessingStatus } from "@/constants/processingStatus";
 
@@ -13,6 +13,7 @@ interface ScreenshotSelectorProps {
   onNavigatePrev: () => void;
   onSelectScreenshot: (id: number) => void;
   onSearch: (search: string) => void;
+  onLoadMore: () => void;
   isLoading: boolean;
   currentUsername: string | null;
 }
@@ -28,6 +29,7 @@ export const ScreenshotSelector = ({
   onNavigatePrev,
   onSelectScreenshot,
   onSearch,
+  onLoadMore,
   isLoading,
   currentUsername,
 }: ScreenshotSelectorProps) => {
@@ -35,6 +37,7 @@ export const ScreenshotSelector = ({
   const [searchTerm, setSearchTerm] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -66,6 +69,24 @@ export const ScreenshotSelector = ({
 
     return () => clearTimeout(timer);
   }, [searchTerm, onSearch]);
+
+  // Load more screenshots when scrolling near the bottom of the list
+  const scrollThrottled = useRef(false);
+  const scrollTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => { clearTimeout(scrollTimer.current); }, []);
+
+  const handleListScroll = useCallback(() => {
+    const el = listRef.current;
+    if (!el || !screenshotList?.has_next || scrollThrottled.current) return;
+
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+    if (nearBottom) {
+      scrollThrottled.current = true;
+      onLoadMore();
+      // Throttle: ignore scroll events for 300ms after triggering a load
+      scrollTimer.current = setTimeout(() => { scrollThrottled.current = false; }, 300);
+    }
+  }, [onLoadMore, screenshotList?.has_next]);
 
   const handleSelectScreenshot = (id: number) => {
     onSelectScreenshot(id);
@@ -209,7 +230,7 @@ export const ScreenshotSelector = ({
             </div>
 
             {/* Screenshot List */}
-            <div className="max-h-52 overflow-y-auto">
+            <div className="max-h-52 overflow-y-auto" ref={listRef} onScroll={handleListScroll}>
               {screenshotList?.items.map((screenshot: Screenshot) => {
                 // Extract filename from file_path
                 const filename = screenshot.file_path?.split("/").pop() || "";

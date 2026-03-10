@@ -6,7 +6,7 @@ import type {
   Screenshot,
 } from "@/core";
 import type { AnnotationState, ProcessingSlice, UIAnnotation } from "./types";
-import { isVerifiedByCurrentUser } from "./helpers";
+import { isVerifiedByCurrentUser, extractGridCoords } from "./helpers";
 
 /**
  * Error thrown when user tries to reprocess a verified screenshot.
@@ -43,19 +43,7 @@ function createStateUpdateFromResult(
   gridCoords?: GridCoordinates,
 ): Partial<AnnotationState> {
   const newGridCoords: GridCoordinates | undefined =
-    gridCoords ||
-    (result.grid_upper_left_x != null
-      ? {
-          upper_left: {
-            x: result.grid_upper_left_x,
-            y: result.grid_upper_left_y || 0,
-          },
-          lower_right: {
-            x: result.grid_lower_right_x || 0,
-            y: result.grid_lower_right_y || 0,
-          },
-        }
-      : undefined);
+    gridCoords || extractGridCoords(result);
 
   return {
     currentAnnotation: {

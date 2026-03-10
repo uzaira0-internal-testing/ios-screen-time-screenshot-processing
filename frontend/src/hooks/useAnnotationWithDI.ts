@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useEffect, useRef } from "react";
+import { useShallow } from "zustand/react/shallow";
 import type { GridCoordinates } from "@/core";
 import type { ProcessingStatus } from "@/types";
 import {
@@ -84,6 +85,7 @@ export const useAnnotation = (groupId?: string, processingStatus?: ProcessingSta
     };
   }, [groupId, processingStatus]);
 
+  // Select reactive data with useShallow (triggers re-render only when data changes)
   const {
     currentScreenshot,
     currentAnnotation,
@@ -94,48 +96,67 @@ export const useAnnotation = (groupId?: string, processingStatus?: ProcessingSta
     error,
     processingIssues,
     isAutoProcessed,
-    loadNextScreenshot,
-    loadScreenshot,
-    loadQueueStats,
-    setGridCoordinates,
-    setHourlyValues,
-    updateHourValue,
-    setExtractedTitle,
-    saveAnnotation,
-    skipScreenshot,
-    reprocessWithGrid: storeReprocessWithGrid,
-    reprocessWithLineBased: storeReprocessWithLineBased,
-    reprocessWithOcrAnchored: storeReprocessWithOcrAnchored,
-    clearError,
-    // NEW: Progress tracking
     processingProgress,
     isTesseractInitialized,
     isInitializingTesseract,
-    setProcessingProgress,
-    clearProcessingProgress,
-    setTesseractInitialized,
-    setInitializingTesseract,
-    // NEW: Navigation state
     currentIndex,
     totalInFilter,
     hasNext,
     hasPrev,
     screenshotList,
     verificationFilter,
-    // NEW: Navigation actions
-    navigateNext,
-    navigatePrev,
-    loadScreenshotList,
-    setVerificationFilter,
-    // NEW: Verification actions
-    verifyCurrentScreenshot,
-    unverifyCurrentScreenshot,
-    // OCR recalculation
-    recalculateOcrTotal,
-    // Grid optimization
     maxShift,
-    setMaxShift,
-  } = store();
+  } = store(
+    useShallow((state) => ({
+      currentScreenshot: state.currentScreenshot,
+      currentAnnotation: state.currentAnnotation,
+      consensus: state.consensus,
+      queueStats: state.queueStats,
+      isLoading: state.isLoading,
+      noScreenshots: state.noScreenshots,
+      error: state.error,
+      processingIssues: state.processingIssues,
+      isAutoProcessed: state.isAutoProcessed,
+      processingProgress: state.processingProgress,
+      isTesseractInitialized: state.isTesseractInitialized,
+      isInitializingTesseract: state.isInitializingTesseract,
+      currentIndex: state.currentIndex,
+      totalInFilter: state.totalInFilter,
+      hasNext: state.hasNext,
+      hasPrev: state.hasPrev,
+      screenshotList: state.screenshotList,
+      verificationFilter: state.verificationFilter,
+      maxShift: state.maxShift,
+    })),
+  );
+
+  // Select stable action refs directly (no useShallow needed — these never change)
+  const loadNextScreenshot = store((s) => s.loadNextScreenshot);
+  const loadScreenshot = store((s) => s.loadScreenshot);
+  const loadQueueStats = store((s) => s.loadQueueStats);
+  const setGridCoordinates = store((s) => s.setGridCoordinates);
+  const setHourlyValues = store((s) => s.setHourlyValues);
+  const updateHourValue = store((s) => s.updateHourValue);
+  const setExtractedTitle = store((s) => s.setExtractedTitle);
+  const saveAnnotation = store((s) => s.saveAnnotation);
+  const skipScreenshot = store((s) => s.skipScreenshot);
+  const storeReprocessWithGrid = store((s) => s.reprocessWithGrid);
+  const storeReprocessWithLineBased = store((s) => s.reprocessWithLineBased);
+  const storeReprocessWithOcrAnchored = store((s) => s.reprocessWithOcrAnchored);
+  const clearError = store((s) => s.clearError);
+  const setProcessingProgress = store((s) => s.setProcessingProgress);
+  const clearProcessingProgress = store((s) => s.clearProcessingProgress);
+  const setTesseractInitialized = store((s) => s.setTesseractInitialized);
+  const setInitializingTesseract = store((s) => s.setInitializingTesseract);
+  const navigateNext = store((s) => s.navigateNext);
+  const navigatePrev = store((s) => s.navigatePrev);
+  const loadScreenshotList = store((s) => s.loadScreenshotList);
+  const loadMoreScreenshots = store((s) => s.loadMoreScreenshots);
+  const setVerificationFilter = store((s) => s.setVerificationFilter);
+  const verifyCurrentScreenshot = store((s) => s.verifyCurrentScreenshot);
+  const unverifyCurrentScreenshot = store((s) => s.unverifyCurrentScreenshot);
+  const recalculateOcrTotal = store((s) => s.recalculateOcrTotal);
+  const setMaxShift = store((s) => s.setMaxShift);
 
   const handleSubmit = useCallback(
     async (notes?: string) => {
@@ -291,6 +312,7 @@ export const useAnnotation = (groupId?: string, processingStatus?: ProcessingSta
     navigateNext,
     navigatePrev,
     loadScreenshotList,
+    loadMoreScreenshots,
     setVerificationFilter,
     // NEW: Verification
     verifyCurrentScreenshot,

@@ -31,12 +31,15 @@ export async function runMigrations(db: ScreenshotDB): Promise<void> {
 }
 
 export async function clearDatabase(db: ScreenshotDB): Promise<void> {
-  await db.transaction('rw', db.screenshots, db.annotations, db.imageBlobs, db.processingQueue, async () => {
+  await db.transaction('rw', [db.screenshots, db.annotations, db.imageBlobs, db.processingQueue, db.groups, db.syncRecords, db.settings], async () => {
     await Promise.all([
       db.screenshots.clear(),
       db.annotations.clear(),
       db.imageBlobs.clear(),
-      db.processingQueue.clear()
+      db.processingQueue.clear(),
+      db.groups.clear(),
+      db.syncRecords.clear(),
+      db.settings.clear(),
     ]);
   });
 }
@@ -46,7 +49,7 @@ export async function exportDatabaseInfo(db: ScreenshotDB): Promise<{
   version: number;
   tableStats: { name: string; count: number }[];
 }> {
-  const tables = ['screenshots', 'annotations', 'imageBlobs', 'settings', 'processingQueue'] as const;
+  const tables = ['screenshots', 'annotations', 'imageBlobs', 'settings', 'processingQueue', 'groups', 'syncRecords'] as const;
 
   const tableStats = await Promise.all(
     tables.map(async (tableName) => ({

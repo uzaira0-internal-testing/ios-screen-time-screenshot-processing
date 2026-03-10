@@ -80,6 +80,7 @@ export class WASMProcessingService implements IProcessingService {
 
     this.worker.onerror = (error) => {
       console.error("Worker error:", error);
+      this.initialized = false;
       this.pendingRequests.forEach((request) => {
         request.reject(new Error("Worker error: " + error.message));
       });
@@ -108,15 +109,17 @@ export class WASMProcessingService implements IProcessingService {
     );
 
     return new Promise<T>((resolve, reject) => {
-      // 30-second timeout to prevent infinite hangs
+      // INITIALIZE downloads ~15MB of Tesseract WASM + trained data — needs longer timeout.
+      // Regular messages use 60s (processing a single image with OCR can take 10-20s).
+      const timeoutMs = message.type === "INITIALIZE" ? 120000 : 60000;
       const timeout = setTimeout(() => {
         this.pendingRequests.delete(id);
         reject(
           new Error(
-            `Worker message ${message.type} timed out after 30 seconds`,
+            `Worker message ${message.type} timed out after ${timeoutMs / 1000} seconds`,
           ),
         );
-      }, 30000);
+      }, timeoutMs);
 
       this.pendingRequests.set(id, {
         resolve: (value: unknown) => {

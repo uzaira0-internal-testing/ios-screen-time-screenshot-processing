@@ -270,7 +270,7 @@ export const StageReviewTable = ({
             <>
               {/* Spacer for items above the virtual window */}
               {virtualizer.getVirtualItems().length > 0 && (
-                <tr style={{ height: virtualizer.getVirtualItems()[0].start }} >
+                <tr style={{ height: virtualizer.getVirtualItems()[0]?.start ?? 0 }} >
                   <td colSpan={5 + resultHeaders.length} />
                 </tr>
               )}

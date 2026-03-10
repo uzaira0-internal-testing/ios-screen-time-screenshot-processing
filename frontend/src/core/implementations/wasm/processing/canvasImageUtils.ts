@@ -731,15 +731,19 @@ export function extractRegion(src: CanvasMat, rect: Rect): CanvasMat {
  */
 export async function blobToImageData(blob: Blob): Promise<ImageData> {
   const imageBitmap = await createImageBitmap(blob);
-  const canvas = new OffscreenCanvas(imageBitmap.width, imageBitmap.height);
-  const ctx = canvas.getContext("2d");
+  try {
+    const canvas = new OffscreenCanvas(imageBitmap.width, imageBitmap.height);
+    const ctx = canvas.getContext("2d");
 
-  if (!ctx) {
-    throw new Error("Failed to get canvas context");
+    if (!ctx) {
+      throw new Error("Failed to get canvas context");
+    }
+
+    ctx.drawImage(imageBitmap, 0, 0);
+    return ctx.getImageData(0, 0, imageBitmap.width, imageBitmap.height);
+  } finally {
+    imageBitmap.close();
   }
-
-  ctx.drawImage(imageBitmap, 0, 0);
-  return ctx.getImageData(0, 0, imageBitmap.width, imageBitmap.height);
 }
 
 /**

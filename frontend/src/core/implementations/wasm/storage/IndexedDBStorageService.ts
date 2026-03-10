@@ -157,36 +157,39 @@ export class IndexedDBStorageService implements IStorageService {
   }): Promise<Screenshot[]> {
     await this.ensureDB();
     try {
-      // Use compound index if both annotation_status and group_id are provided
+      // Start with the most selective indexed filter, then apply remaining as .filter()
+      let collection;
+
       if (filter?.annotation_status && filter?.group_id) {
-        return await db.screenshots
+        collection = db.screenshots
           .where("[group_id+annotation_status]")
-          .equals([filter.group_id, filter.annotation_status])
-          .toArray();
-      }
-
-      if (filter?.group_id) {
-        return await db.screenshots
+          .equals([filter.group_id, filter.annotation_status]);
+      } else if (filter?.group_id) {
+        collection = db.screenshots
           .where("group_id")
-          .equals(filter.group_id)
-          .toArray();
-      }
-
-      if (filter?.annotation_status) {
-        return await db.screenshots
+          .equals(filter.group_id);
+      } else if (filter?.annotation_status) {
+        collection = db.screenshots
           .where("annotation_status")
-          .equals(filter.annotation_status)
-          .toArray();
-      }
-
-      if (filter?.processing_status) {
+          .equals(filter.annotation_status);
+      } else if (filter?.processing_status) {
+        // Only use processing_status index when no other filters
         return await db.screenshots
           .where("processing_status")
           .equals(filter.processing_status)
           .toArray();
+      } else {
+        return await db.screenshots.toArray();
       }
 
-      return await db.screenshots.toArray();
+      // Apply processing_status as a post-filter if it wasn't used as the primary index
+      if (filter?.processing_status) {
+        collection = collection.filter(
+          (s) => s.processing_status === filter.processing_status,
+        );
+      }
+
+      return await collection.toArray();
     } catch (error) {
       console.error("Failed to get all screenshots:", error);
       throw error;
@@ -195,13 +198,10 @@ export class IndexedDBStorageService implements IStorageService {
 
   async updateScreenshot(id: number, data: Partial<Screenshot>): Promise<void> {
     try {
-      const existing = await this.getScreenshot(id);
-
-      if (!existing) {
+      const updated = await db.screenshots.update(id, data);
+      if (updated === 0) {
         throw new Error(`Screenshot with ID ${id} not found`);
       }
-
-      await db.screenshots.update(id, data);
     } catch (error) {
       console.error("Failed to update screenshot:", error);
       throw error;
@@ -502,12 +502,9 @@ export class IndexedDBStorageService implements IStorageService {
 
       // Use compound index if both group_id and processing_status provided
       if (params.group_id && params.processing_status) {
-        // Note: We'd need a compound index for this to be efficient
-        // For now, use the most selective filter first
         collection = db.screenshots
-          .where("group_id")
-          .equals(params.group_id)
-          .filter((s) => s.processing_status === params.processing_status);
+          .where("[group_id+processing_status]")
+          .equals([params.group_id, params.processing_status]);
       } else if (params.group_id) {
         collection = db.screenshots.where("group_id").equals(params.group_id);
       } else if (params.processing_status) {
@@ -604,22 +601,36 @@ export class IndexedDBStorageService implements IStorageService {
     try {
       // Build base query
       let baseQuery = db.screenshots.toCollection();
+      let hasJsFilter = false;
 
-      if (params.group_id) {
+      if (params.group_id && params.processing_status) {
+        // Use compound index when both filters are present
+        baseQuery = db.screenshots
+          .where("[group_id+processing_status]")
+          .equals([params.group_id, params.processing_status]);
+      } else if (params.group_id) {
         baseQuery = db.screenshots.where("group_id").equals(params.group_id);
+      } else if (params.processing_status) {
+        // Use processing_status index directly when no group_id
+        baseQuery = db.screenshots.where("processing_status").equals(params.processing_status);
       }
 
-      // Apply filters
-      if (params.processing_status) {
-        baseQuery = baseQuery.filter(
-          (s) => s.processing_status === params.processing_status,
-        );
+      if (params.verified_by_me !== undefined || params.verified_by_others !== undefined) {
+        hasJsFilter = true;
       }
-
       baseQuery = applyVerificationFilter(baseQuery, params);
 
-      // Get total count
-      const total = await baseQuery.count();
+      // primaryKeys() may not respect JS .filter() predicates — use each() to collect IDs when filters are present
+      let sortedIds: number[];
+      if (hasJsFilter) {
+        const ids: number[] = [];
+        await baseQuery.each((s) => { ids.push(s.id); });
+        sortedIds = ids.sort((a, b) => a - b);
+      } else {
+        sortedIds = await baseQuery.primaryKeys();
+        sortedIds.sort((a, b) => a - b);
+      }
+      const total = sortedIds.length;
 
       if (total === 0) {
         return {
@@ -631,12 +642,12 @@ export class IndexedDBStorageService implements IStorageService {
         };
       }
 
-      // For navigation, we need to find position and adjacent items
-      // Use sorted IDs for consistent ordering
-      const sortedIds = await baseQuery.primaryKeys();
-      sortedIds.sort((a, b) => a - b);
+      let currentIdx = sortedIds.indexOf(currentId);
 
-      const currentIdx = sortedIds.indexOf(currentId);
+      // If currentId is not in the filtered set (e.g., status changed), fall back to first item
+      if (currentIdx === -1) {
+        currentIdx = 0;
+      }
 
       let targetId: number | null = null;
       let targetIdx = currentIdx;
@@ -653,10 +664,8 @@ export class IndexedDBStorageService implements IStorageService {
         }
       } else {
         // current
-        if (currentIdx >= 0) {
-          targetId = sortedIds[currentIdx] ?? null;
-          targetIdx = currentIdx;
-        }
+        targetId = sortedIds[currentIdx] ?? null;
+        targetIdx = currentIdx;
       }
 
       // Fetch only the target screenshot

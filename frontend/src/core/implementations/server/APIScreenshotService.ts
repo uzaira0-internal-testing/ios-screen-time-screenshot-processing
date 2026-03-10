@@ -1,4 +1,4 @@
-import { api } from "@/services/apiClient";
+import { api, getAuthHeaders } from "@/services/apiClient";
 import { config } from "@/config";
 import type {
   Screenshot,
@@ -180,12 +180,7 @@ export class APIScreenshotService implements IScreenshotService {
 
   async exportCSV(): Promise<string> {
     const csvUrl = api.export.getCSVUrl();
-    const response = await fetch(csvUrl, {
-      headers: {
-        "X-Username": localStorage.getItem("username") || "",
-        "X-Site-Password": localStorage.getItem("sitePassword") || "",
-      },
-    });
+    const response = await fetch(csvUrl, { headers: getAuthHeaders() });
     if (!response.ok) throw new Error("Export failed");
     return response.text();
   }

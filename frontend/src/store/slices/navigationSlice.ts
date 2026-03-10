@@ -11,14 +11,22 @@ import type {
   NavigationSlice,
   VerificationFilterType,
 } from "./types";
-import { filterToApiParams } from "./helpers";
+import { filterToApiParams, extractGridCoords } from "./helpers";
 
 export const createNavigationSlice = (
   screenshotService: IScreenshotService,
   annotationService: IAnnotationService,
   groupId?: string,
   processingStatus?: ProcessingStatus,
-): StateCreator<AnnotationState, [], [], NavigationSlice> => (set, get) => ({
+): StateCreator<AnnotationState, [], [], NavigationSlice> => {
+  // Per-instance guard — prevents concurrent loadMore calls without blocking other store instances
+  let loadingMoreInProgress = false;
+  // Stores the last params used by loadScreenshotList so loadMore can replay them (including search)
+  let lastListParams: ScreenshotListParams = {};
+  // Incremented each time loadScreenshotList resets the list; loadMore checks this to discard stale results
+  let listGeneration = 0;
+
+  return (set, get) => ({
   // State
   currentIndex: 0,
   totalInFilter: 0,
@@ -104,12 +112,14 @@ export const createNavigationSlice = (
         group_id: groupId,
         processing_status: processingStatus,
         ...filterToApiParams(get().verificationFilter),
-        page_size: 5000,
+        page_size: 100,
         sort_by: "id",
         sort_order: "asc",
         ...params,
       };
 
+      lastListParams = listParams;
+      listGeneration++;
       const result = await screenshotService.getList(listParams);
       set({
         screenshotList: result,
@@ -117,6 +127,43 @@ export const createNavigationSlice = (
       });
     } catch (error) {
       console.error("Failed to load screenshot list:", error);
+    }
+  },
+
+  loadMoreScreenshots: async () => {
+    const { screenshotList } = get();
+    if (!screenshotList || !screenshotList.has_next || loadingMoreInProgress) return;
+
+    loadingMoreInProgress = true;
+    const nextPage = screenshotList.page + 1;
+    const generationAtStart = listGeneration;
+    try {
+      const result = await screenshotService.getList({
+        ...lastListParams,
+        page: nextPage,
+      });
+
+      // If loadScreenshotList was called while we were fetching, discard stale results
+      if (generationAtStart !== listGeneration) return;
+
+      // Re-read current list to avoid overwriting changes made during the await
+      const currentList = get().screenshotList;
+      const existingItems = currentList?.items ?? [];
+
+      // Deduplicate — items can shift between pages if status changes during pagination
+      const existingIds = new Set(existingItems.map((s) => s.id));
+      const newItems = result.items.filter((s) => !existingIds.has(s.id));
+
+      set({
+        screenshotList: {
+          ...result,
+          items: [...existingItems, ...newItems],
+        },
+      });
+    } catch (error) {
+      console.error("Failed to load more screenshots:", error);
+    } finally {
+      loadingMoreInProgress = false;
     }
   },
 
@@ -147,15 +194,7 @@ export const createNavigationSlice = (
 
     const editedTitle = currentScreenshot.extracted_title;
 
-    const gridCoords = currentAnnotation?.grid_coords || (
-      currentScreenshot.grid_upper_left_x != null &&
-      currentScreenshot.grid_upper_left_y != null &&
-      currentScreenshot.grid_lower_right_x != null &&
-      currentScreenshot.grid_lower_right_y != null ? {
-        upper_left: { x: currentScreenshot.grid_upper_left_x, y: currentScreenshot.grid_upper_left_y },
-        lower_right: { x: currentScreenshot.grid_lower_right_x, y: currentScreenshot.grid_lower_right_y },
-      } : undefined
-    );
+    const gridCoords = currentAnnotation?.grid_coords || extractGridCoords(currentScreenshot);
 
     const hourlyValues = currentAnnotation?.hourly_values || currentScreenshot.extracted_hourly_data || {};
 
@@ -233,3 +272,4 @@ export const createNavigationSlice = (
     }
   },
 });
+};

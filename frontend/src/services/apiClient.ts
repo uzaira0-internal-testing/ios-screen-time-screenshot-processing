@@ -79,6 +79,42 @@ apiClient.use({
 });
 
 /**
+ * Build auth headers for raw fetch calls.
+ * Only includes headers when values are present (unlike `|| ""` which sends empty strings).
+ */
+export function getAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {};
+  const username = localStorage.getItem("username");
+  if (username) headers["X-Username"] = username;
+  const sitePassword = localStorage.getItem("sitePassword");
+  if (sitePassword) headers["X-Site-Password"] = sitePassword;
+  return headers;
+}
+
+/**
+ * Wrapper around fetch that adds auth headers and handles errors consistently.
+ * Used for endpoints not yet in the OpenAPI schema.
+ */
+async function authFetch(
+  url: string,
+  init?: RequestInit,
+  errorMessage?: string,
+): Promise<Response> {
+  const response = await fetch(`${API_BASE_URL}${url}`, {
+    ...init,
+    headers: {
+      ...getAuthHeaders(),
+      ...init?.headers,
+    },
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(detail || errorMessage || "Request failed");
+  }
+  return response;
+}
+
+/**
  * Helper function to throw errors with backend detail messages
  */
 function throwIfError(
@@ -554,109 +590,64 @@ export const api = {
         body.phi_redaction_method = options.phi_redaction_method ?? "redbox";
       }
 
-      const response = await fetch(`${API_BASE_URL}${url}`, {
+      const response = await authFetch(url, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Username": localStorage.getItem("username") || "",
-          "X-Site-Password": localStorage.getItem("sitePassword") || "",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
-      });
-      if (!response.ok) {
-        const detail = await response.text();
-        throw new Error(detail || "Failed to queue stage");
-      }
+      }, "Failed to queue stage");
       return response.json();
     },
 
     async resetStage(stage: string, groupId: string) {
-      const response = await fetch(
-        `${API_BASE_URL}/api/v1/screenshots/preprocess-stage/reset`,
+      const response = await authFetch(
+        "/api/v1/screenshots/preprocess-stage/reset",
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Username": localStorage.getItem("username") || "",
-            "X-Site-Password": localStorage.getItem("sitePassword") || "",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ stage, group_id: groupId }),
         },
+        "Failed to reset stage",
       );
-      if (!response.ok) {
-        const detail = await response.text();
-        throw new Error(detail || "Failed to reset stage");
-      }
       return response.json();
     },
 
     async invalidateFromStage(screenshotId: number, stage: string) {
-      const response = await fetch(
-        `${API_BASE_URL}/api/v1/screenshots/${screenshotId}/invalidate-from-stage`,
+      const response = await authFetch(
+        `/api/v1/screenshots/${screenshotId}/invalidate-from-stage`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Username": localStorage.getItem("username") || "",
-            "X-Site-Password": localStorage.getItem("sitePassword") || "",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ stage }),
         },
+        "Failed to invalidate stages",
       );
-      if (!response.ok) {
-        throw new Error("Failed to invalidate stages");
-      }
       return response.json();
     },
 
     async getSummary(groupId: string) {
-      const response = await fetch(
-        `${API_BASE_URL}/api/v1/screenshots/preprocessing-summary?group_id=${encodeURIComponent(groupId)}`,
-        {
-          headers: {
-            "X-Username": localStorage.getItem("username") || "",
-            "X-Site-Password": localStorage.getItem("sitePassword") || "",
-          },
-        },
+      const response = await authFetch(
+        `/api/v1/screenshots/preprocessing-summary?group_id=${encodeURIComponent(groupId)}`,
+        undefined,
+        "Failed to get preprocessing summary",
       );
-      if (!response.ok) {
-        throw new Error("Failed to get preprocessing summary");
-      }
       return response.json();
     },
 
     async getEventLog(screenshotId: number) {
-      const response = await fetch(
-        `${API_BASE_URL}/api/v1/screenshots/${screenshotId}/preprocessing-events`,
-        {
-          headers: {
-            "X-Username": localStorage.getItem("username") || "",
-            "X-Site-Password": localStorage.getItem("sitePassword") || "",
-          },
-        },
+      const response = await authFetch(
+        `/api/v1/screenshots/${screenshotId}/preprocessing-events`,
+        undefined,
+        "Failed to get event log",
       );
-      if (!response.ok) {
-        throw new Error("Failed to get event log");
-      }
       return response.json();
     },
 
     async uploadBrowser(formData: FormData) {
-      const response = await fetch(
-        `${API_BASE_URL}/api/v1/screenshots/upload/browser`,
-        {
-          method: "POST",
-          headers: {
-            "X-Username": localStorage.getItem("username") || "",
-            "X-Site-Password": localStorage.getItem("sitePassword") || "",
-          },
-          body: formData,
-        },
+      const response = await authFetch(
+        "/api/v1/screenshots/upload/browser",
+        { method: "POST", body: formData },
+        "Failed to upload",
       );
-      if (!response.ok) {
-        const detail = await response.text();
-        throw new Error(detail || "Failed to upload");
-      }
       return response.json();
     },
 
@@ -668,38 +659,24 @@ export const api = {
       screenshotId: number,
       crop: { left: number; top: number; right: number; bottom: number },
     ) {
-      const response = await fetch(
-        `${API_BASE_URL}/api/v1/screenshots/${screenshotId}/manual-crop`,
+      const response = await authFetch(
+        `/api/v1/screenshots/${screenshotId}/manual-crop`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Username": localStorage.getItem("username") || "",
-            "X-Site-Password": localStorage.getItem("sitePassword") || "",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(crop),
         },
+        "Failed to apply crop",
       );
-      if (!response.ok) {
-        const detail = await response.text();
-        throw new Error(detail || "Failed to apply crop");
-      }
       return response.json();
     },
 
     async getPHIRegions(screenshotId: number) {
-      const response = await fetch(
-        `${API_BASE_URL}/api/v1/screenshots/${screenshotId}/phi-regions`,
-        {
-          headers: {
-            "X-Username": localStorage.getItem("username") || "",
-            "X-Site-Password": localStorage.getItem("sitePassword") || "",
-          },
-        },
+      const response = await authFetch(
+        `/api/v1/screenshots/${screenshotId}/phi-regions`,
+        undefined,
+        "Failed to get PHI regions",
       );
-      if (!response.ok) {
-        throw new Error("Failed to get PHI regions");
-      }
       return response.json();
     },
 
@@ -707,22 +684,15 @@ export const api = {
       screenshotId: number,
       body: { regions: Array<{ x: number; y: number; w: number; h: number; label: string; source: string; confidence: number; text: string }>; preset: string },
     ) {
-      const response = await fetch(
-        `${API_BASE_URL}/api/v1/screenshots/${screenshotId}/phi-regions`,
+      const response = await authFetch(
+        `/api/v1/screenshots/${screenshotId}/phi-regions`,
         {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Username": localStorage.getItem("username") || "",
-            "X-Site-Password": localStorage.getItem("sitePassword") || "",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         },
+        "Failed to save PHI regions",
       );
-      if (!response.ok) {
-        const detail = await response.text();
-        throw new Error(detail || "Failed to save PHI regions");
-      }
       return response.json();
     },
 
@@ -730,22 +700,15 @@ export const api = {
       screenshotId: number,
       body: { regions: Array<{ x: number; y: number; w: number; h: number; label: string; source: string; confidence: number; text: string }>; redaction_method: string },
     ) {
-      const response = await fetch(
-        `${API_BASE_URL}/api/v1/screenshots/${screenshotId}/apply-redaction`,
+      const response = await authFetch(
+        `/api/v1/screenshots/${screenshotId}/apply-redaction`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Username": localStorage.getItem("username") || "",
-            "X-Site-Password": localStorage.getItem("sitePassword") || "",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         },
+        "Failed to apply redaction",
       );
-      if (!response.ok) {
-        const detail = await response.text();
-        throw new Error(detail || "Failed to apply redaction");
-      }
       return response.json();
     },
   },

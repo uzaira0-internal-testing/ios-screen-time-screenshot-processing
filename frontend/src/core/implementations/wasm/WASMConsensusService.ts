@@ -181,7 +181,7 @@ function computeConsensus(
       {} as Record<number, number>,
     );
 
-    const consensusValue = parseInt(
+    const consensusValue = Number(
       Object.entries(valueCounts).sort(
         ([, a], [, b]) => (b as number) - (a as number),
       )[0]?.[0] ?? "0",

@@ -26,35 +26,55 @@ export const WASMPreprocessingPage = () => {
     abortRef.current = false;
     setIsProcessing(true);
 
-    // Get all pending screenshots
-    const result = await screenshotService.getList({
-      processing_status: "pending",
-      page: 1,
-      page_size: 10000,
-    });
-    const pending = result.items;
-    setProgress({ current: 0, total: pending.length });
+    // Get total pending count from stats (already loaded)
+    const initialStats = await screenshotService.getStats();
+    const totalPending = initialStats.pending;
+    setProgress({ current: 0, total: totalPending });
 
-    for (let i = 0; i < pending.length; i++) {
-      if (abortRef.current) break;
-      const screenshot = pending[i];
-      if (!screenshot) continue;
+    const PAGE_SIZE = 50;
+    let attempted = 0;
+    let failed = 0;
+    // Track IDs that failed so we skip them on subsequent page fetches
+    // (prevents infinite loop when a screenshot can't leave "pending" status)
+    const failedIds = new Set<number>();
 
-      try {
-        await screenshotService.processIfNeeded(screenshot);
-      } catch (error) {
-        console.error(`Failed to process screenshot ${screenshot.id}:`, error);
+    // Process in pages — fetch a batch, process it, fetch the next
+    // This avoids loading all pending screenshots into memory at once
+    while (!abortRef.current) {
+      const result = await screenshotService.getList({
+        processing_status: "pending",
+        page: 1, // Always page 1: processed items leave "pending" status
+        page_size: PAGE_SIZE,
+      });
+
+      // Filter out previously failed IDs to avoid re-processing them
+      const actionable = result.items.filter((s) => !failedIds.has(s.id));
+      if (actionable.length === 0) break;
+
+      for (const screenshot of actionable) {
+        if (abortRef.current) break;
+
+        try {
+          await screenshotService.processIfNeeded(screenshot);
+        } catch (error) {
+          console.error(`Failed to process screenshot ${screenshot.id}:`, error);
+          failed++;
+          failedIds.add(screenshot.id);
+        }
+        attempted++;
+        setProgress({ current: attempted, total: totalPending });
       }
-      setProgress({ current: i + 1, total: pending.length });
 
-      // Refresh stats every 10 screenshots
-      if ((i + 1) % 10 === 0) {
-        loadStats();
-      }
+      // Refresh stats between pages
+      await loadStats();
+    }
+
+    if (failed > 0) {
+      console.warn(`Processing complete: ${failed} screenshot(s) failed`);
     }
 
     setIsProcessing(false);
-    loadStats();
+    await loadStats();
   }, [screenshotService, loadStats]);
 
   const handleStop = useCallback(() => {

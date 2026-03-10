@@ -13,6 +13,7 @@ import type {
 import type { ImageType } from "@/types";
 import type { IScreenshotService } from "@/core/interfaces";
 import type { IStorageService } from "@/core/interfaces";
+import { extractGridCoords } from "@/store/slices/helpers";
 import type { IProcessingService, ProcessingProgress } from "@/core/interfaces";
 import { db } from "./storage/database";
 import { createObjectURL } from "./storage/opfsBlobStorage";
@@ -24,6 +25,8 @@ export class WASMScreenshotService implements IScreenshotService {
   private storageService: IStorageService;
   private processingService: IProcessingService;
   private processingInProgress = new Set<number>();
+  // Guards against concurrent uploads of the same content hash
+  private uploadingHashes = new Set<string>();
 
   constructor(
     storageService: IStorageService,
@@ -98,62 +101,76 @@ export class WASMScreenshotService implements IScreenshotService {
     // Returns null in non-secure contexts where crypto.subtle is unavailable
     const contentHash = await computeContentHash(file);
     if (contentHash !== null) {
+      // Check-and-add atomically (synchronous) to guard against concurrent batch uploads.
+      // Must happen before the IndexedDB await to prevent the TOCTOU race.
+      if (this.uploadingHashes.has(contentHash)) {
+        throw new DuplicateScreenshotError(0);
+      }
+      this.uploadingHashes.add(contentHash);
+
       const existing = await db.screenshots
         .where("content_hash")
         .equals(contentHash)
         .first();
       if (existing) {
+        this.uploadingHashes.delete(contentHash);
         throw new DuplicateScreenshotError(existing.id!);
       }
     }
 
-    // Create screenshot record without ID (let IndexedDB auto-increment)
-    // Omit id by using Partial and type assertion
-    const screenshotData: Omit<Screenshot, "id"> & { id?: number; content_hash?: string } = {
-      file_path: options?.originalFilepath || file.name,
-      image_type: imageType,
-      uploaded_at: uploadedAt,
-      uploaded_by_id: null,
-      current_annotation_count: 0,
-      target_annotations: 1,
-      has_consensus: null,
-      annotation_status: "pending",
-      processed_at: null,
-      processing_status: "pending",
-      extracted_title: null,
-      extracted_total: null,
-      extracted_hourly_data: null,
-      title_y_position: null,
-      grid_upper_left_x: null,
-      grid_upper_left_y: null,
-      grid_lower_right_x: null,
-      grid_lower_right_y: null,
-      processing_issues: null,
-      has_blocking_issues: false,
-      alignment_score: null,
-      // Folder structure metadata
-      participant_id: options?.participantId ?? null,
-      group_id: options?.groupId ?? null,
-      screenshot_date: options?.screenshotDate ?? null,
-      source_id: null,
-      device_type: null,
-      verified_by_user_ids: null,
-      // Computed readonly properties (provided as null for WASM mode)
-      processing_time_seconds: null,
-      alignment_score_status: null,
-      // Content hash for dedup (null when crypto.subtle unavailable)
-      content_hash: contentHash ?? undefined,
-    };
+    try {
+      // Create screenshot record without ID (let IndexedDB auto-increment)
+      // Omit id by using Partial and type assertion
+      const screenshotData: Omit<Screenshot, "id"> & { id?: number; content_hash?: string } = {
+        file_path: options?.originalFilepath || file.name,
+        image_type: imageType,
+        uploaded_at: uploadedAt,
+        uploaded_by_id: null,
+        current_annotation_count: 0,
+        target_annotations: 1,
+        has_consensus: null,
+        annotation_status: "pending",
+        processed_at: null,
+        processing_status: "pending",
+        extracted_title: null,
+        extracted_total: null,
+        extracted_hourly_data: null,
+        title_y_position: null,
+        grid_upper_left_x: null,
+        grid_upper_left_y: null,
+        grid_lower_right_x: null,
+        grid_lower_right_y: null,
+        processing_issues: null,
+        has_blocking_issues: false,
+        alignment_score: null,
+        // Folder structure metadata
+        participant_id: options?.participantId ?? null,
+        group_id: options?.groupId ?? null,
+        screenshot_date: options?.screenshotDate ?? null,
+        source_id: null,
+        device_type: null,
+        verified_by_user_ids: null,
+        // Computed readonly properties (provided as null for WASM mode)
+        processing_time_seconds: null,
+        alignment_score_status: null,
+        // Content hash for dedup (null when crypto.subtle unavailable)
+        content_hash: contentHash ?? undefined,
+      };
 
-    // Save to IndexedDB - this will assign a unique auto-incremented ID
-    const id = await this.storageService.saveScreenshot(
-      screenshotData as Screenshot,
-    );
-    await this.storageService.saveImageBlob(id, file);
+      // Save to IndexedDB - this will assign a unique auto-incremented ID
+      const id = await this.storageService.saveScreenshot(
+        screenshotData as Screenshot,
+      );
+      await this.storageService.saveImageBlob(id, file);
 
-    const screenshot: Screenshot = { ...screenshotData, id };
+      const screenshot: Screenshot = { ...screenshotData, id };
 
-    return screenshot;
+      return screenshot;
+    } finally {
+      if (contentHash) {
+        this.uploadingHashes.delete(contentHash);
+      }
+    }
   }
 
   async getImageUrl(screenshotId: number): Promise<string> {
@@ -411,14 +428,19 @@ export class WASMScreenshotService implements IScreenshotService {
       `[WASMScreenshotService.processIfNeeded] Processing screenshot ${screenshot.id}`,
     );
 
+    this.processingInProgress.add(screenshot.id);
     try {
       const imageBlob = await this.storageService.getImageBlob(screenshot.id);
 
       if (!imageBlob) {
         console.warn(
-          `[WASMScreenshotService.processIfNeeded] No image blob for screenshot ${screenshot.id}`,
+          `[WASMScreenshotService.processIfNeeded] No image blob for screenshot ${screenshot.id}, marking as failed`,
         );
-        return screenshot;
+        await this.storageService.updateScreenshot(screenshot.id, {
+          processing_status: "failed",
+          processed_at: new Date().toISOString(),
+        });
+        return { ...screenshot, processing_status: "failed" };
       }
 
       // Determine grid coordinates to use (priority: locked > existing > auto-detect)
@@ -430,11 +452,25 @@ export class WASMScreenshotService implements IScreenshotService {
         const savedGrid = localStorage.getItem("lastGridPosition");
         if (savedGrid) {
           try {
-            gridCoordsToUse = JSON.parse(savedGrid);
-            console.log(
-              `[WASMScreenshotService.processIfNeeded] Using locked grid from localStorage:`,
-              gridCoordsToUse,
-            );
+            const parsed = JSON.parse(savedGrid);
+            // Validate shape before using — malformed JSON would crash the worker
+            if (
+              parsed?.upper_left?.x !== undefined &&
+              parsed?.upper_left?.y !== undefined &&
+              parsed?.lower_right?.x !== undefined &&
+              parsed?.lower_right?.y !== undefined
+            ) {
+              gridCoordsToUse = parsed;
+              console.log(
+                `[WASMScreenshotService.processIfNeeded] Using locked grid from localStorage:`,
+                gridCoordsToUse,
+              );
+            } else {
+              console.warn(
+                `[WASMScreenshotService.processIfNeeded] Invalid grid shape in localStorage, ignoring:`,
+                parsed,
+              );
+            }
           } catch (e) {
             console.warn(
               `[WASMScreenshotService.processIfNeeded] Failed to parse saved grid position, clearing corrupted data:`,
@@ -446,25 +482,14 @@ export class WASMScreenshotService implements IScreenshotService {
       }
       
       // Priority 2: Use existing screenshot grid coordinates if available
-      if (
-        !gridCoordsToUse &&
-        screenshot.grid_upper_left_x != null &&
-        screenshot.grid_lower_right_x != null
-      ) {
-        gridCoordsToUse = {
-          upper_left: {
-            x: screenshot.grid_upper_left_x,
-            y: screenshot.grid_upper_left_y ?? 0,
-          },
-          lower_right: {
-            x: screenshot.grid_lower_right_x,
-            y: screenshot.grid_lower_right_y ?? 0,
-          },
-        };
-        console.log(
-          `[WASMScreenshotService.processIfNeeded] Using existing grid from screenshot:`,
-          gridCoordsToUse,
-        );
+      if (!gridCoordsToUse) {
+        gridCoordsToUse = extractGridCoords(screenshot);
+        if (gridCoordsToUse) {
+          console.log(
+            `[WASMScreenshotService.processIfNeeded] Using existing grid from screenshot:`,
+            gridCoordsToUse,
+          );
+        }
       }
 
       // Use full processImage to get title, total, grid, and hourly data
@@ -502,6 +527,13 @@ export class WASMScreenshotService implements IScreenshotService {
         // Return updated screenshot
         return { ...screenshot, ...updates };
       }
+
+      // processImage returned null — mark as failed to prevent infinite reprocess loop
+      await this.storageService.updateScreenshot(screenshot.id, {
+        processing_status: "failed",
+        processed_at: new Date().toISOString(),
+      });
+      return { ...screenshot, processing_status: "failed" };
     } catch (error) {
       console.error(
         `[WASMScreenshotService.processIfNeeded] Failed for screenshot ${screenshot.id}:`,
@@ -517,37 +549,46 @@ export class WASMScreenshotService implements IScreenshotService {
           `[WASMScreenshotService.processIfNeeded] Failed to update status:`,
           updateError,
         );
+        return { ...screenshot, processing_status: "failed" };
       }
+    } finally {
+      this.processingInProgress.delete(screenshot.id);
     }
-
-    return screenshot;
   }
 
   async getStats(): Promise<QueueStats> {
-    const allScreenshots = await this.storageService.getAllScreenshots();
+    // Use indexed counts instead of loading entire table into memory
+    const [
+      totalScreenshots,
+      pendingAnnotation,
+      annotatedAnnotation,
+      verifiedAnnotation,
+      processingCompleted,
+      processingPending,
+      processingFailed,
+      processingSkipped,
+      processingDeleted,
+      totalAnnotations,
+    ] = await Promise.all([
+      db.screenshots.count(),
+      db.screenshots.where("annotation_status").equals("pending").count(),
+      db.screenshots.where("annotation_status").equals("annotated").count(),
+      db.screenshots.where("annotation_status").equals("verified").count(),
+      db.screenshots.where("processing_status").equals("completed").count(),
+      db.screenshots.where("processing_status").equals("pending").count(),
+      db.screenshots.where("processing_status").equals("failed").count(),
+      db.screenshots.where("processing_status").equals("skipped").count(),
+      db.screenshots.where("processing_status").equals("deleted").count(),
+      db.annotations.count(),
+    ]);
 
-    const totalScreenshots = allScreenshots.length;
-    const pendingScreenshots = allScreenshots.filter(
-      (s) => s.annotation_status === "pending",
-    ).length;
-    const completedScreenshots = allScreenshots.filter(
-      (s) =>
-        s.annotation_status === "annotated" ||
-        s.annotation_status === "verified",
-    ).length;
-    const skipped = allScreenshots.filter(
-      (s) => s.annotation_status === "skipped",
-    ).length;
-
-    // Count all annotations in a single query
-    const totalAnnotations = await db.annotations.count();
-
+    const completedScreenshots = annotatedAnnotation + verifiedAnnotation;
     const averageAnnotations =
       totalScreenshots > 0 ? totalAnnotations / totalScreenshots : 0;
 
     return {
       total_screenshots: totalScreenshots,
-      pending_screenshots: pendingScreenshots,
+      pending_screenshots: pendingAnnotation,
       completed_screenshots: completedScreenshots,
       total_annotations: totalAnnotations,
       screenshots_with_consensus: 0,
@@ -555,16 +596,11 @@ export class WASMScreenshotService implements IScreenshotService {
       average_annotations_per_screenshot:
         Math.round(averageAnnotations * 100) / 100,
       users_active: 1,
-      auto_processed: allScreenshots.filter(
-        (s) => s.processing_status === "completed",
-      ).length,
-      pending: allScreenshots.filter((s) => s.processing_status === "pending")
-        .length,
-      failed: allScreenshots.filter((s) => s.processing_status === "failed")
-        .length,
-      skipped,
-      deleted: allScreenshots.filter((s) => s.processing_status === "deleted")
-        .length,
+      auto_processed: processingCompleted,
+      pending: processingPending,
+      failed: processingFailed,
+      skipped: processingSkipped,
+      deleted: processingDeleted,
     };
   }
 
@@ -711,9 +747,7 @@ export class WASMScreenshotService implements IScreenshotService {
   }
 
   async getGroups(): Promise<Group[]> {
-    const allScreenshots = await db.screenshots.toArray();
-
-    // Aggregate screenshots by group_id
+    // Use cursor-based iteration to avoid loading all screenshots into memory at once
     const groupMap = new Map<
       string,
       {
@@ -728,7 +762,7 @@ export class WASMScreenshotService implements IScreenshotService {
       }
     >();
 
-    for (const s of allScreenshots) {
+    await db.screenshots.each((s) => {
       const gid = s.group_id || "ungrouped";
       const existing = groupMap.get(gid) || {
         count: 0,
@@ -750,13 +784,12 @@ export class WASMScreenshotService implements IScreenshotService {
       else if (ps === "skipped") existing.processing_skipped++;
       else if (ps === "deleted") existing.processing_deleted++;
 
-      // Track earliest created_at
       if (s.uploaded_at && s.uploaded_at < existing.created_at) {
         existing.created_at = s.uploaded_at;
       }
 
       groupMap.set(gid, existing);
-    }
+    });
 
     return Array.from(groupMap.entries()).map(([id, data]) => ({
       id,

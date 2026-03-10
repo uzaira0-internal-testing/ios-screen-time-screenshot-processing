@@ -99,6 +99,7 @@ export interface NavigationSlice {
   navigateNext: () => Promise<void>;
   navigatePrev: () => Promise<void>;
   loadScreenshotList: (params?: ScreenshotListParams) => Promise<void>;
+  loadMoreScreenshots: () => Promise<void>;
   setVerificationFilter: (value: VerificationFilterType) => void;
   verifyCurrentScreenshot: () => Promise<void>;
   unverifyCurrentScreenshot: () => Promise<void>;

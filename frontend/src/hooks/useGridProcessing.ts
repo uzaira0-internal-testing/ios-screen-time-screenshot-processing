@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { GridCoordinates } from "@/types";
 import { toastErrorWithRetry } from "@/utils/toastWithRetry";
 
@@ -66,6 +66,15 @@ export function useGridProcessing(options: UseGridProcessingOptions): UseGridPro
     },
     [onReprocess, onSetGrid],
   );
+
+  // Clean up debounce timer on unmount to prevent wasted reprocess calls
+  useEffect(() => {
+    return () => {
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
+    };
+  }, []);
 
   return {
     isProcessing,
