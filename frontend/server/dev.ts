@@ -73,6 +73,7 @@ async function bundle() {
     minify: false,
     naming: "[name]-[hash].[ext]",
     plugins: [pathAliasPlugin],
+    external: ["@tauri-apps/plugin-process", "@tauri-apps/plugin-updater"],
     define: {
       "process.env.NODE_ENV": JSON.stringify("development"),
     },
