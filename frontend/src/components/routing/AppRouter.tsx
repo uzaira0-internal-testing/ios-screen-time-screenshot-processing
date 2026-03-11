@@ -132,7 +132,9 @@ export const AppRouter: React.FC = () => {
         element={
           <ProtectedRoute>
             {features.preprocessing ? (
-              <UploadPage />
+              <PreprocessingProvider>
+                <UploadPage />
+              </PreprocessingProvider>
             ) : (
               <Navigate to="/" replace />
             )}
