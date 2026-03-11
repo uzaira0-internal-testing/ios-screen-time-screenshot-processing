@@ -62,6 +62,7 @@ export const UpdateBanner = () => {
       });
       setState({ status: "ready" });
     } catch (err) {
+      console.error("[UpdateBanner] Download/install failed:", err);
       setState({
         status: "error",
         message: err instanceof Error ? err.message : "Update failed",
