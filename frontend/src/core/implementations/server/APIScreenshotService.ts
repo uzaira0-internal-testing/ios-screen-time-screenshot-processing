@@ -178,6 +178,11 @@ export class APIScreenshotService implements IScreenshotService {
     return (groups ?? []) as Group[];
   }
 
+  async deleteGroup(groupId: string): Promise<{ screenshots_deleted: number; annotations_deleted: number }> {
+    const result = await api.admin.deleteGroup(groupId);
+    return result;
+  }
+
   async exportCSV(): Promise<string> {
     const csvUrl = api.export.getCSVUrl();
     const response = await fetch(csvUrl, { headers: getAuthHeaders() });

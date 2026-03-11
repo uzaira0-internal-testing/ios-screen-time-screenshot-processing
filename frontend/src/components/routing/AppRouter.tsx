@@ -98,12 +98,16 @@ export const AppRouter: React.FC = () => {
           </ProtectedRoute>
         }
       />
-      {/* Consensus — basic tier view works in all modes */}
+      {/* Consensus — server only (requires multiple users) */}
       <Route
         path="/consensus"
         element={
           <ProtectedRoute>
-            <ConsensusPage />
+            {features.consensusComparison ? (
+              <ConsensusPage />
+            ) : (
+              <Navigate to="/" replace />
+            )}
           </ProtectedRoute>
         }
       />

@@ -127,6 +127,14 @@ export interface IScreenshotService {
   getGroups(): Promise<Group[]>;
 
   /**
+   * Delete a group and all its screenshots, annotations, and blobs.
+   * Server: calls DELETE /admin/groups/{id}
+   * WASM: deletes from IndexedDB + OPFS by group_id
+   * Returns count of deleted screenshots and annotations.
+   */
+  deleteGroup(groupId: string): Promise<{ screenshots_deleted: number; annotations_deleted: number }>;
+
+  /**
    * Export annotations as CSV data string.
    * Server: fetches from /screenshots/export/csv
    * WASM: generates CSV from local IndexedDB data

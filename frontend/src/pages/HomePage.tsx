@@ -237,13 +237,11 @@ export const HomePage = () => {
     }
   };
 
-  // Delete group is server-only — lazy-import api to avoid bundling in WASM mode
   const handleDeleteGroup = async (group: Group) => {
-    if (!features.admin) return;
+    if (!config.isLocalMode && !(features.admin && isAdmin)) return;
     setIsDeleting(true);
     try {
-      const { api } = await import("@/services/apiClient");
-      const result = await api.admin.deleteGroup(group.id);
+      const result = await screenshotService.deleteGroup(group.id);
       toast.success(
         `Deleted "${group.name}" (${result.screenshots_deleted} screenshots, ${result.annotations_deleted} annotations)`,
       );
@@ -428,7 +426,7 @@ export const HomePage = () => {
                       <span className="text-xs text-slate-500 dark:text-slate-400">
                         {new Date(group.created_at).toLocaleDateString()}
                       </span>
-                      {features.admin && isAdmin && (
+                      {(config.isLocalMode || (features.admin && isAdmin)) && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -651,8 +649,8 @@ export const HomePage = () => {
         )}
       </div>
 
-      {/* Delete confirmation modal (admin + server only) */}
-      {features.admin && (
+      {/* Delete confirmation modal */}
+      {(config.isLocalMode || (features.admin && isAdmin)) && (
         <Modal
           open={!!deleteConfirm}
           onOpenChange={(open) => {

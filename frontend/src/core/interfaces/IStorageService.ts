@@ -52,6 +52,8 @@ export interface IStorageService {
 
   getImageBlob(screenshotId: number): Promise<Blob | null>;
 
+  deleteScreenshotsByGroup(groupId: string): Promise<{ screenshots_deleted: number; annotations_deleted: number }>;
+
   clearAll(): Promise<void>;
 
   /**

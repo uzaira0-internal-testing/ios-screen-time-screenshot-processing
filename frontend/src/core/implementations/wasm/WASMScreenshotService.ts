@@ -805,6 +805,10 @@ export class WASMScreenshotService implements IScreenshotService {
     }));
   }
 
+  async deleteGroup(groupId: string): Promise<{ screenshots_deleted: number; annotations_deleted: number }> {
+    return this.storageService.deleteScreenshotsByGroup(groupId);
+  }
+
   async exportCSV(): Promise<string> {
     const allScreenshots = await db.screenshots.toArray();
     const allAnnotations = await db.annotations.toArray();

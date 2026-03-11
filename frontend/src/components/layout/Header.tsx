@@ -29,7 +29,7 @@ export const Header = () => {
     ...(!config.isLocalMode && features.preprocessing ? [{ to: "/upload", label: "Upload" }] : []),
     ...(features.preprocessing ? [{ to: "/preprocessing", label: "Preprocessing" }] : []),
     { to: "/annotate", label: "Annotate" },
-    { to: "/consensus", label: "Consensus" },
+    ...(!config.isLocalMode ? [{ to: "/consensus", label: "Consensus" }] : []),
     { to: "/settings", label: "Settings" },
     ...(features.admin && isAdmin ? [{ to: "/admin", label: "Admin" }] : []),
   ];

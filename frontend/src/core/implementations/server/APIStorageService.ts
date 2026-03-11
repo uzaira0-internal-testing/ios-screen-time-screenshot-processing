@@ -86,6 +86,12 @@ export class APIStorageService implements IStorageService {
     );
   }
 
+  async deleteScreenshotsByGroup(_groupId: string): Promise<{ screenshots_deleted: number; annotations_deleted: number }> {
+    throw new Error(
+      "APIStorageService.deleteScreenshotsByGroup is not used in server mode",
+    );
+  }
+
   async clearAll(): Promise<void> {
     throw new Error("APIStorageService.clearAll is not used in server mode");
   }
