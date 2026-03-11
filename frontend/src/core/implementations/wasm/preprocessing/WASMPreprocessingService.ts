@@ -18,7 +18,17 @@ import type {
   RunStageResult,
 } from "@/core/interfaces/IPreprocessingService";
 import type { IndexedDBStorageService } from "../storage/IndexedDBStorageService";
-import type { Screenshot } from "@/types";
+import type {
+  Screenshot,
+  Group,
+  PreprocessingSummary,
+  PreprocessingEvent,
+  PreprocessingEventLog,
+  PreprocessingDetailsResponse,
+  BrowserUploadResponse,
+  PHIRegionsResponse,
+  PHIRegionRect,
+} from "@/types";
 import { detectDevice } from "./deviceDetection";
 import { cropScreenshot } from "./cropping";
 import { detectPHI, terminateNERWorker, terminateTesseractWorker } from "./phiDetection";
@@ -41,14 +51,6 @@ interface PreprocessingMeta {
   stage_status: Record<string, string>;
   events: PreprocessingEvent[];
   current_events: Record<string, number>;
-}
-
-interface PreprocessingEvent {
-  event_id: number;
-  stage: string;
-  status: string;
-  result: Record<string, unknown>;
-  created_at: string;
 }
 
 function getPreprocessing(screenshot: Screenshot): PreprocessingMeta {
@@ -79,9 +81,13 @@ function addEvent(
   const event: PreprocessingEvent = {
     event_id: eid,
     stage,
-    status,
+    timestamp: new Date().toISOString(),
+    source: "wasm",
+    params: {},
     result,
-    created_at: new Date().toISOString(),
+    output_file: null,
+    input_file: null,
+    supersedes: null,
   };
   return {
     ...pp,
@@ -91,6 +97,30 @@ function addEvent(
   };
 }
 
+/**
+ * Normalize legacy events stored with `created_at` (pre-typed era) to the
+ * current `PreprocessingEvent` shape.  Handles existing IndexedDB data without
+ * requiring a Dexie schema migration since events are stored as an opaque JSON
+ * blob inside `processing_metadata`.
+ */
+function normalizeEvents(events: PreprocessingEvent[]): PreprocessingEvent[] {
+  return events.map((e) => {
+    if (!e.timestamp && (e as Record<string, unknown>).created_at) {
+      const { created_at, status, ...rest } = e as Record<string, unknown>;
+      return {
+        ...rest,
+        timestamp: created_at as string,
+        source: (rest.source as string) ?? "wasm",
+        params: (rest.params as Record<string, unknown>) ?? {},
+        output_file: (rest.output_file as string | null) ?? null,
+        input_file: (rest.input_file as string | null) ?? null,
+        supersedes: (rest.supersedes as number | null) ?? null,
+      } as PreprocessingEvent;
+    }
+    return e;
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Service implementation
 // ---------------------------------------------------------------------------
@@ -98,7 +128,7 @@ function addEvent(
 export class WASMPreprocessingService implements IPreprocessingService {
   constructor(private storage: IndexedDBStorageService) {}
 
-  async getGroups(): Promise<any[]> {
+  async getGroups(): Promise<Group[]> {
     const screenshots = await this.storage.getAllScreenshots();
     // Group by group_id
     const groups = new Map<string, { id: string; name: string; screenshot_count: number }>();
@@ -111,7 +141,7 @@ export class WASMPreprocessingService implements IPreprocessingService {
         groups.set(gid, { id: gid, name: gid, screenshot_count: 1 });
       }
     }
-    return [...groups.values()];
+    return [...groups.values()] as Group[];
   }
 
   async getScreenshots(params: {
@@ -119,14 +149,14 @@ export class WASMPreprocessingService implements IPreprocessingService {
     page_size?: number;
     sort_by?: string;
     sort_order?: string;
-  }): Promise<{ items: any[]; total: number }> {
+  }): Promise<{ items: Screenshot[]; total: number }> {
     const all = await this.storage.getAllScreenshots({ group_id: params.group_id });
     // Sort by id ascending by default
     const sorted = [...all].sort((a, b) => (a.id as number) - (b.id as number));
     return { items: sorted, total: sorted.length };
   }
 
-  async getSummary(groupId: string): Promise<any> {
+  async getSummary(groupId: string): Promise<PreprocessingSummary> {
     const screenshots = await this.storage.getAllScreenshots({ group_id: groupId });
     const stageSummaries: Record<string, Record<string, number>> = {
       device_detection: { completed: 0, pending: 0, invalidated: 0, running: 0, failed: 0, exceptions: 0 },
@@ -149,7 +179,7 @@ export class WASMPreprocessingService implements IPreprocessingService {
     }
 
     const summary = { total: screenshots.length, ...stageSummaries };
-    return summary;
+    return summary as PreprocessingSummary;
   }
 
   async runStage(stage: PreprocessingStage, options: RunStageOptions): Promise<RunStageResult> {
@@ -276,6 +306,7 @@ export class WASMPreprocessingService implements IPreprocessingService {
         );
         const updated = addEvent(pp, stage, "completed", {
           was_cropped: cropResult.wasCropped,
+          was_patched: false,
           original_dimensions: [cropResult.originalDimensions.width, cropResult.originalDimensions.height],
           cropped_dimensions: [cropResult.croppedDimensions.width, cropResult.croppedDimensions.height],
           device_model: cropResult.deviceModel,
@@ -355,7 +386,7 @@ export class WASMPreprocessingService implements IPreprocessingService {
     }
   }
 
-  async resetStage(stage: PreprocessingStage, groupId: string): Promise<any> {
+  async resetStage(stage: PreprocessingStage, groupId: string): Promise<{ message: string; count?: number }> {
     const screenshots = await this.storage.getAllScreenshots({ group_id: groupId });
     const stageIdx = STAGES.indexOf(stage);
     const downstreamStages = STAGES.slice(stageIdx);
@@ -411,23 +442,25 @@ export class WASMPreprocessingService implements IPreprocessingService {
     });
   }
 
-  async getEventLog(screenshotId: number): Promise<any> {
+  async getEventLog(screenshotId: number): Promise<PreprocessingEventLog> {
     const screenshot = await this.storage.getScreenshot(screenshotId);
-    if (!screenshot) return { events: [], stage_status: {} };
+    if (!screenshot) return { screenshot_id: screenshotId, base_file_path: "", events: [], stage_status: {}, current_events: {} };
 
     const pp = getPreprocessing(screenshot);
     return {
-      events: pp.events,
+      screenshot_id: screenshotId,
+      base_file_path: `wasm://screenshot/${screenshotId}`,
+      events: normalizeEvents(pp.events),
       stage_status: pp.stage_status,
       current_events: pp.current_events,
     };
   }
 
-  async getScreenshot(screenshotId: number): Promise<any> {
+  async getScreenshot(screenshotId: number): Promise<Screenshot | null> {
     return this.storage.getScreenshot(screenshotId);
   }
 
-  async uploadBrowser(_formData: FormData): Promise<any> {
+  async uploadBrowser(_formData: FormData): Promise<BrowserUploadResponse> {
     // In WASM mode, uploads go through the WASMScreenshotService
     // This is a compatibility shim — the preprocessing upload tab
     // calls this but in WASM mode we handle uploads differently
@@ -473,6 +506,7 @@ export class WASMPreprocessingService implements IPreprocessingService {
       const pp = getPreprocessing(screenshot);
       const updated = addEvent(pp, "cropping", "completed", {
         was_cropped: true,
+        was_patched: false,
         manual: true,
         crop_region: crop,
         original_dimensions: [origWidth, origHeight],
@@ -484,20 +518,21 @@ export class WASMPreprocessingService implements IPreprocessingService {
     }
   }
 
-  async getPHIRegions(screenshotId: number): Promise<any> {
+  async getPHIRegions(screenshotId: number): Promise<PHIRegionsResponse> {
     const screenshot = await this.storage.getScreenshot(screenshotId);
-    if (!screenshot) return { regions: [] };
+    if (!screenshot) return { regions: [], source: null, event_id: null };
 
     const pp = getPreprocessing(screenshot);
     const detectionEventId = pp.current_events.phi_detection;
     const detectionEvent = pp.events.find((e) => e.event_id === detectionEventId);
     return {
       regions: (detectionEvent?.result as any)?.phi_entities ?? [],
-      preset: "screen_time",
+      source: "wasm",
+      event_id: detectionEventId ?? null,
     };
   }
 
-  async savePHIRegions(screenshotId: number, body: any): Promise<void> {
+  async savePHIRegions(screenshotId: number, body: { regions: PHIRegionRect[]; preset: string }): Promise<void> {
     const screenshot = await this.storage.getScreenshot(screenshotId);
     if (!screenshot) throw new Error(`Screenshot ${screenshotId} not found`);
 
@@ -514,7 +549,7 @@ export class WASMPreprocessingService implements IPreprocessingService {
     });
   }
 
-  async applyRedaction(screenshotId: number, body: any): Promise<void> {
+  async applyRedaction(screenshotId: number, body: { regions: PHIRegionRect[]; redaction_method: string }): Promise<void> {
     const blob = await this.storage.getImageBlob(screenshotId);
     if (!blob) throw new Error("No image blob for redaction");
 
@@ -540,13 +575,24 @@ export class WASMPreprocessingService implements IPreprocessingService {
     }
   }
 
-  async getDetails(screenshotId: number): Promise<any> {
+  async getDetails(screenshotId: number): Promise<PreprocessingDetailsResponse | null> {
     const screenshot = await this.storage.getScreenshot(screenshotId);
     if (!screenshot) return null;
+    const pp = getPreprocessing(screenshot);
+    // Build a PreprocessingDetailsResponse from the stored metadata
+    const devEvent = pp.events.find((e) => e.event_id === pp.current_events.device_detection);
+    const cropEvent = pp.events.find((e) => e.event_id === pp.current_events.cropping);
+    const phiDetEvent = pp.events.find((e) => e.event_id === pp.current_events.phi_detection);
+    const phiRedEvent = pp.events.find((e) => e.event_id === pp.current_events.phi_redaction);
     return {
-      ...screenshot,
-      preprocessing: getPreprocessing(screenshot),
-    };
+      has_preprocessing: Object.keys(pp.stage_status).length > 0,
+      device_detection: devEvent?.result ?? null,
+      cropping: cropEvent?.result ?? null,
+      phi_detection: phiDetEvent?.result ?? null,
+      phi_redaction: phiRedEvent?.result ?? null,
+      stage_status: pp.stage_status,
+      current_events: pp.current_events,
+    } as PreprocessingDetailsResponse;
   }
 
   // Track blob URLs created from stage blobs so callers can revoke them

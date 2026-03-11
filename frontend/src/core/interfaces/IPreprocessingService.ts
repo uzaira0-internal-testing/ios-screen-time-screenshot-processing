@@ -1,3 +1,14 @@
+import type {
+  Group,
+  Screenshot,
+  PreprocessingSummary,
+  PreprocessingEventLog,
+  PreprocessingDetailsResponse,
+  BrowserUploadResponse,
+  PHIRegionsResponse,
+  PHIRegionRect,
+} from "@/types";
+
 export type PreprocessingStage = "device_detection" | "cropping" | "phi_detection" | "phi_redaction";
 
 /** A PHI region detected in an image, with bounding box and metadata. */
@@ -28,26 +39,26 @@ export interface RunStageResult {
 }
 
 export interface IPreprocessingService {
-  getGroups(): Promise<any[]>;
+  getGroups(): Promise<Group[]>;
   getScreenshots(params: {
     group_id: string;
     page_size?: number;
     sort_by?: string;
     sort_order?: string;
-  }): Promise<{ items: any[]; total: number }>;
-  getSummary(groupId: string): Promise<any>;
+  }): Promise<{ items: Screenshot[]; total: number }>;
+  getSummary(groupId: string): Promise<PreprocessingSummary>;
   runStage(stage: PreprocessingStage, options: RunStageOptions): Promise<RunStageResult>;
-  resetStage(stage: PreprocessingStage, groupId: string): Promise<any>;
+  resetStage(stage: PreprocessingStage, groupId: string): Promise<{ message: string; count?: number }>;
   invalidateFromStage(screenshotId: number, stage: string): Promise<void>;
-  getEventLog(screenshotId: number): Promise<any>;
-  getScreenshot(screenshotId: number): Promise<any>;
-  uploadBrowser(formData: FormData): Promise<any>;
+  getEventLog(screenshotId: number): Promise<PreprocessingEventLog>;
+  getScreenshot(screenshotId: number): Promise<Screenshot | null>;
+  uploadBrowser(formData: FormData): Promise<BrowserUploadResponse>;
   getOriginalImageUrl(screenshotId: number): Promise<string>;
   applyManualCrop(screenshotId: number, crop: { left: number; top: number; right: number; bottom: number }): Promise<void>;
-  getPHIRegions(screenshotId: number): Promise<any>;
-  savePHIRegions(screenshotId: number, body: any): Promise<void>;
-  applyRedaction(screenshotId: number, body: any): Promise<void>;
-  getDetails(screenshotId: number): Promise<any>;
+  getPHIRegions(screenshotId: number): Promise<PHIRegionsResponse>;
+  savePHIRegions(screenshotId: number, body: { regions: PHIRegionRect[]; preset: string }): Promise<void>;
+  applyRedaction(screenshotId: number, body: { regions: PHIRegionRect[]; redaction_method: string }): Promise<void>;
+  getDetails(screenshotId: number): Promise<PreprocessingDetailsResponse | null>;
   getStageImageUrl(screenshotId: number, stage: string): Promise<string>;
   /** Get the current image URL for a screenshot (latest processed version). */
   getImageUrl(screenshotId: number): Promise<string>;

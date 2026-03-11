@@ -79,6 +79,12 @@ export type BatchPreprocessResponse =
 export type PreprocessingDetailsResponse =
   components["schemas"]["PreprocessingDetailsResponse"];
 
+// PHI types
+export type PHIRegionsResponse = components["schemas"]["PHIRegionsResponse"];
+export type BrowserUploadResponse =
+  components["schemas"]["BrowserUploadResponse"];
+export type PHIRegionRect = components["schemas"]["PHIRegionRect"];
+
 // Composable pipeline types
 export type StagePreprocessRequest =
   components["schemas"]["StagePreprocessRequest"];

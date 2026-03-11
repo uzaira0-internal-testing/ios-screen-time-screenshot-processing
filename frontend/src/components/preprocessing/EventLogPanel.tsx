@@ -112,7 +112,7 @@ export const EventLogPanel = () => {
                   )}
                 </div>
                 <div className="text-slate-400 mb-1">
-                  {new Date(event.timestamp || (event as any).created_at).toLocaleString()}
+                  {new Date(event.timestamp).toLocaleString()}
                 </div>
                 {/* Result summary */}
                 <div className="mt-1 text-slate-600 dark:text-slate-400">
