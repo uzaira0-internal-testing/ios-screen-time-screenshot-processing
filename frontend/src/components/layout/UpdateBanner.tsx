@@ -18,18 +18,23 @@ export const UpdateBanner = () => {
     if (!config.isTauri) return;
 
     const timer = setTimeout(async () => {
+      console.log("[UpdateBanner] Checking for updates...");
       setState({ status: "checking" });
       try {
         const { checkForUpdate } = await import("../../lib/updater");
         const info = await checkForUpdate();
+        console.log("[UpdateBanner] Check result:", info);
         if (info) {
           setState({ status: "available", info });
         } else {
           setState({ status: "idle" });
         }
       } catch (err) {
-        console.warn("[UpdateBanner] Update check failed:", err);
-        setState({ status: "idle" });
+        console.error("[UpdateBanner] Update check failed:", err);
+        setState({
+          status: "error",
+          message: err instanceof Error ? err.message : "Update check failed",
+        });
       }
     }, 3000);
 
