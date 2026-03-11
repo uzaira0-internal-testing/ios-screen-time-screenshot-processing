@@ -157,7 +157,7 @@ jobs:
         run: |
           mkdir -p release-assets
           find artifacts -type f \( \
-            -name '*.tar.gz' -o -name '*.nsis.zip' -o -name '*.sig' \
+            -name '*.tar.gz' -o -name '*.sig' \
             -o -name '*.dmg' -o -name '*.exe' -o -name '*.msi' \
             -o -name '*.deb' -o -name '*.AppImage' \
           \) -exec cp {} release-assets/ \;
@@ -182,18 +182,18 @@ jobs:
             MAC_SIG=$(cat "${MAC_TARBALL}.sig")
           fi
 
-          # --- Windows (NSIS) ---
-          WIN_NSIS_ZIP=$(ls *nsis.zip 2>/dev/null | grep -v '.sig$' | head -1 || true)
+          # --- Windows (NSIS exe — v2 format, no .nsis.zip wrapper) ---
+          WIN_EXE=$(ls *-setup.exe 2>/dev/null | grep -v '.sig$' | head -1 || true)
           WIN_SIG=""
-          if [[ -n "$WIN_NSIS_ZIP" && -f "${WIN_NSIS_ZIP}.sig" ]]; then
-            WIN_SIG=$(cat "${WIN_NSIS_ZIP}.sig")
+          if [[ -n "$WIN_EXE" && -f "${WIN_EXE}.sig" ]]; then
+            WIN_SIG=$(cat "${WIN_EXE}.sig")
           fi
 
-          # --- Linux (AppImage) ---
-          LINUX_APPIMAGE_TARBALL=$(ls *.AppImage.tar.gz 2>/dev/null | head -1 || true)
+          # --- Linux (AppImage — v2 format, no .tar.gz wrapper) ---
+          LINUX_APPIMAGE=$(ls *.AppImage 2>/dev/null | grep -v '.sig$' | head -1 || true)
           LINUX_SIG=""
-          if [[ -n "$LINUX_APPIMAGE_TARBALL" && -f "${LINUX_APPIMAGE_TARBALL}.sig" ]]; then
-            LINUX_SIG=$(cat "${LINUX_APPIMAGE_TARBALL}.sig")
+          if [[ -n "$LINUX_APPIMAGE" && -f "${LINUX_APPIMAGE}.sig" ]]; then
+            LINUX_SIG=$(cat "${LINUX_APPIMAGE}.sig")
           fi
 
           # Build JSON dynamically — only include platforms with artifacts + signatures
@@ -204,13 +204,13 @@ jobs:
               \"darwin-aarch64\": { \"signature\": \"${MAC_SIG}\", \"url\": \"${BASE_URL}/${MAC_TARBALL}\" },
               \"darwin-x86_64\": { \"signature\": \"${MAC_SIG}\", \"url\": \"${BASE_URL}/${MAC_TARBALL}\" }"
           fi
-          if [[ -n "$WIN_NSIS_ZIP" && -n "$WIN_SIG" ]]; then
+          if [[ -n "$WIN_EXE" && -n "$WIN_SIG" ]]; then
             PLATFORMS="${PLATFORMS:+$PLATFORMS,}
-              \"windows-x86_64\": { \"signature\": \"${WIN_SIG}\", \"url\": \"${BASE_URL}/${WIN_NSIS_ZIP}\" }"
+              \"windows-x86_64\": { \"signature\": \"${WIN_SIG}\", \"url\": \"${BASE_URL}/${WIN_EXE}\" }"
           fi
-          if [[ -n "$LINUX_APPIMAGE_TARBALL" && -n "$LINUX_SIG" ]]; then
+          if [[ -n "$LINUX_APPIMAGE" && -n "$LINUX_SIG" ]]; then
             PLATFORMS="${PLATFORMS:+$PLATFORMS,}
-              \"linux-x86_64\": { \"signature\": \"${LINUX_SIG}\", \"url\": \"${BASE_URL}/${LINUX_APPIMAGE_TARBALL}\" }"
+              \"linux-x86_64\": { \"signature\": \"${LINUX_SIG}\", \"url\": \"${BASE_URL}/${LINUX_APPIMAGE}\" }"
           fi
 
           if [[ -z "$PLATFORMS" ]]; then
