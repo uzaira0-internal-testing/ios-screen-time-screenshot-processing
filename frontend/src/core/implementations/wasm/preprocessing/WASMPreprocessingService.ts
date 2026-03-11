@@ -225,7 +225,7 @@ export class WASMPreprocessingService implements IPreprocessingService {
         completed++;
         options.onProgress?.(completed, eligible.length);
         // Yield to browser so the progress bar repaints
-        await new Promise((r) => setTimeout(r, 0));
+        await new Promise<void>((r) => { setTimeout(r, 0); });
       } catch (err) {
         console.error(`[WASM] ${stage} failed for screenshot ${screenshot.id}:`, err);
         // Mark as exception
@@ -413,8 +413,8 @@ export class WASMPreprocessingService implements IPreprocessingService {
     for (const s of screenshots) {
       const pp = getPreprocessing(s);
       let changed = false;
-      let newStageStatus = { ...pp.stage_status };
-      let newCurrentEvents = { ...pp.current_events };
+      const newStageStatus = { ...pp.stage_status };
+      const newCurrentEvents = { ...pp.current_events };
       for (const ds of downstreamStages) {
         if (newStageStatus[ds] && newStageStatus[ds] !== "pending") {
           newStageStatus[ds] = "pending";
