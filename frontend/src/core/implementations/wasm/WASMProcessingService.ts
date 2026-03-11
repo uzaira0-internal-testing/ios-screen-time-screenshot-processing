@@ -297,13 +297,14 @@ export class WASMProcessingService implements IProcessingService {
   async detectGrid(
     imageData: ImageData | Blob,
     imageType: ImageType,
+    method?: "ocr_anchored" | "line_based",
   ): Promise<GridCoordinates | null> {
     const imgData = await this.ensureReadyAndConvert(imageData);
     const result = await this.sendMessage<{
       gridCoordinates: GridCoordinates | null;
     }>({
       type: "DETECT_GRID",
-      payload: { imageData: imgData, imageType },
+      payload: { imageData: imgData, imageType, method },
     });
     return result.gridCoordinates;
   }

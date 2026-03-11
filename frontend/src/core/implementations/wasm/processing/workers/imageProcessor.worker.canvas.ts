@@ -24,6 +24,7 @@ import { imageDataToMat, convertDarkMode } from "../imageUtils.canvas";
 import { findScreenshotTitle, findScreenshotTotalUsage } from "../ocr.canvas";
 import { extractHourlyData } from "../barExtraction.canvas";
 import { detectGrid } from "../gridDetection.canvas";
+import { detectGridLineBased } from "../lineBasedDetection.canvas";
 
 let tesseractWorker: TesseractWorker | null = null;
 let initialized = false;
@@ -361,17 +362,27 @@ async function handleDetectGrid(
   id: string,
   payload: DetectGridMessage["payload"],
 ): Promise<void> {
-  if (!tesseractWorker) {
-    throw new Error("Worker not initialized - Tesseract not available");
-  }
-
   const mat = imageDataToMat(payload.imageData);
   const darkModeConverted = convertDarkMode(mat);
 
-  const gridCoordinates = await detectGrid(
-    tesseractWorker,
-    darkModeConverted,
-  );
+  let gridCoordinates;
+
+  if (payload.method === "line_based") {
+    // Line-based detection — no OCR required
+    const result = detectGridLineBased(darkModeConverted);
+    gridCoordinates = result.gridCoordinates;
+    console.log("[Worker.handleDetectGrid] Line-based result:", {
+      found: !!gridCoordinates,
+      confidence: result.confidence,
+      diagnostics: result.diagnostics,
+    });
+  } else {
+    // OCR-anchored detection (default)
+    if (!tesseractWorker) {
+      throw new Error("Worker not initialized - Tesseract not available");
+    }
+    gridCoordinates = await detectGrid(tesseractWorker, darkModeConverted);
+  }
 
   const response: WorkerResponse = {
     type: "DETECT_GRID_COMPLETE",

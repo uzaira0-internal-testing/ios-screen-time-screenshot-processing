@@ -41,7 +41,7 @@ export interface IProcessingService {
     imageType: ImageType
   ): Promise<HourlyData>;
 
-  detectGrid(imageData: ImageData | Blob, imageType: ImageType): Promise<GridCoordinates | null>;
+  detectGrid(imageData: ImageData | Blob, imageType: ImageType, method?: "ocr_anchored" | "line_based"): Promise<GridCoordinates | null>;
 
   initialize(): Promise<void>;
 

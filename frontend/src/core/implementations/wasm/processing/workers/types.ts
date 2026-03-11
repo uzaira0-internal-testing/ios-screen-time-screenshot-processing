@@ -39,6 +39,8 @@ export interface ExtractHourlyDataPayload {
 export interface DetectGridPayload {
   imageData: ImageData;
   imageType: ImageType;
+  /** If "line_based", uses line-based detection (no OCR). Default is OCR-anchored. */
+  method?: "ocr_anchored" | "line_based";
 }
 
 export interface WorkerMessage {

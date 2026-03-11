@@ -282,29 +282,6 @@ export class WASMScreenshotService implements IScreenshotService {
     _onProgress?: (progress: ProcessingProgress) => void,
     _maxShift?: number, // Ignored in WASM mode - optimization is server-side only
   ): Promise<ProcessingResult> {
-    // WASM mode doesn't support line-based detection (requires server-side processing)
-    if (method === "line_based") {
-      return {
-        success: false,
-        processing_status: "failed",
-        skipped: false,
-        extracted_title: null,
-        extracted_total: null,
-        extracted_hourly_data: null,
-        issues: [
-          {
-            issue_type: "UnsupportedMethod",
-            severity: "blocking" as const,
-            description:
-              "Line-based detection is not available in offline mode. Please use server mode or select grid manually.",
-          },
-        ],
-        has_blocking_issues: true,
-        is_daily_total: false,
-      };
-    }
-
-    // For ocr_anchored, just do a full reprocess without grid coords
     const screenshot = await this.getById(screenshotId);
     const imageBlob = await this.storageService.getImageBlob(screenshotId);
 
@@ -312,9 +289,24 @@ export class WASMScreenshotService implements IScreenshotService {
       throw new Error("Image blob not found for screenshot " + screenshotId);
     }
 
-    const result = await this.processingService.processImage(imageBlob, {
+    // For line_based, detect grid first with that method, then process with those coords
+    let gridCoordinates: GridCoordinates | undefined;
+    if (method === "line_based") {
+      const detected = await this.processingService.detectGrid(imageBlob, screenshot.image_type, "line_based");
+      if (detected) {
+        gridCoordinates = detected;
+      }
+      // If line-based fails, fall through to process without grid (will auto-detect with OCR)
+    }
+
+    const processConfig: { imageType: typeof screenshot.image_type; gridCoordinates?: GridCoordinates } = {
       imageType: screenshot.image_type,
-    });
+    };
+    if (gridCoordinates) {
+      processConfig.gridCoordinates = gridCoordinates;
+    }
+
+    const result = await this.processingService.processImage(imageBlob, processConfig);
 
     if (result) {
       // Check if grid detection specifically failed
