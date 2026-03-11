@@ -85,15 +85,17 @@ export const EventLogPanel = () => {
                     <span className="font-semibold text-slate-700 dark:text-slate-300">
                       #{event.event_id}
                     </span>
-                    <span
-                      className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                        event.source === "auto"
-                          ? "bg-primary-100 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400"
-                          : "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
-                      }`}
-                    >
-                      {event.source}
-                    </span>
+                    {event.source && (
+                      <span
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                          event.source === "auto"
+                            ? "bg-primary-100 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400"
+                            : "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
+                        }`}
+                      >
+                        {event.source}
+                      </span>
+                    )}
                     <span className="text-slate-500">
                       {STAGE_LABELS[event.stage] ?? event.stage}
                     </span>
@@ -110,7 +112,7 @@ export const EventLogPanel = () => {
                   )}
                 </div>
                 <div className="text-slate-400 mb-1">
-                  {new Date(event.timestamp).toLocaleString()}
+                  {new Date(event.timestamp || (event as any).created_at).toLocaleString()}
                 </div>
                 {/* Result summary */}
                 <div className="mt-1 text-slate-600 dark:text-slate-400">
@@ -136,9 +138,11 @@ export const EventLogPanel = () => {
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-2 border-t border-slate-100 dark:border-slate-700 text-xs text-slate-400">
-        Base: {eventLog.base_file_path.split("/").pop()}
-      </div>
+      {eventLog.base_file_path && (
+        <div className="px-4 py-2 border-t border-slate-100 dark:border-slate-700 text-xs text-slate-400">
+          Base: {eventLog.base_file_path.split("/").pop()}
+        </div>
+      )}
     </div>
   );
 };

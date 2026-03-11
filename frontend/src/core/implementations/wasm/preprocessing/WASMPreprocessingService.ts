@@ -276,8 +276,8 @@ export class WASMPreprocessingService implements IPreprocessingService {
         );
         const updated = addEvent(pp, stage, "completed", {
           was_cropped: cropResult.wasCropped,
-          original_dimensions: cropResult.originalDimensions,
-          cropped_dimensions: cropResult.croppedDimensions,
+          original_dimensions: [cropResult.originalDimensions.width, cropResult.originalDimensions.height],
+          cropped_dimensions: [cropResult.croppedDimensions.width, cropResult.croppedDimensions.height],
           device_model: cropResult.deviceModel,
           is_ipad: (detectionEvent?.result as any)?.device_category === "ipad",
         });
@@ -449,8 +449,10 @@ export class WASMPreprocessingService implements IPreprocessingService {
     if (!blob) throw new Error("No image blob for manual crop");
 
     const bitmap = await createImageBitmap(blob);
-    const cropWidth = bitmap.width - crop.left - crop.right;
-    const cropHeight = bitmap.height - crop.top - crop.bottom;
+    const origWidth = bitmap.width;
+    const origHeight = bitmap.height;
+    const cropWidth = origWidth - crop.left - crop.right;
+    const cropHeight = origHeight - crop.top - crop.bottom;
 
     const canvas = new OffscreenCanvas(cropWidth, cropHeight);
     const ctx = canvas.getContext("2d");
@@ -471,9 +473,10 @@ export class WASMPreprocessingService implements IPreprocessingService {
       const pp = getPreprocessing(screenshot);
       const updated = addEvent(pp, "cropping", "completed", {
         was_cropped: true,
-        manual_crop: true,
+        manual: true,
         crop_region: crop,
-        cropped_dimensions: { width: cropWidth, height: cropHeight },
+        original_dimensions: [origWidth, origHeight],
+        cropped_dimensions: [cropWidth, cropHeight],
       });
       await this.storage.updateScreenshot(screenshotId, {
         processing_metadata: setPreprocessing(screenshot, updated),

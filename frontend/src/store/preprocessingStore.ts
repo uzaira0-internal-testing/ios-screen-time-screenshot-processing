@@ -8,6 +8,7 @@ import type {
   PreprocessingEventLog,
 } from "@/types";
 import type { IPreprocessingService } from "@/core/interfaces/IPreprocessingService";
+import { config } from "@/config";
 import toast from "react-hot-toast";
 
 // Local types not in backend schema (UI-only concerns)
@@ -322,12 +323,21 @@ export function createPreprocessingStore(service: IPreprocessingService) {
       const result = await service.runStage(stage, options);
       if (result && result.queued_count > 0) {
         toast.success(result.message);
-        set({
-          stageProgress: { completed: 0, total: result.queued_count },
-          _queuedCount: result.queued_count,
-        });
-        // Start polling for completion
-        get().startPolling();
+
+        if (config.isLocalMode) {
+          // WASM mode: runStage already completed all work synchronously.
+          // Skip polling — just refresh and mark done.
+          set({ isRunningStage: false, stageProgress: null });
+          await get().loadScreenshots();
+          await get().loadSummary();
+        } else {
+          // Server mode: work is queued on Celery — poll for completion.
+          set({
+            stageProgress: { completed: 0, total: result.queued_count },
+            _queuedCount: result.queued_count,
+          });
+          get().startPolling();
+        }
       } else {
         // Nothing queued — done immediately
         if (result) toast.success(result.message);
