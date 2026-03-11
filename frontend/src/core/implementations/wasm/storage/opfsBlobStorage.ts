@@ -181,6 +181,34 @@ export async function deleteImageBlob(id: number): Promise<void> {
   }
 }
 
+/** All known preprocessing stage names — must match stageIndex(). */
+const ALL_STAGES = ["device_detection", "cropping", "phi_detection", "phi_redaction"] as const;
+
+/**
+ * Delete the main image blob AND all stage blobs for a screenshot.
+ * Handles both OPFS and IndexedDB fallback paths. Best-effort — logs warnings on failure.
+ */
+export async function deleteAllBlobsForScreenshot(id: number): Promise<void> {
+  revokeObjectURL(id);
+
+  const root = await getOpfsRoot();
+  if (root) {
+    const names = [`${id}.img`, ...ALL_STAGES.map((s) => `${id}_stage_${s}.img`)];
+    await Promise.allSettled(
+      names.map((name) =>
+        root.removeEntry(name).catch((err) => {
+          if (!(err instanceof DOMException && err.name === "NotFoundError")) {
+            console.warn(`[opfsBlobStorage] Failed to delete ${name}:`, err);
+          }
+        }),
+      ),
+    );
+  } else {
+    const stageKeys = ALL_STAGES.map((_, i) => -(id * 100 + (i + 1)));
+    await db.imageBlobs.bulkDelete([id, ...stageKeys]);
+  }
+}
+
 /**
  * Create an object URL for a screenshot image.
  *

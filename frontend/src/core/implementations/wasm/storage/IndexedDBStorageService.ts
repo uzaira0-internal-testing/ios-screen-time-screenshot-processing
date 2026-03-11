@@ -13,7 +13,7 @@ import { db } from "./database";
 import {
   storeImageBlob,
   retrieveImageBlob,
-  deleteImageBlob,
+  deleteAllBlobsForScreenshot,
   clearAllOpfsBlobs,
   getTotalBlobSize,
   storeStageBlob,
@@ -65,20 +65,63 @@ export class IndexedDBStorageService implements IStorageService {
   private dbOpenFailed = false;
 
   constructor() {
-    this.dbReady = db.open().then(
-      () => {},
-      (error) => {
-        this.dbOpenFailed = true;
-        console.error("Failed to open IndexedDB:", error);
-        throw new Error(
-          `IndexedDB unavailable: ${error instanceof Error ? error.message : String(error)}. ` +
-            "Local storage mode requires IndexedDB. Check that you are not in private browsing mode.",
-        );
-      },
-    );
-
-    // Request persistent storage to prevent browser from evicting data
+    this.dbReady = this.initializeDb();
     this.requestPersistentStorage();
+  }
+
+  private async initializeDb(): Promise<void> {
+    try {
+      await this.maybeBackupBeforeMigration();
+      await db.open();
+    } catch (error) {
+      this.dbOpenFailed = true;
+      console.error("Failed to open IndexedDB:", error);
+      throw new Error(
+        `IndexedDB unavailable: ${error instanceof Error ? error.message : String(error)}. ` +
+          "Local storage mode requires IndexedDB. Check that you are not in private browsing mode.",
+      );
+    }
+  }
+
+  private async maybeBackupBeforeMigration(): Promise<void> {
+    let currentVersion: number;
+    try {
+      currentVersion = await new Promise<number>((resolve, reject) => {
+        let resolved = false;
+        const req = indexedDB.open("ScreenshotProcessorDB");
+        req.onupgradeneeded = () => {
+          // DB doesn't exist yet — abort to avoid creating it, resolve as 0
+          req.transaction?.abort();
+          resolved = true;
+          resolve(0);
+        };
+        req.onsuccess = () => {
+          if (!resolved) {
+            resolve(req.result.version);
+            req.result.close();
+          }
+        };
+        req.onerror = () => {
+          // onerror fires after onupgradeneeded abort — ignore if already resolved
+          if (!resolved) reject(req.error);
+        };
+      });
+    } catch (err) {
+      console.error("[Migration] Failed to probe DB version:", err);
+      return;
+    }
+
+    const targetVersion = db.verno;
+    if (currentVersion > 0 && currentVersion < targetVersion) {
+      try {
+        const { createPreMigrationBackup } = await import(
+          "./database/preMigrationBackup"
+        );
+        await createPreMigrationBackup("ScreenshotProcessorDB");
+      } catch (err) {
+        console.warn("[Migration] Pre-migration backup failed (continuing):", err);
+      }
+    }
   }
 
   /** Ensure the database is open before performing operations. */
@@ -199,6 +242,7 @@ export class IndexedDBStorageService implements IStorageService {
   }
 
   async updateScreenshot(id: number, data: Partial<Screenshot>): Promise<void> {
+    await this.ensureDB();
     try {
       const updated = await db.screenshots.update(id, data);
       if (updated === 0) {
@@ -211,8 +255,9 @@ export class IndexedDBStorageService implements IStorageService {
   }
 
   async deleteScreenshot(id: number): Promise<void> {
+    await this.ensureDB();
     try {
-      // Delete IndexedDB records atomically, then clean up OPFS blob separately
+      // Delete IndexedDB records atomically, then clean up OPFS blobs separately
       // (OPFS is outside IndexedDB transaction scope)
       await db.transaction(
         "rw",
@@ -222,12 +267,11 @@ export class IndexedDBStorageService implements IStorageService {
         async () => {
           await db.screenshots.delete(id);
           await db.annotations.where("screenshot_id").equals(id).delete();
-          // Delete IndexedDB fallback blob (if any) inside transaction
           await db.imageBlobs.delete(id);
         },
       );
-      // Delete OPFS blob outside transaction — best-effort cleanup
-      await deleteImageBlob(id);
+      // Delete OPFS blobs (main + stage) outside transaction — best-effort cleanup
+      await deleteAllBlobsForScreenshot(id);
     } catch (error) {
       console.error("Failed to delete screenshot:", error);
       throw error;
@@ -372,6 +416,45 @@ export class IndexedDBStorageService implements IStorageService {
       return await retrieveStageBlob(screenshotId, stage);
     } catch (error) {
       console.error(`Failed to get stage blob for ${stage}:`, error);
+      throw error;
+    }
+  }
+
+  async deleteScreenshotsByGroup(groupId: string): Promise<{ screenshots_deleted: number; annotations_deleted: number }> {
+    await this.ensureDB();
+    try {
+      const screenshots = await db.screenshots
+        .where("group_id")
+        .equals(groupId)
+        .toArray();
+
+      const screenshotIds = screenshots.map((s) => s.id!);
+      if (screenshotIds.length === 0) {
+        return { screenshots_deleted: 0, annotations_deleted: 0 };
+      }
+
+      // Delete records atomically, capturing annotation count from delete() return values
+      let annotationsDeleted = 0;
+      await db.transaction(
+        "rw",
+        db.screenshots,
+        db.annotations,
+        db.imageBlobs,
+        async () => {
+          await db.screenshots.bulkDelete(screenshotIds);
+          for (const id of screenshotIds) {
+            annotationsDeleted += await db.annotations.where("screenshot_id").equals(id).delete();
+            await db.imageBlobs.delete(id);
+          }
+        },
+      );
+
+      // Delete OPFS blobs (main + stage) outside transaction — best-effort cleanup
+      await Promise.allSettled(screenshotIds.map((id) => deleteAllBlobsForScreenshot(id)));
+
+      return { screenshots_deleted: screenshotIds.length, annotations_deleted: annotationsDeleted };
+    } catch (error) {
+      console.error("Failed to delete screenshots by group:", error);
       throw error;
     }
   }

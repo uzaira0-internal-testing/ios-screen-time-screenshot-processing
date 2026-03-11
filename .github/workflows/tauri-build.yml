@@ -1,8 +1,17 @@
 name: Tauri Build
+
 on:
   push:
     tags: ['tauri-v*']
   workflow_dispatch:
+    inputs:
+      prerelease:
+        description: 'Mark as prerelease'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -54,21 +63,185 @@ jobs:
         working-directory: frontend
         run: npx vite build
 
-      - name: Install Tauri CLI
-        run: npm install -g @tauri-apps/cli@^2
+      - name: Validate updater config
+        run: |
+          PUBKEY=$(jq -r '.plugins.updater.pubkey' frontend/src-tauri/tauri.conf.json)
+          if [[ "$PUBKEY" == "REPLACE_WITH_PUBLIC_KEY" ]]; then
+            echo "::error::Updater public key is still a placeholder! Run: cd frontend && npx @tauri-apps/cli signer generate"
+            exit 1
+          fi
 
       - name: Build Tauri
         working-directory: frontend
-        run: tauri build
+        run: npx @tauri-apps/cli build ${{ matrix.os == 'macos-latest' && '--target universal-apple-darwin' || '' }}
         env:
           CI: true
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload updater artifacts
+        uses: actions/upload-artifact@v4
         with:
-          name: tauri-${{ matrix.os }}
+          name: updater-${{ matrix.target }}
           path: |
-            frontend/src-tauri/target/release/bundle/**/*.dmg
-            frontend/src-tauri/target/release/bundle/**/*.exe
-            frontend/src-tauri/target/release/bundle/**/*.msi
-            frontend/src-tauri/target/release/bundle/**/*.deb
-            frontend/src-tauri/target/release/bundle/**/*.AppImage
+            frontend/src-tauri/target/**/release/bundle/**/*.tar.gz
+            frontend/src-tauri/target/**/release/bundle/**/*.nsis.zip
+            frontend/src-tauri/target/**/release/bundle/**/*.sig
+          if-no-files-found: warn
+
+      - name: Upload installer artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.target }}
+          path: |
+            frontend/src-tauri/target/**/release/bundle/**/*.dmg
+            frontend/src-tauri/target/**/release/bundle/**/*.exe
+            frontend/src-tauri/target/**/release/bundle/**/*.msi
+            frontend/src-tauri/target/**/release/bundle/**/*.deb
+            frontend/src-tauri/target/**/release/bundle/**/*.AppImage
+          if-no-files-found: warn
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Determine version and tag
+        id: version
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_PRERELEASE: ${{ github.event.inputs.prerelease }}
+        run: |
+          if [[ "$REF_TYPE" == "tag" ]]; then
+            TAG="$REF_NAME"
+            VERSION="${TAG#tauri-v}"
+          else
+            VERSION=$(jq -r '.version' frontend/src-tauri/tauri.conf.json)
+            TAG="tauri-v${VERSION}"
+          fi
+
+          # Detect prerelease: tag contains '-' (e.g. 0.2.0-beta.1) OR workflow_dispatch input
+          PRERELEASE="false"
+          if [[ "$VERSION" == *-* ]]; then
+            PRERELEASE="true"
+          fi
+          if [[ "$INPUT_PRERELEASE" == "true" ]]; then
+            PRERELEASE="true"
+          fi
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "prerelease=${PRERELEASE}" >> "$GITHUB_OUTPUT"
+          echo "Version: ${VERSION}, Tag: ${TAG}, Prerelease: ${PRERELEASE}"
+
+      - name: Create tag for workflow_dispatch
+        if: github.ref_type != 'tag'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "$TAG"
+          git push origin "$TAG"
+
+      - name: Flatten artifacts
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f \( \
+            -name '*.tar.gz' -o -name '*.nsis.zip' -o -name '*.sig' \
+            -o -name '*.dmg' -o -name '*.exe' -o -name '*.msi' \
+            -o -name '*.deb' -o -name '*.AppImage' \
+          \) -exec cp {} release-assets/ \;
+          echo "Release assets:"
+          ls -la release-assets/
+
+      - name: Generate latest.json
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          REPO="uzaira0-internal-testing/ios-screen-time-screenshot-processing"
+          BASE_URL="https://github.com/${REPO}/releases/download/${TAG}"
+          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          cd release-assets
+
+          # --- macOS (universal) ---
+          MAC_TARBALL=$(ls *.app.tar.gz 2>/dev/null | head -1 || true)
+          MAC_SIG=""
+          if [[ -n "$MAC_TARBALL" && -f "${MAC_TARBALL}.sig" ]]; then
+            MAC_SIG=$(cat "${MAC_TARBALL}.sig")
+          fi
+
+          # --- Windows (NSIS) ---
+          WIN_NSIS_ZIP=$(ls *nsis.zip 2>/dev/null | grep -v '.sig$' | head -1 || true)
+          WIN_SIG=""
+          if [[ -n "$WIN_NSIS_ZIP" && -f "${WIN_NSIS_ZIP}.sig" ]]; then
+            WIN_SIG=$(cat "${WIN_NSIS_ZIP}.sig")
+          fi
+
+          # --- Linux (AppImage) ---
+          LINUX_APPIMAGE_TARBALL=$(ls *.AppImage.tar.gz 2>/dev/null | head -1 || true)
+          LINUX_SIG=""
+          if [[ -n "$LINUX_APPIMAGE_TARBALL" && -f "${LINUX_APPIMAGE_TARBALL}.sig" ]]; then
+            LINUX_SIG=$(cat "${LINUX_APPIMAGE_TARBALL}.sig")
+          fi
+
+          # Build JSON dynamically — only include platforms with artifacts + signatures
+          PLATFORMS=""
+          if [[ -n "$MAC_TARBALL" && -n "$MAC_SIG" ]]; then
+            PLATFORMS="${PLATFORMS:+$PLATFORMS,}
+              \"darwin-universal\": { \"signature\": \"${MAC_SIG}\", \"url\": \"${BASE_URL}/${MAC_TARBALL}\" },
+              \"darwin-aarch64\": { \"signature\": \"${MAC_SIG}\", \"url\": \"${BASE_URL}/${MAC_TARBALL}\" },
+              \"darwin-x86_64\": { \"signature\": \"${MAC_SIG}\", \"url\": \"${BASE_URL}/${MAC_TARBALL}\" }"
+          fi
+          if [[ -n "$WIN_NSIS_ZIP" && -n "$WIN_SIG" ]]; then
+            PLATFORMS="${PLATFORMS:+$PLATFORMS,}
+              \"windows-x86_64\": { \"signature\": \"${WIN_SIG}\", \"url\": \"${BASE_URL}/${WIN_NSIS_ZIP}\" }"
+          fi
+          if [[ -n "$LINUX_APPIMAGE_TARBALL" && -n "$LINUX_SIG" ]]; then
+            PLATFORMS="${PLATFORMS:+$PLATFORMS,}
+              \"linux-x86_64\": { \"signature\": \"${LINUX_SIG}\", \"url\": \"${BASE_URL}/${LINUX_APPIMAGE_TARBALL}\" }"
+          fi
+
+          if [[ -z "$PLATFORMS" ]]; then
+            echo "::error::No platform artifacts with signatures found — cannot generate latest.json"
+            ls -la
+            exit 1
+          fi
+
+          cat > ../latest.json <<ENDJSON
+          {
+            "version": "v${VERSION}",
+            "notes": "Release v${VERSION}",
+            "pub_date": "${PUB_DATE}",
+            "platforms": {${PLATFORMS}
+            }
+          }
+          ENDJSON
+
+          # Clean up indentation from heredoc
+          sed -i 's/^          //' ../latest.json
+
+          echo "Generated latest.json:"
+          cat ../latest.json
+
+      - name: Copy latest.json to release assets
+        run: cp latest.json release-assets/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
+          generate_release_notes: true
+          files: release-assets/*
