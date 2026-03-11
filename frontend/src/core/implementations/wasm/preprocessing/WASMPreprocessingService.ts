@@ -212,12 +212,17 @@ export class WASMPreprocessingService implements IPreprocessingService {
       return { queued_count: 0, message: `No eligible screenshots for ${stage.replace(/_/g, " ")}` };
     }
 
-    // Process each screenshot synchronously
+    // Process each screenshot, yielding to the browser between items
+    // so React can paint progress updates.
     let completed = 0;
+    options.onProgress?.(0, eligible.length);
     for (const screenshot of eligible) {
       try {
         await this.processStage(screenshot, stage, options);
         completed++;
+        options.onProgress?.(completed, eligible.length);
+        // Yield to browser so the progress bar repaints
+        await new Promise((r) => setTimeout(r, 0));
       } catch (err) {
         console.error(`[WASM] ${stage} failed for screenshot ${screenshot.id}:`, err);
         // Mark as exception
@@ -289,16 +294,24 @@ export class WASMPreprocessingService implements IPreprocessingService {
       case "cropping": {
         if (!blob) throw new Error("No image blob for cropping");
 
-        const cropResult = await cropScreenshot(blob);
+        // Use the preserved original if available (handles re-runs after reset)
+        const originalBlob = await this.storage.getStageBlob(id, "original");
+        const sourceBlob = originalBlob ?? blob;
+
+        const cropResult = await cropScreenshot(sourceBlob);
         const pp = getPreprocessing(screenshot);
 
         if (cropResult.wasCropped) {
+          // Preserve original only once, before first overwrite
+          if (!originalBlob) {
+            await this.storage.saveStageBlob(id, "original", sourceBlob);
+          }
           // Save cropped blob as current + stage snapshot
           await this.storage.saveImageBlob(id, cropResult.croppedBlob);
           await this.storage.saveStageBlob(id, "cropping", cropResult.croppedBlob);
         } else {
           // Even if not cropped, save a snapshot so getStageImageUrl("cropping") works
-          await this.storage.saveStageBlob(id, "cropping", blob);
+          await this.storage.saveStageBlob(id, "cropping", sourceBlob);
         }
 
         const detectionEvent = pp.events.find(
@@ -468,8 +481,9 @@ export class WASMPreprocessingService implements IPreprocessingService {
   }
 
   async getOriginalImageUrl(screenshotId: number): Promise<string> {
-    // Return a blob URL from OPFS storage
-    const blob = await this.storage.getImageBlob(screenshotId);
+    // Prefer the preserved original (saved before cropping), fall back to current
+    const originalBlob = await this.storage.getStageBlob(screenshotId, "original");
+    const blob = originalBlob ?? await this.storage.getImageBlob(screenshotId);
     if (!blob) throw new Error(`No image blob for screenshot ${screenshotId}`);
     return URL.createObjectURL(blob);
   }
@@ -478,8 +492,15 @@ export class WASMPreprocessingService implements IPreprocessingService {
     screenshotId: number,
     crop: { left: number; top: number; right: number; bottom: number },
   ): Promise<void> {
-    const blob = await this.storage.getImageBlob(screenshotId);
+    // For manual crop, use the original image (not a previously cropped one)
+    const originalBlob = await this.storage.getStageBlob(screenshotId, "original");
+    const blob = originalBlob ?? await this.storage.getImageBlob(screenshotId);
     if (!blob) throw new Error("No image blob for manual crop");
+
+    // Preserve original if not already saved
+    if (!originalBlob) {
+      await this.storage.saveStageBlob(screenshotId, "original", blob);
+    }
 
     const bitmap = await createImageBitmap(blob);
     const origWidth = bitmap.width;

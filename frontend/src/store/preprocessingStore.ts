@@ -7,7 +7,7 @@ import type {
   PreprocessingEvent,
   PreprocessingEventLog,
 } from "@/types";
-import type { IPreprocessingService } from "@/core/interfaces/IPreprocessingService";
+import type { IPreprocessingService, RunStageOptions } from "@/core/interfaces/IPreprocessingService";
 import { config } from "@/config";
 import toast from "react-hot-toast";
 
@@ -303,14 +303,7 @@ export function createPreprocessingStore(service: IPreprocessingService) {
     const baseline = summary ? summary[stage]?.completed ?? 0 : 0;
     set({ isRunningStage: true, stageProgress: null, _pollCount: 0, _queuedCount: 0, _completedBaseline: baseline, _pollStage: stage });
     try {
-      const options: {
-        group_id?: string;
-        screenshot_ids?: number[];
-        phi_pipeline_preset?: string;
-        phi_redaction_method?: string;
-        llm_endpoint?: string;
-        llm_model?: string;
-      } = {
+      const options: RunStageOptions = {
         group_id: selectedGroupId || undefined,
         screenshot_ids: screenshotIds,
         phi_pipeline_preset: phiPreset,
@@ -319,6 +312,12 @@ export function createPreprocessingStore(service: IPreprocessingService) {
       if (llmEnabled && stage === "phi_detection") {
         options.llm_endpoint = llmEndpoint;
         options.llm_model = llmModel;
+      }
+      if (config.isLocalMode) {
+        // WASM mode: report per-screenshot progress via callback
+        options.onProgress = (completed, total) => {
+          set({ stageProgress: { completed, total } });
+        };
       }
       const result = await service.runStage(stage, options);
       if (result && result.queued_count > 0) {
