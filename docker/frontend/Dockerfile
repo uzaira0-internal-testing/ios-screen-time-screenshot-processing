@@ -50,6 +50,10 @@ COPY apps/ios-screen-time-screenshot-processing/docker/nginx/nginx.conf /etc/ngi
 COPY apps/ios-screen-time-screenshot-processing/docker/frontend/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
+# Run nginx as non-root (nginx user already exists in nginx:alpine)
+RUN chown -R nginx:nginx /usr/share/nginx/html /var/cache/nginx /var/log/nginx && \
+    touch /var/run/nginx.pid && chown nginx:nginx /var/run/nginx.pid
+
 EXPOSE 80
 
 # Health check

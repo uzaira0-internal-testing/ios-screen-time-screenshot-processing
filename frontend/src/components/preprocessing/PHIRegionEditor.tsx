@@ -140,7 +140,7 @@ export const PHIRegionEditor = ({
     });
 
     return () => { cancelled = true; };
-  }, [isOpen, inline, screenshotId]);
+  }, [isOpen, inline, screenshotId, preprocessingService]);
 
   // Calculate scale
   useEffect(() => {

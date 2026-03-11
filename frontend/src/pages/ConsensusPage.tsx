@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { Layout } from "@/components/layout/Layout";
 import {
@@ -56,10 +56,39 @@ export const ConsensusPage = () => {
   );
   const [loadingScreenshots, setLoadingScreenshots] = useState(false);
 
+  const loadGroups = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await consensusService.getGroupsWithTiers();
+      setGroups(data);
+    } catch (error) {
+      console.error("Failed to load groups:", error);
+      toast.error("Failed to load verification data");
+    } finally {
+      setLoading(false);
+    }
+  }, [consensusService]);
+
+  const loadTierScreenshots = useCallback(async (
+    groupId: string,
+    tier: VerificationTier,
+  ) => {
+    try {
+      setLoadingScreenshots(true);
+      const data = await consensusService.getScreenshotsByTier(groupId, tier);
+      setTierScreenshots(data);
+    } catch (error) {
+      console.error("Failed to load screenshots:", error);
+      toast.error("Failed to load screenshots");
+    } finally {
+      setLoadingScreenshots(false);
+    }
+  }, [consensusService]);
+
   // Load groups on mount
   useEffect(() => {
     loadGroups();
-  }, []);
+  }, [loadGroups]);
 
   // Handle URL params for deep linking
   useEffect(() => {
@@ -78,36 +107,7 @@ export const ConsensusPage = () => {
     } else {
       setTierScreenshots([]);
     }
-  }, [selectedGroup, selectedTier]);
-
-  const loadGroups = async () => {
-    try {
-      setLoading(true);
-      const data = await consensusService.getGroupsWithTiers();
-      setGroups(data);
-    } catch (error) {
-      console.error("Failed to load groups:", error);
-      toast.error("Failed to load verification data");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadTierScreenshots = async (
-    groupId: string,
-    tier: VerificationTier,
-  ) => {
-    try {
-      setLoadingScreenshots(true);
-      const data = await consensusService.getScreenshotsByTier(groupId, tier);
-      setTierScreenshots(data);
-    } catch (error) {
-      console.error("Failed to load screenshots:", error);
-      toast.error("Failed to load screenshots");
-    } finally {
-      setLoadingScreenshots(false);
-    }
-  };
+  }, [selectedGroup, selectedTier, loadTierScreenshots]);
 
   const handleTierClick = (
     groupId: string,

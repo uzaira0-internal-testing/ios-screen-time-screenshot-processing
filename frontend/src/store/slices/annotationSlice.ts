@@ -8,6 +8,7 @@ import type {
 } from "@/core";
 import type { AnnotationState, AnnotationSlice } from "./types";
 import { initialAnnotation } from "./types";
+import { extractErrorMessage } from "./helpers";
 
 export const createAnnotationSlice = (
   screenshotService: IScreenshotService,
@@ -104,11 +105,8 @@ export const createAnnotationSlice = (
 
       set({ isLoading: false });
       await get().loadQueueStats();
-    } catch (error: any) {
-      const message =
-        error.response?.data?.detail ||
-        error.message ||
-        "Failed to save annotation";
+    } catch (error: unknown) {
+      const message = extractErrorMessage(error, "Failed to save annotation");
       set({ error: message, isLoading: false });
       throw error;
     }

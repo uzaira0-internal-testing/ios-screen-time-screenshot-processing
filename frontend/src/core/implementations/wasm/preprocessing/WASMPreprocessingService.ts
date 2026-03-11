@@ -267,10 +267,12 @@ export class WASMPreprocessingService implements IPreprocessingService {
           height = bmp.height;
           bmp.close();
         } else {
-          // Fall back to stored dimensions — likely missing blob
+          // Fall back to stored dimensions — likely missing blob.
+          // image_width/image_height may exist on IndexedDB records but aren't in the Screenshot type.
           console.warn(`[WASM] device_detection: No image blob for screenshot ${id}, using stored dimensions`);
-          width = (screenshot as any).image_width ?? 0;
-          height = (screenshot as any).image_height ?? 0;
+          const metadata = screenshot as unknown as Record<string, unknown>;
+          width = (typeof metadata.image_width === "number" ? metadata.image_width : 0);
+          height = (typeof metadata.image_height === "number" ? metadata.image_height : 0);
         }
 
         const result = detectDevice(width, height);
@@ -323,7 +325,7 @@ export class WASMPreprocessingService implements IPreprocessingService {
           original_dimensions: [cropResult.originalDimensions.width, cropResult.originalDimensions.height],
           cropped_dimensions: [cropResult.croppedDimensions.width, cropResult.croppedDimensions.height],
           device_model: cropResult.deviceModel,
-          is_ipad: (detectionEvent?.result as any)?.device_category === "ipad",
+          is_ipad: detectionEvent?.result?.device_category === "ipad",
         });
 
         await this.storage.updateScreenshot(id, {
@@ -361,7 +363,7 @@ export class WASMPreprocessingService implements IPreprocessingService {
         const pp = getPreprocessing(screenshot);
         const detectionEventId = pp.current_events.phi_detection;
         const detectionEvent = pp.events.find((e) => e.event_id === detectionEventId);
-        const regions = ((detectionEvent?.result as any)?.phi_entities ?? []) as PHIRegion[];
+        const regions = (detectionEvent?.result?.phi_entities ?? []) as PHIRegion[];
 
         if (regions.length === 0) {
           // No PHI to redact
@@ -547,7 +549,7 @@ export class WASMPreprocessingService implements IPreprocessingService {
     const detectionEventId = pp.current_events.phi_detection;
     const detectionEvent = pp.events.find((e) => e.event_id === detectionEventId);
     return {
-      regions: (detectionEvent?.result as any)?.phi_entities ?? [],
+      regions: (detectionEvent?.result?.phi_entities ?? []) as PHIRegionRect[],
       source: "wasm",
       event_id: detectionEventId ?? null,
     };

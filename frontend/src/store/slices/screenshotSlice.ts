@@ -3,7 +3,7 @@ import type { IScreenshotService, NavigationParams, ProcessingIssue, Screenshot 
 import type { ProcessingStatus } from "@/types";
 import type { AnnotationState, ScreenshotSlice, UIAnnotation } from "./types";
 import { initialAnnotation } from "./types";
-import { extractGridCoords, filterToApiParams, isVerifiedByCurrentUser } from "./helpers";
+import { extractGridCoords, filterToApiParams, isVerifiedByCurrentUser, extractErrorMessage, extractErrorStatus } from "./helpers";
 
 export const createScreenshotSlice = (
   screenshotService: IScreenshotService,
@@ -142,14 +142,12 @@ export const createScreenshotSlice = (
       if (processedScreenshot.current_annotation_count > 0) {
         await get().loadConsensus(processedScreenshot.id);
       }
-    } catch (error: any) {
-      const message =
-        error.response?.data?.detail ||
-        error.message ||
-        "Failed to load screenshot";
+    } catch (error: unknown) {
+      const message = extractErrorMessage(error, "Failed to load screenshot");
+      const status = extractErrorStatus(error);
       if (
         message.includes("No screenshots") ||
-        error.response?.status === 404
+        status === 404
       ) {
         set({ noScreenshots: true, isLoading: false, error: null });
         return;
@@ -234,11 +232,8 @@ export const createScreenshotSlice = (
       if (screenshot.current_annotation_count > 0) {
         await get().loadConsensus(screenshot.id);
       }
-    } catch (error: any) {
-      const message =
-        error.response?.data?.detail ||
-        error.message ||
-        "Failed to load screenshot";
+    } catch (error: unknown) {
+      const message = extractErrorMessage(error, "Failed to load screenshot");
       set({ error: message, isLoading: false });
       throw error;
     }

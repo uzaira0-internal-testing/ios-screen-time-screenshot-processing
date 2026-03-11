@@ -86,6 +86,18 @@ export class APIStorageService implements IStorageService {
     );
   }
 
+  async saveStageBlob(_screenshotId: number, _stage: string, _blob: Blob): Promise<void> {
+    throw new Error(
+      "APIStorageService.saveStageBlob is not used in server mode",
+    );
+  }
+
+  async getStageBlob(_screenshotId: number, _stage: string): Promise<Blob | null> {
+    throw new Error(
+      "APIStorageService.getStageBlob is not used in server mode",
+    );
+  }
+
   async deleteScreenshotsByGroup(_groupId: string): Promise<{ screenshots_deleted: number; annotations_deleted: number }> {
     throw new Error(
       "APIStorageService.deleteScreenshotsByGroup is not used in server mode",

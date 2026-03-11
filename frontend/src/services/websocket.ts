@@ -1,7 +1,7 @@
 import { WebSocketEvent } from '../types/websocket';
 import { config } from '@/config';
 
-type EventListener = (data: any) => void;
+type EventListener = (data: unknown) => void;
 
 export class WebSocketService {
   private ws: WebSocket | null = null;
@@ -11,7 +11,7 @@ export class WebSocketService {
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
   private listeners: Map<string, Set<EventListener>> = new Map();
-  private messageQueue: any[] = [];
+  private messageQueue: (string | Record<string, unknown>)[] = [];
   private isConnecting = false;
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private reconnectTimeout: NodeJS.Timeout | null = null;
@@ -40,7 +40,6 @@ export class WebSocketService {
         this.ws = new WebSocket(wsUrlWithToken);
 
         this.ws.onopen = () => {
-          console.log('WebSocket connected');
           this.isConnecting = false;
           this.reconnectAttempts = 0;
           this.startHeartbeat();
@@ -63,8 +62,7 @@ export class WebSocketService {
           reject(error);
         };
 
-        this.ws.onclose = (event) => {
-          console.log('WebSocket closed:', event.code, event.reason);
+        this.ws.onclose = () => {
           this.isConnecting = false;
           this.stopHeartbeat();
           this.attemptReconnect();
@@ -104,7 +102,6 @@ export class WebSocketService {
     }
 
     const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts);
-    console.log(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})`);
 
     this.reconnectTimeout = setTimeout(() => {
       this.reconnectAttempts++;
@@ -179,7 +176,7 @@ export class WebSocketService {
     }
   }
 
-  send(data: any): void {
+  send(data: string | Record<string, unknown>): void {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(typeof data === 'string' ? data : JSON.stringify(data));
     } else {
@@ -190,7 +187,9 @@ export class WebSocketService {
   private flushMessageQueue(): void {
     while (this.messageQueue.length > 0 && this.ws?.readyState === WebSocket.OPEN) {
       const message = this.messageQueue.shift();
-      this.send(message);
+      if (message !== undefined) {
+        this.send(message);
+      }
     }
   }
 

@@ -106,7 +106,9 @@ async def enrich_screenshot_with_usernames(screenshot: Screenshot, repo: Screens
     return await repo.enrich_with_usernames(screenshot)
 
 
-async def enrich_screenshots_with_usernames(screenshots: list[Screenshot], repo: ScreenshotRepository) -> list[ScreenshotRead]:
+async def enrich_screenshots_with_usernames(
+    screenshots: list[Screenshot], repo: ScreenshotRepository
+) -> list[ScreenshotRead]:
     """Convert a list of Screenshot models to ScreenshotRead with verified_by_usernames populated."""
     return await repo.enrich_many_with_usernames(screenshots)
 
@@ -253,6 +255,7 @@ async def get_preprocessing_summary(
         STAGE_ORDER,
         get_stage_counts,
     )
+
     screenshots = await repo.get_by_group(group_id)
 
     stage_summaries = {}
@@ -682,7 +685,9 @@ class RecalculateOcrResponse(BaseModel):
 
 
 @router.post("/{screenshot_id}/recalculate-ocr", response_model=RecalculateOcrResponse)
-async def recalculate_ocr_total(screenshot_id: int, db: DatabaseSession, repo: ScreenshotRepo, current_user: CurrentUser):
+async def recalculate_ocr_total(
+    screenshot_id: int, db: DatabaseSession, repo: ScreenshotRepo, current_user: CurrentUser
+):
     """
     Recalculate the OCR total for a specific screenshot.
     Re-runs OCR extraction on the original image to get the total usage time.
@@ -883,8 +888,10 @@ def _detect_device_type(width: int, height: int) -> str:
                 return "ipad"
             elif result.is_iphone:
                 return "iphone"
-    except (ImportError, AttributeError, Exception):
-        pass
+    except Exception as e:
+        logger.debug(
+            "Device detection via ios_device_detector failed, using heuristic fallback", extra={"error": str(e)}
+        )
 
     # Fallback: simple aspect ratio heuristic
     aspect_ratio = height / width if width > 0 else 0
@@ -1187,7 +1194,7 @@ async def _process_single_upload(
         try:
             file_path.unlink(missing_ok=True)
         except Exception:
-            pass
+            pass  # Best-effort cleanup: DB insert failed, don't mask original error
         _raise_upload_error(UploadErrorCode.DATABASE_ERROR, f"Failed to create screenshot record: {e}")
     timings["db_insert"] = (time.perf_counter() - t1) * 1000
 
@@ -2770,8 +2777,11 @@ async def export_consensus_csv(
                         hourly_values[hour_idx] = str(value) if value is not None else ""
                         if value is not None:
                             total_minutes += float(value)
-                except (ValueError, TypeError):
-                    pass
+                except (ValueError, TypeError) as e:
+                    logger.warning(
+                        "Skipping invalid hourly value during CSV export",
+                        extra={"hour": hour_str, "value": value, "error": str(e)},
+                    )
             hours = int(total_minutes // 60)
             mins = int(total_minutes % 60)
             computed_total = f"{hours}h {mins}m" if hours > 0 else f"{mins}m"

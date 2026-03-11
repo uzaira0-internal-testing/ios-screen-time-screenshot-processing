@@ -28,6 +28,8 @@ import { detectGrid } from "../gridDetection.canvas";
 let tesseractWorker: TesseractWorker | null = null;
 let initialized = false;
 let initializationPromise: Promise<void> | null = null;
+// Track the current message id so progress messages can be correlated
+let currentMessageId: string | undefined;
 
 async function initialize(): Promise<void> {
   console.log("[Worker.initialize] Starting initialization");
@@ -99,6 +101,7 @@ function postProgress(
 ): void {
   self.postMessage({
     type: "PROGRESS",
+    id: currentMessageId,
     payload: {
       stage,
       progress,
@@ -109,6 +112,8 @@ function postProgress(
 
 self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
   const { type, id, payload } = e.data;
+  // Track current message id so postProgress can include it
+  currentMessageId = id;
   console.log("[Worker.onmessage] Received message:", {
     type,
     id,

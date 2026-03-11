@@ -52,6 +52,12 @@ export interface IStorageService {
 
   getImageBlob(screenshotId: number): Promise<Blob | null>;
 
+  /** Save a blob for a specific pipeline stage (e.g., "original", "cropping"). */
+  saveStageBlob(screenshotId: number, stage: string, blob: Blob): Promise<void>;
+
+  /** Retrieve a blob for a specific pipeline stage. */
+  getStageBlob(screenshotId: number, stage: string): Promise<Blob | null>;
+
   deleteScreenshotsByGroup(groupId: string): Promise<{ screenshots_deleted: number; annotations_deleted: number }>;
 
   clearAll(): Promise<void>;

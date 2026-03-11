@@ -64,7 +64,7 @@ export async function createPreMigrationBackup(dbName: string): Promise<void> {
     // ------- 2. Read all metadata tables -------
     const tables: BackupPayload["tables"] = {};
 
-    const tx = rawDb.transaction(tablesToBackup as unknown as string[], "readonly");
+    const tx = rawDb.transaction([...tablesToBackup], "readonly");
 
     await Promise.all(
       tablesToBackup.map(

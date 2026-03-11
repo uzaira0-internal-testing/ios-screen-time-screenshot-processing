@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router";
 import { Layout } from "@/components/layout/Layout";
 import { Modal } from "@/components/ui/Modal";
@@ -33,13 +33,7 @@ export const ConsensusComparisonPage = () => {
     resolution_notes: "",
   });
 
-  useEffect(() => {
-    if (screenshotId) {
-      loadComparison(parseInt(screenshotId, 10));
-    }
-  }, [screenshotId]);
-
-  const loadComparison = async (id: number) => {
+  const loadComparison = useCallback(async (id: number) => {
     try {
       setLoading(true);
       const data = await api.consensus.getScreenshotComparison(id);
@@ -61,7 +55,13 @@ export const ConsensusComparisonPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (screenshotId) {
+      loadComparison(parseInt(screenshotId, 10));
+    }
+  }, [screenshotId, loadComparison]);
 
   const handleResolve = async () => {
     if (!comparison) return;

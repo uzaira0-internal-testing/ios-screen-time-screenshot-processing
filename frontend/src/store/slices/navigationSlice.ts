@@ -11,7 +11,7 @@ import type {
   NavigationSlice,
   VerificationFilterType,
 } from "./types";
-import { filterToApiParams, extractGridCoords } from "./helpers";
+import { filterToApiParams, extractGridCoords, extractErrorMessage } from "./helpers";
 
 export const createNavigationSlice = (
   screenshotService: IScreenshotService,
@@ -65,9 +65,8 @@ export const createNavigationSlice = (
       } else {
         set({ noScreenshots: true, isLoading: false });
       }
-    } catch (error: any) {
-      const message =
-        error.response?.data?.detail || error.message || "Failed to navigate";
+    } catch (error: unknown) {
+      const message = extractErrorMessage(error, "Failed to navigate");
       set({ error: message, isLoading: false });
     }
   },
@@ -99,9 +98,8 @@ export const createNavigationSlice = (
           hasPrev: result.has_prev,
         });
       }
-    } catch (error: any) {
-      const message =
-        error.response?.data?.detail || error.message || "Failed to navigate";
+    } catch (error: unknown) {
+      const message = extractErrorMessage(error, "Failed to navigate");
       set({ error: message, isLoading: false });
     }
   },
@@ -237,11 +235,8 @@ export const createNavigationSlice = (
       if (verificationFilter === "not_verified_by_me") {
         await get().navigateNext();
       }
-    } catch (error: any) {
-      const message =
-        error.response?.data?.detail ||
-        error.message ||
-        "Failed to verify screenshot";
+    } catch (error: unknown) {
+      const message = extractErrorMessage(error, "Failed to verify screenshot");
       set({ error: message });
     }
   },
@@ -263,11 +258,8 @@ export const createNavigationSlice = (
       if (verificationFilter === "verified_by_me") {
         await get().navigateNext();
       }
-    } catch (error: any) {
-      const message =
-        error.response?.data?.detail ||
-        error.message ||
-        "Failed to unverify screenshot";
+    } catch (error: unknown) {
+      const message = extractErrorMessage(error, "Failed to unverify screenshot");
       set({ error: message });
     }
   },

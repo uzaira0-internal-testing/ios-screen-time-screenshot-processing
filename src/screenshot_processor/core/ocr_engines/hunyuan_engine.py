@@ -514,7 +514,7 @@ class HunyuanOCREngine:
         try:
             self.close()
         except Exception:
-            pass
+            pass  # Best-effort cleanup during garbage collection; interpreter may be shutting down
 
     @classmethod
     def reset_rate_limiter(cls) -> None:

@@ -135,7 +135,7 @@ export const HomePage = () => {
     setIsDragOver(false);
   }, []);
 
-  const loadGroups = async (showLoading = false) => {
+  const loadGroups = useCallback(async (showLoading = false) => {
     try {
       if (showLoading) setLoading(true);
       const groupsData = await screenshotService.getGroups();
@@ -148,9 +148,9 @@ export const HomePage = () => {
       setLoading(false);
       setInitialLoad(false);
     }
-  };
+  }, [screenshotService]);
 
-  const loadVerificationTiers = async () => {
+  const loadVerificationTiers = useCallback(async () => {
     try {
       const tiers = await consensusService.getGroupsWithTiers();
       const tiersMap: VerificationTiersMap = {};
@@ -163,7 +163,7 @@ export const HomePage = () => {
         console.error("Failed to load verification tiers:", error);
       }
     }
-  };
+  }, [consensusService]);
 
   useEffect(() => {
     loadGroups(true);
@@ -178,7 +178,7 @@ export const HomePage = () => {
       }, 5000);
       return () => clearInterval(interval);
     }
-  }, []);
+  }, [loadGroups, loadVerificationTiers]);
 
   const handleGroupClick = (groupId: string, processingStatus?: string) => {
     if (isAuthenticated) {

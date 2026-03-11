@@ -237,7 +237,7 @@ class PaddleOCRRemoteEngine:
         try:
             self.close()
         except Exception:
-            pass
+            pass  # Best-effort cleanup during garbage collection; interpreter may be shutting down
 
     def get_engine_name(self) -> str:
         """Get the name of the OCR engine.

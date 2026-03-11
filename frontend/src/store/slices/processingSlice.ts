@@ -3,10 +3,11 @@ import type {
   IScreenshotService,
   GridCoordinates,
   ProcessingProgress,
+  ProcessingIssue,
   Screenshot,
 } from "@/core";
 import type { AnnotationState, ProcessingSlice, UIAnnotation } from "./types";
-import { isVerifiedByCurrentUser, extractGridCoords } from "./helpers";
+import { isVerifiedByCurrentUser, extractGridCoords, extractErrorMessage } from "./helpers";
 
 /**
  * Error thrown when user tries to reprocess a verified screenshot.
@@ -30,7 +31,7 @@ function createStateUpdateFromResult(
     extracted_title?: string | null;
     extracted_total?: string | null;
     processing_status?: string;
-    issues?: any[];
+    issues?: ProcessingIssue[];
     has_blocking_issues?: boolean;
     alignment_score?: number | null;
     processing_method?: string | null;
@@ -128,11 +129,8 @@ export const createProcessingSlice = (
       } else {
         set({ processingIssues: result.issues || [] });
       }
-    } catch (error: any) {
-      const message =
-        error.response?.data?.detail ||
-        error.message ||
-        "Failed to reprocess screenshot";
+    } catch (error: unknown) {
+      const message = extractErrorMessage(error, "Failed to reprocess screenshot");
       set({ error: message });
       throw error;
     } finally {
@@ -168,11 +166,8 @@ export const createProcessingSlice = (
       } else {
         set({ processingIssues: result.issues || [] });
       }
-    } catch (error: any) {
-      const message =
-        error.response?.data?.detail ||
-        error.message ||
-        "Failed to reprocess with line-based detection";
+    } catch (error: unknown) {
+      const message = extractErrorMessage(error, "Failed to reprocess with line-based detection");
       set({ error: message });
       throw error;
     } finally {
@@ -208,11 +203,8 @@ export const createProcessingSlice = (
       } else {
         set({ processingIssues: result.issues || [] });
       }
-    } catch (error: any) {
-      const message =
-        error.response?.data?.detail ||
-        error.message ||
-        "Failed to reprocess with OCR-anchored detection";
+    } catch (error: unknown) {
+      const message = extractErrorMessage(error, "Failed to reprocess with OCR-anchored detection");
       set({ error: message });
       throw error;
     } finally {
@@ -239,11 +231,8 @@ export const createProcessingSlice = (
       }
 
       return newTotal;
-    } catch (error: any) {
-      const message =
-        error.response?.data?.detail ||
-        error.message ||
-        "Failed to recalculate OCR total";
+    } catch (error: unknown) {
+      const message = extractErrorMessage(error, "Failed to recalculate OCR total");
       set({ error: message });
       return null;
     }

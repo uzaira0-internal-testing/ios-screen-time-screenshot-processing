@@ -279,6 +279,7 @@ export class IndexedDBStorageService implements IStorageService {
   }
 
   async saveAnnotation(annotation: Annotation): Promise<number> {
+    await this.ensureDB();
     try {
       const id = await db.transaction(
         "rw",
@@ -336,6 +337,7 @@ export class IndexedDBStorageService implements IStorageService {
   }
 
   async getAnnotation(id: number): Promise<Annotation | null> {
+    await this.ensureDB();
     try {
       const annotation = await db.annotations.get(id);
       return annotation || null;
@@ -348,6 +350,7 @@ export class IndexedDBStorageService implements IStorageService {
   async getAnnotationsByScreenshot(
     screenshotId: number,
   ): Promise<Annotation[]> {
+    await this.ensureDB();
     try {
       return await db.annotations
         .where("screenshot_id")
@@ -360,6 +363,7 @@ export class IndexedDBStorageService implements IStorageService {
   }
 
   async deleteAnnotation(id: number): Promise<void> {
+    await this.ensureDB();
     try {
       await db.transaction("rw", db.annotations, db.screenshots, async () => {
         const annotation = await db.annotations.get(id);
@@ -385,6 +389,7 @@ export class IndexedDBStorageService implements IStorageService {
   }
 
   async saveImageBlob(screenshotId: number, blob: Blob): Promise<void> {
+    await this.ensureDB();
     try {
       await storeImageBlob(screenshotId, blob);
     } catch (error) {
@@ -394,6 +399,7 @@ export class IndexedDBStorageService implements IStorageService {
   }
 
   async getImageBlob(screenshotId: number): Promise<Blob | null> {
+    await this.ensureDB();
     try {
       return await retrieveImageBlob(screenshotId);
     } catch (error) {
@@ -403,6 +409,7 @@ export class IndexedDBStorageService implements IStorageService {
   }
 
   async saveStageBlob(screenshotId: number, stage: string, blob: Blob): Promise<void> {
+    await this.ensureDB();
     try {
       await storeStageBlob(screenshotId, stage, blob);
     } catch (error) {
@@ -412,6 +419,7 @@ export class IndexedDBStorageService implements IStorageService {
   }
 
   async getStageBlob(screenshotId: number, stage: string): Promise<Blob | null> {
+    await this.ensureDB();
     try {
       return await retrieveStageBlob(screenshotId, stage);
     } catch (error) {

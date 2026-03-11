@@ -22,5 +22,8 @@ EXPOSE 5173
 # Environment variables for development
 ENV NODE_ENV=development
 
+# Run as non-root user (bun user exists in oven/bun images)
+USER bun
+
 # Start Bun dev server (binds to 0.0.0.0 by default via Bun.serve)
 CMD ["bun", "run", "dev"]

@@ -3,6 +3,7 @@ import { BrowserRouter, HashRouter } from "react-router";
 import { Toaster } from "react-hot-toast";
 import toast from "react-hot-toast";
 import { AppRouter } from "./components/routing/AppRouter";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { useAuthStore } from "./store/authStore";
 import { config } from "./config";
@@ -25,7 +26,8 @@ function WebSocketIntegration() {
 
     const unsubscribeAnnotationSubmitted = subscribe(
       "annotation_submitted",
-      (data: AnnotationSubmittedEvent) => {
+      (raw: unknown) => {
+        const data = raw as AnnotationSubmittedEvent;
         toast.success(
           `${data.username} submitted annotation (${data.annotation_count}/${data.required_count})`,
           { duration: 4000 },
@@ -35,7 +37,8 @@ function WebSocketIntegration() {
 
     const unsubscribeScreenshotCompleted = subscribe(
       "screenshot_completed",
-      (data: ScreenshotCompletedEvent) => {
+      (raw: unknown) => {
+        const data = raw as ScreenshotCompletedEvent;
         toast.success(`Screenshot "${data.filename}" completed!`, {
           duration: 4000,
         });
@@ -44,7 +47,8 @@ function WebSocketIntegration() {
 
     const unsubscribeUserJoined = subscribe(
       "user_joined",
-      (data: UserJoinedEvent) => {
+      (raw: unknown) => {
+        const data = raw as UserJoinedEvent;
         toast(`${data.username} joined (${data.active_users} online)`, {
           duration: 3000,
         });
@@ -53,7 +57,8 @@ function WebSocketIntegration() {
 
     const unsubscribeUserLeft = subscribe(
       "user_left",
-      (data: UserLeftEvent) => {
+      (raw: unknown) => {
+        const data = raw as UserLeftEvent;
         toast(`${data.username} left (${data.active_users} online)`, {
           duration: 3000,
         });
@@ -79,36 +84,38 @@ function App() {
   const routerProps = config.isTauri ? {} : { basename: config.basePath };
 
   return (
-    <Router {...routerProps}>
-      {config.hasApi && <WebSocketIntegration />}
+    <ErrorBoundary>
+      <Router {...routerProps}>
+        {config.hasApi && <WebSocketIntegration />}
 
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 3000,
-          style: {
-            background: "#363636",
-            color: "#fff",
-          },
-          success: {
+        <Toaster
+          position="top-right"
+          toastOptions={{
             duration: 3000,
-            iconTheme: {
-              primary: "#10B981",
-              secondary: "#fff",
+            style: {
+              background: "#363636",
+              color: "#fff",
             },
-          },
-          error: {
-            duration: 4000,
-            iconTheme: {
-              primary: "#EF4444",
-              secondary: "#fff",
+            success: {
+              duration: 3000,
+              iconTheme: {
+                primary: "#10B981",
+                secondary: "#fff",
+              },
             },
-          },
-        }}
-      />
+            error: {
+              duration: 4000,
+              iconTheme: {
+                primary: "#EF4444",
+                secondary: "#fff",
+              },
+            },
+          }}
+        />
 
-      <AppRouter />
-    </Router>
+        <AppRouter />
+      </Router>
+    </ErrorBoundary>
   );
 }
 

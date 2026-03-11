@@ -91,7 +91,7 @@ export interface ParsedFilePath {
  *   filename.png → "unknown" participant
  */
 export function parseRelativePath(file: File): ParsedFilePath {
-  const relativePath = (file as any).webkitRelativePath || file.name;
+  const relativePath = file.webkitRelativePath || file.name;
   const parts = relativePath.split("/").filter(Boolean);
 
   if (parts.length >= 3) {

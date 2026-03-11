@@ -137,6 +137,7 @@ services:
     container_name: ios-screen-time-screenshot-processing-frontend
     environment:
       BASE_PATH: /ios-screen-time-screenshot-processing
+      API_BASE_URL: /ios-screen-time-screenshot-processing/api/v1
     depends_on:
       - backend
     restart: unless-stopped

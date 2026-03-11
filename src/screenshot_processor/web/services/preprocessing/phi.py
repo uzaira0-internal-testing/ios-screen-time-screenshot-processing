@@ -64,13 +64,20 @@ def detect_phi(
                 .union_aggregation()
                 .with_min_bbox_area(100)
                 .with_merge_nearby(enabled=False)
-                .with_allow_list([
-                    # Common OCR artifacts from bar charts that Presidio misreads
-                    "INFO", "INFO Paget", "Camera Lo",
-                    "My Tom", "My Talking Tom",
-                    "al l", "al l - Daily",
-                    "YtKids", "Yt Kids",
-                ])
+                .with_allow_list(
+                    [
+                        # Common OCR artifacts from bar charts that Presidio misreads
+                        "INFO",
+                        "INFO Paget",
+                        "Camera Lo",
+                        "My Tom",
+                        "My Talking Tom",
+                        "al l",
+                        "al l - Daily",
+                        "YtKids",
+                        "Yt Kids",
+                    ]
+                )
             )
         else:
             builder_fn = builders.get(preset, PHIPipelineBuilder.screen_time)
@@ -103,7 +110,11 @@ def detect_phi(
         logger.debug("phi-detector-remover not installed, skipping PHI detection")
         return PHIDetectionResult(phi_detected=False, regions_count=0)
     except Exception as e:
-        logger.warning("PHI detection failed", extra={"error": str(e)})
+        logger.error(
+            "PHI detection failed — treating as no PHI detected, but this may mask real PHI",
+            exc_info=True,
+            extra={"error": str(e)},
+        )
         return PHIDetectionResult(phi_detected=False, regions_count=0)
 
 
@@ -161,7 +172,9 @@ def redact_phi(
         logger.debug("phi-detector-remover not installed, skipping PHI redaction")
         return PHIRedactionResult(image_bytes=image_bytes, regions_redacted=0, redaction_method=redaction_method)
     except Exception as e:
-        logger.warning("PHI redaction failed", extra={"error": str(e)})
+        logger.error(
+            "PHI redaction failed — returning unredacted image, review manually", exc_info=True, extra={"error": str(e)}
+        )
         return PHIRedactionResult(image_bytes=image_bytes, regions_redacted=0, redaction_method=redaction_method)
 
 
@@ -182,14 +195,16 @@ def serialize_phi_regions(regions: list) -> list[dict]:
             else:
                 # Plain tuple (x, y, w, h)
                 x, y, w, h = bbox[0], bbox[1], bbox[2], bbox[3]
-            serialized.append({
-                "x": x,
-                "y": y,
-                "w": w,
-                "h": h,
-                "label": getattr(region, "entity_type", "UNKNOWN"),
-                "source": getattr(region, "source", "auto"),
-                "confidence": getattr(region, "confidence", getattr(region, "score", 0.0)),
-                "text": getattr(region, "text", ""),
-            })
+            serialized.append(
+                {
+                    "x": x,
+                    "y": y,
+                    "w": w,
+                    "h": h,
+                    "label": getattr(region, "entity_type", "UNKNOWN"),
+                    "source": getattr(region, "source", "auto"),
+                    "confidence": getattr(region, "confidence", getattr(region, "score", 0.0)),
+                    "text": getattr(region, "text", ""),
+                }
+            )
     return serialized

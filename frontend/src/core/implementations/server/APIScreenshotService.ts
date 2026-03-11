@@ -85,11 +85,11 @@ export class APIScreenshotService implements IScreenshotService {
   }
 
   async getProcessingResult(screenshotId: number): Promise<ProcessingResult> {
-    // Get screenshot and return it as ProcessingResult
-    // The API schema ProcessingResultResponse has all needed fields
+    // Get screenshot and return it as ProcessingResult.
+    // Screenshot and ProcessingResult share most fields (extracted_hourly_data, etc.)
+    // but are separate schema types. The cast is intentional for API compatibility.
     const screenshot = await this.getById(screenshotId);
-    // Cast to any to avoid type issues - the structure is compatible
-    return screenshot as any;
+    return screenshot as unknown as ProcessingResult;
   }
 
   async reprocess(
@@ -170,7 +170,7 @@ export class APIScreenshotService implements IScreenshotService {
 
   async recalculateOcr(screenshotId: number): Promise<string | null> {
     const result = await api.screenshots.recalculateOcr(screenshotId);
-    return (result as any)?.extracted_total ?? null;
+    return result?.extracted_total ?? null;
   }
 
   async getGroups(): Promise<Group[]> {

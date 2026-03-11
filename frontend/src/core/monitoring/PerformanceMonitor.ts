@@ -75,7 +75,8 @@ export class PerformanceMonitor {
    */
   static measureMemory(): MemoryMetrics | null {
     if ("memory" in performance) {
-      const memory = (performance as any).memory;
+      // performance.memory is a Chrome-only API not in standard TS types
+      const memory = (performance as Performance & { memory: MemoryMetrics }).memory;
       const metrics: MemoryMetrics = {
         usedJSHeapSize: memory.usedJSHeapSize,
         totalJSHeapSize: memory.totalJSHeapSize,
@@ -232,7 +233,9 @@ export class PerformanceMonitor {
           duration: value,
         });
 
-        console.log(`Web Vital - ${name}: ${value.toFixed(2)}ms`);
+        if (import.meta.env?.MODE === "development") {
+          console.log(`Web Vital - ${name}: ${value.toFixed(2)}ms`);
+        }
       } catch (e) {
         // Silently fail if performance API not available
       }
@@ -248,7 +251,8 @@ export class PerformanceMonitor {
         const observer = new PerformanceObserver((list) => {
           for (const entry of list.getEntries()) {
             if (entry.entryType === "first-input") {
-              const fidEntry = entry as any;
+              // PerformanceEventTiming has processingStart but isn't in all TS DOM lib versions
+              const fidEntry = entry as PerformanceEntry & { processingStart: number };
               const fid = fidEntry.processingStart - entry.startTime;
               this.markWebVital("FID", fid);
             }
@@ -272,8 +276,10 @@ export class PerformanceMonitor {
 
         const observer = new PerformanceObserver((list) => {
           for (const entry of list.getEntries()) {
-            if (!(entry as any).hadRecentInput) {
-              clsValue += (entry as any).value;
+            // Layout shift entries have hadRecentInput and value but aren't in standard TS types
+            const layoutEntry = entry as PerformanceEntry & { hadRecentInput: boolean; value: number };
+            if (!layoutEntry.hadRecentInput) {
+              clsValue += layoutEntry.value;
               this.markWebVital("CLS", clsValue);
             }
           }
@@ -302,6 +308,8 @@ export class PerformanceMonitor {
       this.measureMemory();
     }, 30000);
 
-    console.log("Performance monitoring initialized");
+    if (import.meta.env?.MODE === "development") {
+      console.log("Performance monitoring initialized");
+    }
   }
 }

@@ -23,8 +23,20 @@ export async function relaunchApp(): Promise<void> {
 
 // Module-level reference to the raw Update object from the plugin
 // so downloadAndInstall can use it after checkForUpdate returns.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let pendingUpdate: any = null;
+// Typed as the subset of the Tauri Update interface we use (plugin may not be installed)
+let pendingUpdate: {
+  available?: boolean;
+  version: string;
+  currentVersion: string;
+  body?: string;
+  date?: string;
+  downloadAndInstall: (cb: (event: UpdateEvent) => void) => Promise<void>;
+} | null = null;
+
+interface UpdateEvent {
+  event: "Started" | "Progress" | "Finished";
+  data: { contentLength?: number; chunkLength?: number };
+}
 
 export async function checkForUpdate(): Promise<UpdateInfo | null> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -56,8 +68,7 @@ export async function downloadAndInstall(
   let totalBytes = 0;
 
   await pendingUpdate.downloadAndInstall(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (event: any) => {
+    (event: UpdateEvent) => {
       if (!onProgress) return;
 
       switch (event.event) {
@@ -67,7 +78,7 @@ export async function downloadAndInstall(
           break;
         case "Progress":
           onProgress({
-            downloaded: event.data.chunkLength,
+            downloaded: event.data.chunkLength ?? 0,
             total: totalBytes,
           });
           break;

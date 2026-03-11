@@ -112,7 +112,7 @@ export async function retrieveStageBlob(id: number, stage: string): Promise<Blob
 
 /** Map stage names to numeric indices for IndexedDB fallback key encoding. */
 function stageIndex(stage: string): number {
-  const stages: Record<string, number> = { device_detection: 1, cropping: 2, phi_detection: 3, phi_redaction: 4 };
+  const stages: Record<string, number> = { original: 0, device_detection: 1, cropping: 2, phi_detection: 3, phi_redaction: 4 };
   const idx = stages[stage];
   if (idx === undefined) {
     throw new Error(`Unknown preprocessing stage: "${stage}"`);
@@ -182,7 +182,7 @@ export async function deleteImageBlob(id: number): Promise<void> {
 }
 
 /** All known preprocessing stage names — must match stageIndex(). */
-const ALL_STAGES = ["device_detection", "cropping", "phi_detection", "phi_redaction"] as const;
+const ALL_STAGES = ["original", "device_detection", "cropping", "phi_detection", "phi_redaction"] as const;
 
 /**
  * Delete the main image blob AND all stage blobs for a screenshot.
@@ -204,7 +204,7 @@ export async function deleteAllBlobsForScreenshot(id: number): Promise<void> {
       ),
     );
   } else {
-    const stageKeys = ALL_STAGES.map((_, i) => -(id * 100 + (i + 1)));
+    const stageKeys = ALL_STAGES.map((s) => -(id * 100 + stageIndex(s)));
     await db.imageBlobs.bulkDelete([id, ...stageKeys]);
   }
 }

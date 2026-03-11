@@ -1,3 +1,21 @@
+interface PreprocessingData {
+  device_detection?: {
+    device_category?: string;
+    device_model?: string;
+    confidence: number;
+  };
+  cropping?: { was_cropped?: boolean };
+  phi_detection?: {
+    phi_detected?: boolean;
+    regions_count?: number;
+  };
+  phi_redaction?: {
+    redacted?: boolean;
+    regions_redacted?: number;
+    method?: string;
+  };
+}
+
 interface PreprocessingSummaryProps {
   processingMetadata?: Record<string, unknown> | null;
 }
@@ -5,7 +23,7 @@ interface PreprocessingSummaryProps {
 export const PreprocessingSummary = ({
   processingMetadata,
 }: PreprocessingSummaryProps) => {
-  const preprocessing = (processingMetadata as any)?.preprocessing;
+  const preprocessing = processingMetadata?.preprocessing as PreprocessingData | undefined;
   if (!preprocessing) return null;
 
   const dd = preprocessing.device_detection;

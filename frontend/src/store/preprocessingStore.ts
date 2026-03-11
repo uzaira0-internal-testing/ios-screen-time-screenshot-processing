@@ -243,13 +243,18 @@ export function createPreprocessingStore(service: IPreprocessingService) {
         // this prevents downstream useMemo/re-renders from triggering.
         const prev = get().screenshots;
         const next = data.items;
+        const stageStatusJson = (s: Screenshot) => {
+          const pp = (s.processing_metadata as Record<string, unknown> | undefined)?.preprocessing as Record<string, unknown> | undefined;
+          return JSON.stringify(pp?.stage_status);
+        };
+        // Pre-cache prev stage_status strings to avoid 2N JSON.stringify calls during polling
+        const prevCache = prev.map(stageStatusJson);
         const changed = prev.length !== next.length ||
-          next.some((item: any, i: number) =>
+          next.some((item, i) =>
             item.id !== prev[i]?.id ||
             item.processing_status !== prev[i]?.processing_status ||
             item.processed_at !== prev[i]?.processed_at ||
-            JSON.stringify((item.processing_metadata as any)?.preprocessing?.stage_status) !==
-              JSON.stringify((prev[i]?.processing_metadata as any)?.preprocessing?.stage_status)
+            stageStatusJson(item) !== prevCache[i]
           );
         if (changed) {
           set({ screenshots: next });
@@ -270,12 +275,11 @@ export function createPreprocessingStore(service: IPreprocessingService) {
     try {
       const data = await service.getSummary(selectedGroupId);
       if (data) {
-        set({ summary: data as PreprocessingSummaryData });
+        set({ summary: data });
 
         // Auto-detect running tasks and start polling if not already polling
-        const summaryData = data as PreprocessingSummaryData;
         const activeStage = get().activeStage;
-        const stageSummary = summaryData[activeStage];
+        const stageSummary = data[activeStage];
         const alreadyPolling = get()._pollInterval !== null;
         if (stageSummary && stageSummary.running > 0 && !alreadyPolling) {
           set({
@@ -380,7 +384,7 @@ export function createPreprocessingStore(service: IPreprocessingService) {
   loadEventLog: async (screenshotId) => {
     try {
       const data = await service.getEventLog(screenshotId);
-      set({ selectedScreenshotId: screenshotId, eventLog: data as EventLogData });
+      set({ selectedScreenshotId: screenshotId, eventLog: data });
     } catch (err) {
       console.error("Failed to load event log:", err);
       toast.error("Failed to load event log");

@@ -50,5 +50,10 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import httpx; httpx.get('http://localhost:8000/api/v1/health').raise_for_status()"
 
+# Create non-root user
+RUN useradd --create-home --shell /bin/bash appuser && \
+    chown -R appuser:appuser /app
+USER appuser
+
 # Run the service
 CMD ["python", "-m", "uvicorn", "ipad_screenshot_cropper.web.main:app", "--host", "0.0.0.0", "--port", "8000"]

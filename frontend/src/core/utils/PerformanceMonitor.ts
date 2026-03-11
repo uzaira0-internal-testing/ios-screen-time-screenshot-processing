@@ -96,7 +96,8 @@ class PerformanceMonitorClass {
 
   getMemoryUsage(): number | undefined {
     if ('memory' in performance) {
-      const memory = (performance as any).memory;
+      // performance.memory is a Chrome-only API not in standard TS types
+      const memory = (performance as Performance & { memory: { usedJSHeapSize: number } }).memory;
       return memory.usedJSHeapSize;
     }
     return undefined;

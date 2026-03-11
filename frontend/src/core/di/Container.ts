@@ -71,7 +71,6 @@ export class ServiceContainer {
           typeof instance.terminate === "function"
         ) {
           try {
-            console.log(`[ServiceContainer] Terminating service: ${token}`);
             instance.terminate();
           } catch (error) {
             console.error(
@@ -84,7 +83,6 @@ export class ServiceContainer {
           typeof instance.destroy === "function"
         ) {
           try {
-            console.log(`[ServiceContainer] Destroying service: ${token}`);
             instance.destroy();
           } catch (error) {
             console.error(
@@ -97,7 +95,6 @@ export class ServiceContainer {
           typeof instance.cleanup === "function"
         ) {
           try {
-            console.log(`[ServiceContainer] Cleaning up service: ${token}`);
             instance.cleanup();
           } catch (error) {
             console.error(

@@ -1,7 +1,7 @@
 export interface WebSocketEvent {
   type: string;
   timestamp: string;
-  data: any;
+  data: unknown;
 }
 
 export interface AnnotationSubmittedEvent {

@@ -122,7 +122,7 @@ function throwIfError(
   defaultMessage: string,
 ): asserts error is undefined {
   if (error) {
-    const detail = (error as any)?.detail || defaultMessage;
+    const detail = (error as { detail?: string })?.detail || defaultMessage;
     throw new Error(detail);
   }
 }

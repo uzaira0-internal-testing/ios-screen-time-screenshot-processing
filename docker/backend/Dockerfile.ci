@@ -6,19 +6,20 @@
 # Build context: monorepo root (for git-based installs)
 #
 # Required build args:
-#   GITHUB_TOKEN - GitHub token with repo access
 #   GITHUB_REPOSITORY - e.g., "your-org/monorepo"
+# Required build secrets:
+#   GITHUB_TOKEN - GitHub token with repo access (passed via --secret, not ARG)
 #
 # =============================================================================
 
 FROM python:3.12-slim AS builder
 
 # Build arguments
-ARG GITHUB_TOKEN
+# GITHUB_TOKEN is passed via --mount=type=secret (not ARG) to avoid leaking into image layers
+# Usage: docker build --secret id=GITHUB_TOKEN,env=GITHUB_TOKEN ...
 ARG GITHUB_REPOSITORY
 
 # Validate required args
-RUN test -n "$GITHUB_TOKEN" || (echo "GITHUB_TOKEN is required" && exit 1)
 RUN test -n "$GITHUB_REPOSITORY" || (echo "GITHUB_REPOSITORY is required" && exit 1)
 
 # Install build dependencies
@@ -37,14 +38,15 @@ WORKDIR /build
 RUN uv venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Configure git to use token for private repo access
-RUN git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
-
 # Install monorepo packages from git
-# These are installed directly from the private repo
-RUN --mount=type=cache,target=/root/.cache/pip \
+# Use --mount=type=secret to avoid leaking GITHUB_TOKEN into image layers
+RUN --mount=type=secret,id=GITHUB_TOKEN \
+    --mount=type=cache,target=/root/.cache/pip \
+    GITHUB_TOKEN=$(cat /run/secrets/GITHUB_TOKEN) && \
+    git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/" && \
     pip install \
-    "global-pass-honor-username-auth @ git+https://github.com/${GITHUB_REPOSITORY}.git@main#subdirectory=packages/global-pass-honor-username-auth"
+    "global-pass-honor-username-auth @ git+https://github.com/${GITHUB_REPOSITORY}.git@main#subdirectory=packages/global-pass-honor-username-auth" && \
+    git config --global --remove-section url."https://${GITHUB_TOKEN}@github.com/"
 
 # Install remaining dependencies (from pyproject.toml [web] extras)
 RUN --mount=type=cache,target=/root/.cache/pip \

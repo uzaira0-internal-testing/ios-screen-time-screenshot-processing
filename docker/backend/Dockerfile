@@ -71,6 +71,11 @@ COPY apps/ios-screen-time-screenshot-processing/alembic.ini ./
 # Create necessary directories
 RUN mkdir -p /app/db /app/output /app/debug /app/uploads
 
+# Create non-root user and set ownership
+RUN useradd --create-home --shell /bin/bash appuser && \
+    chown -R appuser:appuser /app
+USER appuser
+
 # Expose port
 EXPOSE 8000
 

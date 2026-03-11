@@ -252,10 +252,7 @@ def optimize_boundaries(
                 best_shift_penalty = 5 * abs(best_shift_x) + abs(best_shift_y) + 5 * abs(best_shift_width)
 
                 # Priority: 1) lower diff, 2) smaller shift
-                is_better = (
-                    diff < best_diff
-                    or (diff == best_diff and shift_penalty < best_shift_penalty)
-                )
+                is_better = diff < best_diff or (diff == best_diff and shift_penalty < best_shift_penalty)
 
                 if is_better:
                     best_diff = diff
@@ -267,7 +264,7 @@ def optimize_boundaries(
 
                     # Early exit if we found exact match with no shift
                     if diff == 0 and shift_penalty == 0:
-                        logger.debug(f"Found exact match at origin")
+                        logger.debug("Found exact match at origin")
                         return OptimizationResult(
                             bounds=best_bounds,
                             bar_total_minutes=int(best_bar_total),
@@ -280,9 +277,7 @@ def optimize_boundaries(
                         )
 
     # Apply OCR 7->1 correction using bar total as a hint
-    corrected_ocr_total, corrected_minutes = correct_ocr_total_with_bar_hint(
-        ocr_total, int(best_bar_total)
-    )
+    corrected_ocr_total, corrected_minutes = correct_ocr_total_with_bar_hint(ocr_total, int(best_bar_total))
     final_diff = abs(int(best_bar_total) - corrected_minutes)
 
     logger.debug(

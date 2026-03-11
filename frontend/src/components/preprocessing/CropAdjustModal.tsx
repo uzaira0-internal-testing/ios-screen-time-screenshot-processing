@@ -75,7 +75,7 @@ export const CropAdjustModal = ({
     preprocessingService.getOriginalImageUrl(screenshotId).then((url) => {
       img.src = url;
     }).catch(() => setImageError(true));
-  }, [isOpen, inline, screenshotId, initialCrop]);
+  }, [isOpen, inline, screenshotId, initialCrop, preprocessingService]);
 
   // Calculate scale to fit canvas — use most of the viewport
   useEffect(() => {

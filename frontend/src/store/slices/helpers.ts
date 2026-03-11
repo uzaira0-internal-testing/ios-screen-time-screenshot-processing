@@ -44,6 +44,29 @@ export const isVerifiedByCurrentUser = (
 };
 
 /**
+ * Extract a user-friendly error message from an unknown caught error.
+ * Handles axios-style errors (response.data.detail), standard Error objects, and fallbacks.
+ */
+type AxiosLikeError = Error & { response?: { data?: { detail?: string }; status?: number } };
+
+export function extractErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error) {
+    const axiosLike = error as AxiosLikeError;
+    return axiosLike.response?.data?.detail || error.message || fallback;
+  }
+  if (typeof error === "string") return error;
+  return fallback;
+}
+
+/** Extract HTTP status code from an axios-like error, or undefined if unavailable. */
+export function extractErrorStatus(error: unknown): number | undefined {
+  if (error instanceof Error) {
+    return (error as AxiosLikeError).response?.status;
+  }
+  return undefined;
+}
+
+/**
  * Convert a VerificationFilterType to API query parameters.
  * Centralizes filter-to-API conversion to avoid duplication.
  */

@@ -24,7 +24,7 @@ from .config import OCRConfig
 from .exceptions import ImageProcessingError
 from .grid_anchors import find_grid_anchors_and_calculate_roi
 from .image_utils import adjust_contrast_brightness, convert_dark_mode, remove_all_but
-from .ocr import find_screenshot_title, find_screenshot_total_usage, find_title_and_total, get_text
+from .ocr import find_title_and_total, get_text
 from .ocr_integration import adjust_anchor_offsets, perform_ocr, prepare_image_chunks
 from .roi import calculate_roi, calculate_roi_from_clicks
 
@@ -369,6 +369,7 @@ def _save_debug_graph(filename: str | Path, row: list, roi_height: int) -> str:
 
 
 # Utility functions for image comparison (used in testing/validation)
+
 
 def mse_between_loaded_images(image1: np.ndarray, image2: np.ndarray) -> float:
     """Calculate mean squared error between two images."""

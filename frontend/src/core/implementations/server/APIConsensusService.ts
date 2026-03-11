@@ -18,6 +18,9 @@ export class APIConsensusService implements IConsensusService {
 
   async getForScreenshot(screenshotId: number): Promise<Consensus> {
     const result = await api.consensus.getForScreenshot(screenshotId);
+    // ConsensusAnalysis (API) and Consensus (UI) have different shapes but
+    // the backend response is consumed directly by the UI. Double cast needed
+    // until these types are unified.
     return result as unknown as Consensus;
   }
 

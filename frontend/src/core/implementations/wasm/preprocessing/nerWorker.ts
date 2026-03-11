@@ -64,9 +64,11 @@ self.onmessage = async (e: MessageEvent) => {
     }) as TokenClassificationOutput;
 
     // Filter to relevant entity types (PERSON, ORG, LOC, MISC)
-    const entities = result
-      .filter((e: any) => e.score >= 0.85)
-      .map((e: any) => ({
+    // With aggregation_strategy: "simple", results include entity_group (not in base type)
+    type AggregatedEntity = { entity_group: string; word: string; start?: number; end?: number; score: number };
+    const entities = (result as unknown as AggregatedEntity[])
+      .filter((e) => e.score >= 0.85)
+      .map((e) => ({
         entity_group: e.entity_group,
         word: e.word,
         start: e.start,
