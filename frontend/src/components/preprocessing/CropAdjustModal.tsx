@@ -61,9 +61,12 @@ export const CropAdjustModal = ({
     if (!isOpen && !inline) return;
     setImageError(false);
     setImage(null);
+    let cancelled = false;
+    let blobUrl: string | undefined;
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
+      if (cancelled) return;
       setImage(img);
       if (initialCrop) {
         setCrop(initialCrop);
@@ -71,10 +74,19 @@ export const CropAdjustModal = ({
         setCrop({ left: 0, top: 0, right: img.naturalWidth, bottom: img.naturalHeight });
       }
     };
-    img.onerror = () => setImageError(true);
+    img.onerror = () => { if (!cancelled) setImageError(true); };
     preprocessingService.getOriginalImageUrl(screenshotId).then((url) => {
+      if (cancelled) {
+        if (url.startsWith("blob:")) URL.revokeObjectURL(url);
+        return;
+      }
+      blobUrl = url;
       img.src = url;
-    }).catch(() => setImageError(true));
+    }).catch(() => { if (!cancelled) setImageError(true); });
+    return () => {
+      cancelled = true;
+      if (blobUrl?.startsWith("blob:")) URL.revokeObjectURL(blobUrl);
+    };
   }, [isOpen, inline, screenshotId, initialCrop, preprocessingService]);
 
   // Calculate scale to fit canvas — use most of the viewport

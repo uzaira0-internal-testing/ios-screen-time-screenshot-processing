@@ -69,15 +69,15 @@ function setPreprocessing(screenshot: Screenshot, pp: PreprocessingMeta): Record
   return pm;
 }
 
-let nextEventId = Date.now();
-
 function addEvent(
   pp: PreprocessingMeta,
   stage: string,
   status: string,
   result: Record<string, unknown>,
 ): PreprocessingMeta {
-  const eid = nextEventId++;
+  // Derive next ID from existing events to avoid collisions across page reloads
+  const maxExisting = pp.events.reduce((max, e) => Math.max(max, e.event_id), 0);
+  const eid = maxExisting + 1;
   const event: PreprocessingEvent = {
     event_id: eid,
     stage,
@@ -510,8 +510,14 @@ export class WASMPreprocessingService implements IPreprocessingService {
     const bitmap = await createImageBitmap(blob);
     const origWidth = bitmap.width;
     const origHeight = bitmap.height;
-    const cropWidth = origWidth - crop.left - crop.right;
-    const cropHeight = origHeight - crop.top - crop.bottom;
+    // crop.left/top/right/bottom are absolute pixel coordinates (matching server contract)
+    const cropWidth = crop.right - crop.left;
+    const cropHeight = crop.bottom - crop.top;
+
+    if (cropWidth <= 0 || cropHeight <= 0) {
+      bitmap.close();
+      throw new Error(`Invalid crop dimensions: ${cropWidth}x${cropHeight}`);
+    }
 
     const canvas = new OffscreenCanvas(cropWidth, cropHeight);
     const ctx = canvas.getContext("2d");
