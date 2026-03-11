@@ -23,7 +23,8 @@ import { detectDevice } from "./deviceDetection";
 import { cropScreenshot } from "./cropping";
 import { detectPHI, terminateNERWorker, terminateTesseractWorker } from "./phiDetection";
 import { redactImage } from "./phiRedaction";
-import type { PHIRegion } from "./phiRedaction";
+import type { PHIRegion } from "@/core/interfaces/IPreprocessingService";
+import { createObjectURL as cachedCreateObjectURL } from "../storage/opfsBlobStorage";
 
 const STAGES: PreprocessingStage[] = [
   "device_detection",
@@ -540,18 +541,20 @@ export class WASMPreprocessingService implements IPreprocessingService {
   }
 
   async getStageImageUrl(screenshotId: number, stage: string): Promise<string> {
-    // Try to load a per-stage snapshot first (saved after image-modifying stages)
-    const stageBlob = await this.storage.getStageBlob(screenshotId, stage);
-    if (stageBlob) {
-      return URL.createObjectURL(stageBlob);
+    // Only image-modifying stages (cropping, phi_redaction) save snapshots
+    if (stage === "cropping" || stage === "phi_redaction") {
+      const stageBlob = await this.storage.getStageBlob(screenshotId, stage);
+      if (stageBlob) {
+        return URL.createObjectURL(stageBlob);
+      }
     }
     // Fall back to current image
     return this.getImageUrl(screenshotId);
   }
 
   async getImageUrl(screenshotId: number): Promise<string> {
-    const blob = await this.storage.getImageBlob(screenshotId);
-    if (!blob) throw new Error(`No image blob for screenshot ${screenshotId}`);
-    return URL.createObjectURL(blob);
+    const url = await cachedCreateObjectURL(screenshotId);
+    if (!url) throw new Error(`No image blob for screenshot ${screenshotId}`);
+    return url;
   }
 }

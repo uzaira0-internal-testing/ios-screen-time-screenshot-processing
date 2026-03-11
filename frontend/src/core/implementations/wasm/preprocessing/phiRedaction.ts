@@ -1,4 +1,4 @@
-import type { PHIRegion } from "./phiDetection";
+import type { PHIRegion } from "@/core/interfaces/IPreprocessingService";
 export type { PHIRegion };
 
 export type RedactionMethod = "redbox" | "blackbox" | "pixelate";

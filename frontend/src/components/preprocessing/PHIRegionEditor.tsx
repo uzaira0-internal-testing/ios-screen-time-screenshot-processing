@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { usePreprocessingPipelineService } from "@/core";
 import toast from "react-hot-toast";
-import type { PHIRegion } from "@/core/implementations/wasm/preprocessing/phiDetection";
+import type { PHIRegion } from "@/core/interfaces/IPreprocessingService";
 export type { PHIRegion };
 
 export interface RecentPHIConfig {
@@ -136,6 +136,9 @@ export const PHIRegionEditor = ({
     }).catch(() => {
       setRegions([]);
     });
+
+    // Note: blob URLs from getStageImageUrl may be LRU-cached — don't revoke here.
+    // The LRU cache in opfsBlobStorage manages lifecycle automatically.
   }, [isOpen, inline, screenshotId]);
 
   // Calculate scale

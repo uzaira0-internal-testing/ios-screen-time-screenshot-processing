@@ -9,16 +9,8 @@
  * 5. Map matches back to image coordinates via OCR word bboxes
  */
 
-export interface PHIRegion {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  label: string;
-  source: string;
-  confidence: number;
-  text: string;
-}
+import type { PHIRegion } from "@/core/interfaces/IPreprocessingService";
+export type { PHIRegion };
 
 export interface PHIDetectionResult {
   regions: PHIRegion[];

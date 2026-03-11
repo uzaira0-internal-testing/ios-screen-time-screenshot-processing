@@ -113,7 +113,11 @@ export async function retrieveStageBlob(id: number, stage: string): Promise<Blob
 /** Map stage names to numeric indices for IndexedDB fallback key encoding. */
 function stageIndex(stage: string): number {
   const stages: Record<string, number> = { device_detection: 1, cropping: 2, phi_detection: 3, phi_redaction: 4 };
-  return stages[stage] ?? 0;
+  const idx = stages[stage];
+  if (idx === undefined) {
+    throw new Error(`Unknown preprocessing stage: "${stage}"`);
+  }
+  return idx;
 }
 
 export async function storeImageBlob(id: number, blob: Blob): Promise<void> {

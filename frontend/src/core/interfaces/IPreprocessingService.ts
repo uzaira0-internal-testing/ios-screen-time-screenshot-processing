@@ -1,5 +1,17 @@
 export type PreprocessingStage = "device_detection" | "cropping" | "phi_detection" | "phi_redaction";
 
+/** A PHI region detected in an image, with bounding box and metadata. */
+export interface PHIRegion {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  label: string;
+  source: string;
+  confidence: number;
+  text: string;
+}
+
 export interface RunStageOptions {
   group_id?: string;
   screenshot_ids?: number[];

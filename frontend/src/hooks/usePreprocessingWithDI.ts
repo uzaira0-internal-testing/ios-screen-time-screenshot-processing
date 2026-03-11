@@ -94,7 +94,6 @@ export function usePreprocessingStore<T>(selector?: (state: PreprocessingState) 
 // ---------------------------------------------------------------------------
 
 const serviceContext = createContext<IPreprocessingService | null>(null);
-export { serviceContext as PreprocessingServiceContext };
 
 /**
  * Load an image URL for a screenshot via the preprocessing service.
@@ -131,7 +130,10 @@ export function useScreenshotImageUrl(
         if (!revoked) {
           objectUrl = result;
           setUrl(result);
-        } else if (result.startsWith("blob:")) {
+        } else if (result.startsWith("blob:") && method === "getOriginalImageUrl") {
+          // Only revoke getOriginalImageUrl — it always creates uncached blob URLs.
+          // getImageUrl uses an LRU cache; getStageImageUrl may fall through to the
+          // LRU cache. Revoking cached URLs would corrupt the cache for other consumers.
           URL.revokeObjectURL(result);
         }
       } catch {
@@ -141,7 +143,10 @@ export function useScreenshotImageUrl(
 
     return () => {
       revoked = true;
-      if (objectUrl?.startsWith("blob:")) {
+      // Only revoke getOriginalImageUrl blob URLs — they're always uncached.
+      // getImageUrl uses an LRU cache; getStageImageUrl may fall through to the
+      // cached path. Revoking cached URLs would corrupt the cache for other consumers.
+      if (objectUrl?.startsWith("blob:") && method === "getOriginalImageUrl") {
         URL.revokeObjectURL(objectUrl);
       }
     };
