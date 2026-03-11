@@ -215,29 +215,44 @@ export class WASMPreprocessingService implements IPreprocessingService {
       return { queued_count: 0, message: `No eligible screenshots for ${stage.replace(/_/g, " ")}` };
     }
 
-    // Process each screenshot, yielding to the browser between items
-    // so React can paint progress updates.
+    // Process screenshots, yielding to the browser for progress updates.
+    // Device detection and cropping are parallelized in batches since they're
+    // I/O-bound (IndexedDB reads) not CPU-bound. PHI stages stay sequential
+    // because they use shared Tesseract/NER workers.
     let completed = 0;
     options.onProgress?.(0, eligible.length);
-    for (const screenshot of eligible) {
+
+    const isBatchable = stage === "device_detection" || stage === "cropping";
+    const BATCH_SIZE = isBatchable ? 8 : 1;
+
+    for (let i = 0; i < eligible.length; i += BATCH_SIZE) {
       if (options.abortSignal?.aborted) break;
-      try {
-        await this.processStage(screenshot, stage, options);
-        completed++;
-        options.onProgress?.(completed, eligible.length);
-        // Yield to browser so the progress bar repaints
-        await new Promise<void>((r) => { setTimeout(r, 0); });
-      } catch (err) {
-        console.error(`[WASM] ${stage} failed for screenshot ${screenshot.id}:`, err);
-        // Mark as exception
-        const pp = getPreprocessing(screenshot);
-        const updated = addEvent(pp, stage, "exception", {
-          error: err instanceof Error ? err.message : String(err),
-        });
-        await this.storage.updateScreenshot(screenshot.id as number, {
-          processing_metadata: setPreprocessing(screenshot, updated),
-        });
+      const batch = eligible.slice(i, i + BATCH_SIZE);
+
+      const results = await Promise.allSettled(
+        batch.map((screenshot) => this.processStage(screenshot, stage, options)),
+      );
+
+      for (let j = 0; j < results.length; j++) {
+        const result = results[j]!;
+        if (result.status === "fulfilled") {
+          completed++;
+        } else {
+          const screenshot = batch[j]!;
+          console.error(`[WASM] ${stage} failed for screenshot ${screenshot.id}:`, result.reason);
+          const pp = getPreprocessing(screenshot);
+          const updated = addEvent(pp, stage, "exception", {
+            error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+          });
+          await this.storage.updateScreenshot(screenshot.id as number, {
+            processing_metadata: setPreprocessing(screenshot, updated),
+          });
+        }
       }
+
+      options.onProgress?.(completed, eligible.length);
+      // Yield to browser so the progress bar repaints
+      await new Promise<void>((r) => { setTimeout(r, 0); });
     }
 
     // Clean up workers after PHI detection batch
@@ -263,20 +278,22 @@ export class WASMPreprocessingService implements IPreprocessingService {
 
     switch (stage) {
       case "device_detection": {
-        // Get image dimensions
+        // Get image dimensions — try stored metadata first to avoid full decode
         let width: number, height: number;
-        if (blob) {
+        const metadata = screenshot as unknown as Record<string, unknown>;
+        if (typeof metadata.image_width === "number" && typeof metadata.image_height === "number" &&
+            metadata.image_width > 0 && metadata.image_height > 0) {
+          width = metadata.image_width;
+          height = metadata.image_height;
+        } else if (blob) {
           const bmp = await createImageBitmap(blob);
           width = bmp.width;
           height = bmp.height;
           bmp.close();
         } else {
-          // Fall back to stored dimensions — likely missing blob.
-          // image_width/image_height may exist on IndexedDB records but aren't in the Screenshot type.
-          console.warn(`[WASM] device_detection: No image blob for screenshot ${id}, using stored dimensions`);
-          const metadata = screenshot as unknown as Record<string, unknown>;
-          width = (typeof metadata.image_width === "number" ? metadata.image_width : 0);
-          height = (typeof metadata.image_height === "number" ? metadata.image_height : 0);
+          console.warn(`[WASM] device_detection: No dimensions or blob for screenshot ${id}`);
+          width = 0;
+          height = 0;
         }
 
         const result = detectDevice(width, height);

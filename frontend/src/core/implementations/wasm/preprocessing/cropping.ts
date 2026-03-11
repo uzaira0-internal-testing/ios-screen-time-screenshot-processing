@@ -121,8 +121,8 @@ export async function cropScreenshot(imageBlob: Blob): Promise<CropResult> {
   );
   bitmap.close();
 
-  // 6. Convert to blob
-  const croppedBlob = await canvas.convertToBlob({ type: "image/png" });
+  // 6. Convert to blob — JPEG is ~10x faster to encode than PNG for screenshots
+  const croppedBlob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.92 });
 
   return {
     croppedBlob,
