@@ -280,7 +280,7 @@ export class WASMScreenshotService implements IScreenshotService {
     screenshotId: number,
     method: "ocr_anchored" | "line_based",
     _onProgress?: (progress: ProcessingProgress) => void,
-    _maxShift?: number, // Ignored in WASM mode - optimization is server-side only
+    maxShift?: number,
   ): Promise<ProcessingResult> {
     const screenshot = await this.getById(screenshotId);
     const imageBlob = await this.storageService.getImageBlob(screenshotId);
@@ -299,11 +299,14 @@ export class WASMScreenshotService implements IScreenshotService {
       // If line-based fails, fall through to process without grid (will auto-detect with OCR)
     }
 
-    const processConfig: { imageType: typeof screenshot.image_type; gridCoordinates?: GridCoordinates } = {
+    const processConfig: { imageType: typeof screenshot.image_type; gridCoordinates?: GridCoordinates; maxShift?: number } = {
       imageType: screenshot.image_type,
     };
     if (gridCoordinates) {
       processConfig.gridCoordinates = gridCoordinates;
+    }
+    if (maxShift && maxShift > 0) {
+      processConfig.maxShift = maxShift;
     }
 
     const result = await this.processingService.processImage(imageBlob, processConfig);

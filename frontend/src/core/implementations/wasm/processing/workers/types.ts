@@ -20,6 +20,8 @@ export interface ProcessImagePayload {
   imageData: ImageData;
   imageType: ImageType;
   gridCoordinates?: GridCoordinates;
+  /** Max pixels to shift grid for optimization (0 = disabled, default = 0) */
+  maxShift?: number;
 }
 
 export interface ExtractTitlePayload {

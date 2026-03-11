@@ -25,6 +25,7 @@ import { findScreenshotTitle, findScreenshotTotalUsage } from "../ocr.canvas";
 import { extractHourlyData } from "../barExtraction.canvas";
 import { detectGrid } from "../gridDetection.canvas";
 import { detectGridLineBased } from "../lineBasedDetection.canvas";
+import { optimizeBoundaries } from "../boundaryOptimizer.canvas";
 
 let tesseractWorker: TesseractWorker | null = null;
 let initialized = false;
@@ -257,11 +258,37 @@ async function handleProcessImage(
 
   postProgress("ocr_hourly", 80, "Extracting hourly data...");
   console.log("[Worker.handleProcessImage] Extracting hourly data...");
-  const hourlyData = extractHourlyData(
-    darkModeConverted,
-    gridCoordinates,
-    payload.imageType === "battery",
-  );
+
+  const maxShift = payload.maxShift ?? 0;
+  let hourlyData;
+
+  if (maxShift > 0 && total) {
+    // Boundary optimization: shift grid to match OCR total
+    console.log(`[Worker.handleProcessImage] Optimizing boundaries (maxShift=${maxShift}, total=${total})`);
+    const optResult = optimizeBoundaries(
+      darkModeConverted,
+      gridCoordinates,
+      total,
+      maxShift,
+      payload.imageType === "battery",
+    );
+    hourlyData = optResult.hourlyData;
+    gridCoordinates = optResult.bounds;
+    console.log("[Worker.handleProcessImage] Optimization result:", {
+      converged: optResult.converged,
+      shift: `(${optResult.shiftX}, ${optResult.shiftY}, ${optResult.shiftWidth})`,
+      barTotal: optResult.barTotalMinutes,
+      ocrTotal: optResult.ocrTotalMinutes,
+      iterations: optResult.iterations,
+    });
+  } else {
+    hourlyData = extractHourlyData(
+      darkModeConverted,
+      gridCoordinates,
+      payload.imageType === "battery",
+    );
+  }
+
   console.log("[Worker.handleProcessImage] Hourly data extracted:", hourlyData);
 
   postProgress("complete", 100, "Processing complete");

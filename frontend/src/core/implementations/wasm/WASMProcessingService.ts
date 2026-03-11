@@ -242,6 +242,7 @@ export class WASMProcessingService implements IProcessingService {
           imageData: imgData,
           imageType: config.imageType,
           gridCoordinates: config.gridCoordinates,
+          maxShift: config.maxShift,
         },
       },
       onProgress,

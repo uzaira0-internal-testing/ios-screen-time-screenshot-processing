@@ -3,6 +3,8 @@ import type { HourlyData, GridCoordinates, ImageType } from '@/types';
 export interface ProcessingConfig {
   imageType: ImageType;
   gridCoordinates?: GridCoordinates;
+  /** Max pixels to shift grid for optimization (0 = disabled) */
+  maxShift?: number;
 }
 
 /**
