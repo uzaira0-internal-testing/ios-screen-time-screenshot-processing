@@ -76,6 +76,7 @@ interface PreprocessingState {
   _pollCount: number;
   _queuedCount: number;
   _completedBaseline: number;
+  _abortController: AbortController | null;
   _pollStage: Stage;
 
   // Upload state (Phase 2)
@@ -110,6 +111,7 @@ interface PreprocessingState {
   loadScreenshots: () => Promise<void>;
   loadSummary: () => Promise<void>;
   runStage: (stage: Stage, screenshotIds?: number[]) => Promise<void>;
+  stopStage: () => void;
   resetStage: (stage: Stage) => Promise<void>;
   invalidateFromStage: (screenshotId: number, stage: string) => Promise<void>;
   loadEventLog: (screenshotId: number) => Promise<void>;
@@ -172,6 +174,7 @@ export function createPreprocessingStore(service: IPreprocessingService) {
   _pollCount: 0,
   _queuedCount: 0,
   _completedBaseline: 0,
+  _abortController: null,
   _pollStage: "device_detection",
 
   // Upload state
@@ -305,7 +308,8 @@ export function createPreprocessingStore(service: IPreprocessingService) {
     // Capture how many are already completed before this batch starts
     const summary = get().summary;
     const baseline = summary ? summary[stage]?.completed ?? 0 : 0;
-    set({ isRunningStage: true, stageProgress: null, _pollCount: 0, _queuedCount: 0, _completedBaseline: baseline, _pollStage: stage });
+    const abortController = new AbortController();
+    set({ isRunningStage: true, stageProgress: null, _pollCount: 0, _queuedCount: 0, _completedBaseline: baseline, _pollStage: stage, _abortController: abortController });
     try {
       const options: RunStageOptions = {
         ...(selectedGroupId && { group_id: selectedGroupId }),
@@ -322,6 +326,7 @@ export function createPreprocessingStore(service: IPreprocessingService) {
         options.onProgress = (completed, total) => {
           set({ stageProgress: { completed, total } });
         };
+        options.abortSignal = abortController.signal;
       }
       const result = await service.runStage(stage, options);
       if (result && result.queued_count > 0) {
@@ -353,6 +358,16 @@ export function createPreprocessingStore(service: IPreprocessingService) {
       toast.error(`Failed to queue ${stage}`);
       set({ isRunningStage: false });
     }
+  },
+
+  stopStage: () => {
+    const ac = get()._abortController;
+    if (ac) ac.abort();
+    get().stopPolling();
+    set({ isRunningStage: false, stageProgress: null, _abortController: null });
+    toast.success("Stage stopped");
+    get().loadScreenshots();
+    get().loadSummary();
   },
 
   resetStage: async (stage) => {

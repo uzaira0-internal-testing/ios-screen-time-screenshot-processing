@@ -175,7 +175,10 @@ let tesseractWorker: Awaited<ReturnType<typeof import("tesseract.js").createWork
 async function getTesseractWorker() {
   if (!tesseractWorker) {
     const Tesseract = await import("tesseract.js");
-    tesseractWorker = await Tesseract.createWorker("eng");
+    // Use locally bundled worker to avoid CDN dependency (required for Tauri CSP + offline)
+    tesseractWorker = await Tesseract.createWorker("eng", undefined, {
+      workerPath: new URL("/tesseract-worker.min.js", window.location.origin).href,
+    });
   }
   return tesseractWorker;
 }

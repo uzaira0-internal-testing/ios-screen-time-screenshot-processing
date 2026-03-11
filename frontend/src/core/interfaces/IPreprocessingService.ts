@@ -32,6 +32,8 @@ export interface RunStageOptions {
   llm_model?: string;
   /** Called after each screenshot completes (WASM mode only). */
   onProgress?: (completed: number, total: number) => void;
+  /** Signal to abort processing (WASM mode only). */
+  abortSignal?: AbortSignal;
 }
 
 export interface RunStageResult {

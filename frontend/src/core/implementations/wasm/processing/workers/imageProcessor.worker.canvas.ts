@@ -56,6 +56,7 @@ async function initializeInternal(): Promise<void> {
     console.log("[Worker.initialize] Loading Tesseract.js...");
 
     tesseractWorker = await createTesseractWorker("eng", 1, {
+      workerPath: new URL("/tesseract-worker.min.js", self.location.origin).href,
       logger: (m) => {
         if (m.status === "recognizing text") {
           postProgress(

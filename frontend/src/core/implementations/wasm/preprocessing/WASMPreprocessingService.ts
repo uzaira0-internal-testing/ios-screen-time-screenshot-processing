@@ -220,6 +220,7 @@ export class WASMPreprocessingService implements IPreprocessingService {
     let completed = 0;
     options.onProgress?.(0, eligible.length);
     for (const screenshot of eligible) {
+      if (options.abortSignal?.aborted) break;
       try {
         await this.processStage(screenshot, stage, options);
         completed++;

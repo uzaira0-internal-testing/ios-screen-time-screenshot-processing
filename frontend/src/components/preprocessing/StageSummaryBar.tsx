@@ -24,6 +24,7 @@ export const StageSummaryBar = () => {
   const runStage = usePreprocessingStore((s) => s.runStage);
   const resetStage = usePreprocessingStore((s) => s.resetStage);
 
+  const stopStage = usePreprocessingStore((s) => s.stopStage);
   const enterQueue = usePreprocessingStore((s) => s.enterQueue);
   const getScreenshotsForStage = usePreprocessingStore((s) => s.getScreenshotsForStage);
 
@@ -82,19 +83,29 @@ export const StageSummaryBar = () => {
         })}
       </div>
 
-      {/* Progress bar when running */}
-      {isRunningStage && stageProgress && (
+      {/* Progress bar + stop button when running */}
+      {isRunningStage && (
         <div className="flex items-center gap-2 ml-2">
-          <div className="w-32 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-primary-600 rounded-full transition-all"
-              style={{ width: `${(stageProgress.completed / stageProgress.total) * 100}%` }}
-            />
-          </div>
-          <span className="text-xs text-slate-500">
-            {stageProgress.completed}/{stageProgress.total}
-          </span>
+          {stageProgress && (
+            <>
+              <div className="w-32 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary-600 rounded-full transition-all"
+                  style={{ width: `${(stageProgress.completed / stageProgress.total) * 100}%` }}
+                />
+              </div>
+              <span className="text-xs text-slate-500">
+                {stageProgress.completed}/{stageProgress.total}
+              </span>
+            </>
+          )}
           <span className="inline-block w-3 h-3 border-2 border-slate-300 border-t-primary-600 rounded-full animate-spin" />
+          <button
+            onClick={stopStage}
+            className="px-2.5 py-1 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 transition-colors"
+          >
+            Stop
+          </button>
         </div>
       )}
 
@@ -120,13 +131,13 @@ export const StageSummaryBar = () => {
         </button>
       )}
 
-      {/* Re-run button — shows when all are completed and nothing is eligible */}
-      {!isRunningStage && eligible === 0 && counts.completed > 0 && (
+      {/* Re-run button — shows when nothing is eligible (all completed or failed) */}
+      {!isRunningStage && eligible === 0 && (counts.completed > 0 || counts.exceptions > 0) && (
         <button
           onClick={() => resetStage(activeStage)}
           className="ml-auto px-4 py-1.5 text-sm font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded-md hover:bg-orange-100 transition-colors"
         >
-          Reset & Re-run {stageLabel} ({counts.completed})
+          Reset & Re-run {stageLabel} ({counts.completed + counts.exceptions})
         </button>
       )}
 
