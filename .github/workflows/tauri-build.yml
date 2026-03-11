@@ -246,7 +246,7 @@ jobs:
         run: cp latest.json release-assets/
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@c95fe1c986181354c4b3f57db0aaa59455a3f37a # v2.2.1
+        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.tag }}
