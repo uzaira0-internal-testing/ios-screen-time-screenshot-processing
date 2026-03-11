@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useSearchParams, useLocation } from "react-router";
+import { Link, useSearchParams, useLocation, useNavigate } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { PROCESSING_STATUS_LABELS, type ProcessingStatus } from "@/constants/processingStatus";
 import { Menu, X, LogOut } from "lucide-react";
@@ -11,6 +11,7 @@ export const Header = () => {
   const { username, isAuthenticated, isAdmin, logout } = useAuth();
   const [searchParams] = useSearchParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { mode: themeMode, setMode: setThemeMode } = useThemeStore();
   const features = useFeatures();
@@ -115,7 +116,7 @@ export const Header = () => {
                   <ThemeIcon className="h-4 w-4" />
                 </button>
                 <button
-                  onClick={logout}
+                  onClick={() => { logout(); navigate("/login"); }}
                   className="hidden md:inline-flex items-center gap-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 px-4 py-2 rounded-md text-sm font-medium transition-colors focus-ring"
                   aria-label="Logout"
                 >
@@ -158,7 +159,7 @@ export const Header = () => {
             </Link>
           ))}
           <button
-            onClick={() => { logout(); setMobileMenuOpen(false); }}
+            onClick={() => { logout(); setMobileMenuOpen(false); navigate("/login"); }}
             className="w-full text-left text-slate-600 dark:text-slate-300 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 px-3 py-2 rounded-md text-sm font-medium transition-colors focus-ring flex items-center gap-2"
           >
             <LogOut className="h-4 w-4" />
