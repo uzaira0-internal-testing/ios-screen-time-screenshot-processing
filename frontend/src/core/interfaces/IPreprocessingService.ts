@@ -36,4 +36,5 @@ export interface IPreprocessingService {
   savePHIRegions(screenshotId: number, body: any): Promise<void>;
   applyRedaction(screenshotId: number, body: any): Promise<void>;
   getDetails(screenshotId: number): Promise<any>;
+  getStageImageUrl(screenshotId: number, stage: string): Promise<string>;
 }

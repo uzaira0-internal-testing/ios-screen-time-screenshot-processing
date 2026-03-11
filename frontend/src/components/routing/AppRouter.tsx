@@ -26,21 +26,16 @@ const ConsensusComparisonPage = React.lazy(() =>
     default: m.ConsensusComparisonPage,
   })),
 );
-const ServerPreprocessingPage = React.lazy(() =>
+const PreprocessingPage = React.lazy(() =>
   import("@/pages/PreprocessingPage").then((m) => ({
     default: m.PreprocessingPage,
-  })),
-);
-const WASMPreprocessingPage = React.lazy(() =>
-  import("@/pages/WASMPreprocessingPage").then((m) => ({
-    default: m.WASMPreprocessingPage,
   })),
 );
 
 // Auth guard
 import { useAuthStore } from "@/store/authStore";
 import { useFeatures } from "@/core/hooks/useServices";
-import { config } from "@/config";
+import { PreprocessingProvider } from "@/hooks/usePreprocessingWithDI";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -147,7 +142,9 @@ export const AppRouter: React.FC = () => {
           <ProtectedRoute>
             {features.preprocessing ? (
               <React.Suspense fallback={ServerOnlyFallback}>
-                {config.isLocalMode ? <WASMPreprocessingPage /> : <ServerPreprocessingPage />}
+                <PreprocessingProvider>
+                  <PreprocessingPage />
+                </PreprocessingProvider>
               </React.Suspense>
             ) : (
               <Navigate to="/" replace />

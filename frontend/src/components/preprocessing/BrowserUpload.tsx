@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { usePreprocessingStore } from "@/store/preprocessingStore";
+import { usePreprocessingStore } from "@/hooks/usePreprocessingWithDI";
 import type { UploadFileItem } from "@/store/preprocessingStore";
 import { UploadDropZone } from "./UploadDropZone";
 import { UploadTagTable } from "./UploadTagTable";

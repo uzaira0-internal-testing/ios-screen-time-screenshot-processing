@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Screenshot } from "@/types";
 import type { PreprocessingEventData } from "@/store/preprocessingStore";
-import { usePreprocessingStore } from "@/store/preprocessingStore";
+import { usePreprocessingStore } from "@/hooks/usePreprocessingWithDI";
 import { StageReviewTable } from "./StageReviewTable";
 import { PHIRegionEditor } from "./PHIRegionEditor";
 

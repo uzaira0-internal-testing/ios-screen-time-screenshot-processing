@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { api } from "@/services/apiClient";
+import { usePreprocessingPipelineService } from "@/core";
 import toast from "react-hot-toast";
 
 export interface CropRect {
@@ -34,6 +34,7 @@ export const CropAdjustModal = ({
   onApplyAndNext,
   recentCrops,
 }: CropAdjustModalProps) => {
+  const preprocessingService = usePreprocessingPipelineService();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
@@ -71,7 +72,7 @@ export const CropAdjustModal = ({
       }
     };
     img.onerror = () => setImageError(true);
-    api.preprocessing.getOriginalImageUrl(screenshotId).then((url) => {
+    preprocessingService.getOriginalImageUrl(screenshotId).then((url) => {
       img.src = url;
     }).catch(() => setImageError(true));
   }, [isOpen, inline, screenshotId, initialCrop]);
@@ -262,7 +263,7 @@ export const CropAdjustModal = ({
 
     setIsApplying(true);
     try {
-      await api.preprocessing.applyManualCrop(screenshotId, crop);
+      await preprocessingService.applyManualCrop(screenshotId, crop);
       toast.success("Manual crop applied");
       onCropApplied();
       onClose();
@@ -281,7 +282,7 @@ export const CropAdjustModal = ({
   const handleApplyAndNext = async () => {
     setIsApplying(true);
     try {
-      await api.preprocessing.applyManualCrop(screenshotId, crop);
+      await preprocessingService.applyManualCrop(screenshotId, crop);
       toast.success("Manual crop applied");
       onCropApplied();
       onApplyAndNext?.();

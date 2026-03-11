@@ -11,7 +11,8 @@ import { pipeline, env, type TokenClassificationOutput } from "@huggingface/tran
 // Configure Transformers.js
 env.allowLocalModels = false;
 
-let nerPipeline: Awaited<ReturnType<typeof pipeline>> | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let nerPipeline: any = null;
 let initPromise: Promise<void> | null = null;
 
 async function initPipeline() {

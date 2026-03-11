@@ -1,4 +1,4 @@
-import { usePreprocessingStore } from "@/store/preprocessingStore";
+import { usePreprocessingStore } from "@/hooks/usePreprocessingWithDI";
 import type { Screenshot } from "@/types";
 
 interface QueueNavigationBarProps {

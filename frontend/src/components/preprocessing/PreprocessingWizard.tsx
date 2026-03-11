@@ -1,4 +1,5 @@
-import { usePreprocessingStore, STAGES } from "@/store/preprocessingStore";
+import { usePreprocessingStore } from "@/hooks/usePreprocessingWithDI";
+import { STAGES } from "@/store/preprocessingStore";
 import type { Stage } from "@/store/preprocessingStore";
 
 const STAGE_LABELS: Record<Stage, string> = {

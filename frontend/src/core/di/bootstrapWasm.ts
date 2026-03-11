@@ -8,6 +8,7 @@ import { WASMScreenshotService } from "../implementations/wasm/WASMScreenshotSer
 import { WASMAnnotationService } from "../implementations/wasm/WASMAnnotationService";
 import { WASMConsensusService } from "../implementations/wasm/WASMConsensusService";
 import { WASMProcessingService } from "../implementations/wasm/WASMProcessingService";
+import { WASMPreprocessingService } from "../implementations/wasm/preprocessing/WASMPreprocessingService";
 
 /**
  * Bootstrap services for WASM (local-first) mode.
@@ -47,6 +48,11 @@ export function bootstrapWasmServices(_config: AppConfig): ServiceContainer {
   container.registerSingleton(TOKENS.CONSENSUS_SERVICE, () => {
     const storage = container.resolve<IndexedDBStorageService>(TOKENS.STORAGE_SERVICE);
     return new WASMConsensusService(storage);
+  });
+
+  container.registerSingleton(TOKENS.PREPROCESSING_PIPELINE_SERVICE, () => {
+    const storage = container.resolve<IndexedDBStorageService>(TOKENS.STORAGE_SERVICE);
+    return new WASMPreprocessingService(storage);
   });
 
   // WASM mode: local processing via Tesseract.js + IndexedDB.

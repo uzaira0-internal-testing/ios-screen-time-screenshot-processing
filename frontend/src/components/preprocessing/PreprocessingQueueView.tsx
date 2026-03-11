@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { usePreprocessingStore } from "@/store/preprocessingStore";
+import { usePreprocessingStore } from "@/hooks/usePreprocessingWithDI";
 import { QueueNavigationBar } from "./QueueNavigationBar";
 import { PHIRegionEditor } from "./PHIRegionEditor";
 import { CropAdjustModal } from "./CropAdjustModal";

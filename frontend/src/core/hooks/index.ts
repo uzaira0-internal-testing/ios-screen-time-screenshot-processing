@@ -5,4 +5,5 @@ export {
   useConsensusService,
   useStorageService,
   useProcessingService,
+  usePreprocessingPipelineService,
 } from "./useServices";

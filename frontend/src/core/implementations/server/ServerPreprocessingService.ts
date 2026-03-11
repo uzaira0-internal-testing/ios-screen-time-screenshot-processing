@@ -1,4 +1,5 @@
 import { api } from "@/services/apiClient";
+import { config } from "@/config";
 import type {
   IPreprocessingService,
   PreprocessingStage,
@@ -77,5 +78,9 @@ export class ServerPreprocessingService implements IPreprocessingService {
 
   async getDetails(screenshotId: number): Promise<any> {
     return api.preprocessing.getDetails(screenshotId);
+  }
+
+  async getStageImageUrl(screenshotId: number, stage: string): Promise<string> {
+    return `${config.apiBaseUrl}/screenshots/${screenshotId}/stage-image?stage=${stage}`;
   }
 }

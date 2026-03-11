@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { api } from "@/services/apiClient";
 import type {
   Screenshot,
   Group,
@@ -8,6 +7,7 @@ import type {
   PreprocessingEvent,
   PreprocessingEventLog,
 } from "@/types";
+import type { IPreprocessingService } from "@/core/interfaces/IPreprocessingService";
 import toast from "react-hot-toast";
 
 // Local types not in backend schema (UI-only concerns)
@@ -143,7 +143,12 @@ interface PreprocessingState {
   getEligibleCount: (stage: Stage) => { eligible: number; blockedByPrereq: number };
 }
 
-export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
+/**
+ * Factory function to create a preprocessing store with an injected service.
+ * Server mode passes ServerPreprocessingService, WASM mode passes WASMPreprocessingService.
+ */
+export function createPreprocessingStore(service: IPreprocessingService) {
+  return create<PreprocessingState>((set, get) => ({
   // Initial state
   screenshots: [],
   selectedGroupId: "",
@@ -202,7 +207,7 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
 
   loadGroups: async () => {
     try {
-      const data = await api.groups.list();
+      const data = await service.getGroups();
       if (data && data.length > 0) {
         set({ groups: data });
         if (!get().selectedGroupId) {
@@ -225,7 +230,7 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
     const isInitialLoad = get().screenshots.length === 0;
     if (isInitialLoad) set({ isLoading: true });
     try {
-      const data = await api.screenshots.list({
+      const data = await service.getScreenshots({
         group_id: selectedGroupId,
         page_size: 5000,
         sort_by: "id",
@@ -237,7 +242,7 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
         const prev = get().screenshots;
         const next = data.items;
         const changed = prev.length !== next.length ||
-          next.some((item, i) =>
+          next.some((item: any, i: number) =>
             item.id !== prev[i]?.id ||
             item.processing_status !== prev[i]?.processing_status ||
             item.processed_at !== prev[i]?.processed_at
@@ -259,7 +264,7 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
     if (!selectedGroupId) return;
 
     try {
-      const data = await api.preprocessing.getSummary(selectedGroupId);
+      const data = await service.getSummary(selectedGroupId);
       if (data) {
         set({ summary: data as PreprocessingSummaryData });
 
@@ -294,7 +299,14 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
     const baseline = summary ? summary[stage]?.completed ?? 0 : 0;
     set({ isRunningStage: true, stageProgress: null, _pollCount: 0, _queuedCount: 0, _completedBaseline: baseline, _pollStage: stage });
     try {
-      const options: Parameters<typeof api.preprocessing.runStage>[1] = {
+      const options: {
+        group_id?: string;
+        screenshot_ids?: number[];
+        phi_pipeline_preset?: string;
+        phi_redaction_method?: string;
+        llm_endpoint?: string;
+        llm_model?: string;
+      } = {
         group_id: selectedGroupId || undefined,
         screenshot_ids: screenshotIds,
         phi_pipeline_preset: phiPreset,
@@ -304,7 +316,7 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
         options.llm_endpoint = llmEndpoint;
         options.llm_model = llmModel;
       }
-      const result = await api.preprocessing.runStage(stage, options);
+      const result = await service.runStage(stage, options);
       if (result && result.queued_count > 0) {
         toast.success(result.message);
         set({
@@ -331,7 +343,7 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
     const { selectedGroupId } = get();
     if (!selectedGroupId) return;
     try {
-      const result = await api.preprocessing.resetStage(stage, selectedGroupId);
+      const result = await service.resetStage(stage, selectedGroupId);
       toast.success(result.message || `Stage ${stage.replace(/_/g, " ")} reset`);
       await get().loadScreenshots();
       await get().loadSummary();
@@ -343,7 +355,7 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
 
   invalidateFromStage: async (screenshotId, stage) => {
     try {
-      await api.preprocessing.invalidateFromStage(screenshotId, stage);
+      await service.invalidateFromStage(screenshotId, stage);
       toast.success(`Downstream stages invalidated from ${stage.replace(/_/g, " ")}`);
       await get().loadScreenshots();
       await get().loadSummary();
@@ -355,7 +367,7 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
 
   loadEventLog: async (screenshotId) => {
     try {
-      const data = await api.preprocessing.getEventLog(screenshotId);
+      const data = await service.getEventLog(screenshotId);
       set({ selectedScreenshotId: screenshotId, eventLog: data as EventLogData });
     } catch (err) {
       console.error("Failed to load event log:", err);
@@ -401,7 +413,7 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
       }
 
       try {
-        const result = await api.preprocessing.uploadBrowser(formData);
+        const result = await service.uploadBrowser(formData);
         totalCompleted += result.successful || 0;
         if (result.failed > 0) {
           for (const r of result.results || []) {
@@ -618,6 +630,7 @@ export const usePreprocessingStore = create<PreprocessingState>((set, get) => ({
     return { eligible, blockedByPrereq };
   },
 }));
+}
 
-export type { Stage, StageStatus, FilterMode, PageMode, StageSummary, PreprocessingSummaryData, PreprocessingEventData, EventLogData, UploadFileItem };
+export type { Stage, StageStatus, FilterMode, PageMode, StageSummary, PreprocessingSummaryData, PreprocessingEventData, EventLogData, UploadFileItem, PreprocessingState };
 export { STAGES };

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { usePreprocessingStore } from "@/store/preprocessingStore";
+import { usePreprocessingStore } from "@/hooks/usePreprocessingWithDI";
 import type { FilterMode } from "@/store/preprocessingStore";
 import type { Screenshot } from "@/types";
 

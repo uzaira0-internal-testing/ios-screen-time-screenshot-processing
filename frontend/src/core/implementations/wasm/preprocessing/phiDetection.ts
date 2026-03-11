@@ -172,10 +172,9 @@ async function ocrWithBboxes(imageBlob: Blob): Promise<{
   ctx.drawImage(imageBitmap, 0, 0);
   imageBitmap.close();
 
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
   const worker = await Tesseract.createWorker("eng");
-  const result = await worker.recognize(imageData);
+  // Tesseract.js v7 requires a canvas, not raw ImageData
+  const result = await worker.recognize(canvas as unknown as HTMLCanvasElement);
   await worker.terminate();
 
   const words: OCRWord[] = [];
@@ -183,28 +182,34 @@ async function ocrWithBboxes(imageBlob: Blob): Promise<{
   let totalConfidence = 0;
   let wordCount = 0;
 
-  for (const line of result.data.lines) {
-    for (const word of line.words) {
-      const charStart = fullText.length;
-      fullText += word.text;
-      const charEnd = fullText.length;
+  // Tesseract.js v7: blocks → paragraphs → lines → words
+  const page = result.data;
+  for (const block of (page as any).blocks ?? []) {
+    for (const para of block.paragraphs) {
+      for (const line of para.lines) {
+        for (const word of line.words) {
+          const charStart = fullText.length;
+          fullText += word.text;
+          const charEnd = fullText.length;
 
-      words.push({
-        text: word.text,
-        bbox: word.bbox,
-        confidence: word.confidence,
-        charStart,
-        charEnd,
-      });
+          words.push({
+            text: word.text,
+            bbox: word.bbox,
+            confidence: word.confidence,
+            charStart,
+            charEnd,
+          });
 
-      totalConfidence += word.confidence;
-      wordCount++;
+          totalConfidence += word.confidence;
+          wordCount++;
 
-      fullText += " ";
-    }
-    // Replace trailing space with newline for line breaks
-    if (fullText.endsWith(" ")) {
-      fullText = fullText.slice(0, -1) + "\n";
+          fullText += " ";
+        }
+        // Replace trailing space with newline for line breaks
+        if (fullText.endsWith(" ")) {
+          fullText = fullText.slice(0, -1) + "\n";
+        }
+      }
     }
   }
 

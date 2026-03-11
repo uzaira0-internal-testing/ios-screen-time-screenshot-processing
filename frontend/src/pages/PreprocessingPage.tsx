@@ -1,7 +1,7 @@
 import { useEffect, useCallback } from "react";
 import { useSearchParams, Link } from "react-router";
 import { Layout } from "@/components/layout/Layout";
-import { usePreprocessingStore } from "@/store/preprocessingStore";
+import { usePreprocessingStore } from "@/hooks/usePreprocessingWithDI";
 import type { Stage } from "@/store/preprocessingStore";
 import { PreprocessingWizard } from "@/components/preprocessing/PreprocessingWizard";
 import { StageSummaryBar } from "@/components/preprocessing/StageSummaryBar";
@@ -11,10 +11,11 @@ import { PHIDetectionTab } from "@/components/preprocessing/PHIDetectionTab";
 import { PHIRedactionTab } from "@/components/preprocessing/PHIRedactionTab";
 import { EventLogPanel } from "@/components/preprocessing/EventLogPanel";
 import { PreprocessingQueueView } from "@/components/preprocessing/PreprocessingQueueView";
-import { api } from "@/services/apiClient";
+import { usePreprocessingPipelineService } from "@/core";
 
 export const PreprocessingPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const preprocessingService = usePreprocessingPipelineService();
   const groups = usePreprocessingStore((s) => s.groups);
   const selectedGroupId = usePreprocessingStore((s) => s.selectedGroupId);
   const setSelectedGroupId = usePreprocessingStore((s) => s.setSelectedGroupId);
@@ -68,7 +69,7 @@ export const PreprocessingPage = () => {
     if (screenshotId) {
       const id = parseInt(screenshotId, 10);
       if (!isNaN(id)) {
-        api.screenshots.getById(id).then((screenshot) => {
+        preprocessingService.getScreenshot(id).then((screenshot) => {
           if (screenshot?.group_id) {
             setSelectedGroupId(screenshot.group_id);
           }

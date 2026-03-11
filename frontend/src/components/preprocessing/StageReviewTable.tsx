@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { usePreprocessingStore } from "@/store/preprocessingStore";
+import { usePreprocessingStore } from "@/hooks/usePreprocessingWithDI";
 import type { Stage, StageStatus, PreprocessingEventData } from "@/store/preprocessingStore";
 import type { Screenshot } from "@/types";
 import { config } from "@/config";

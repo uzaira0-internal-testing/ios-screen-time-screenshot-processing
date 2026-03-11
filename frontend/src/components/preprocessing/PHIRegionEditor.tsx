@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { api } from "@/services/apiClient";
-import { config } from "@/config";
+import { usePreprocessingPipelineService } from "@/core";
 import toast from "react-hot-toast";
 
 export interface PHIRegion {
@@ -66,6 +65,7 @@ export const PHIRegionEditor = ({
   onSaveAndNext,
   recentPHIConfigs,
 }: PHIRegionEditorProps) => {
+  const preprocessingService = usePreprocessingPipelineService();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [regions, setRegions] = useState<PHIRegion[]>([]);
@@ -131,15 +131,16 @@ export const PHIRegionEditor = ({
     setSelectedIndex(null);
 
     // Load the cropped image (not the redacted one)
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    const imageUrl = `${config.apiBaseUrl}/screenshots/${screenshotId}/stage-image?stage=cropping`;
-    img.src = imageUrl;
-    img.onload = () => setImage(img);
-    img.onerror = () => setImageError(true);
+    preprocessingService.getStageImageUrl(screenshotId, "cropping").then((imageUrl) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = imageUrl;
+      img.onload = () => setImage(img);
+      img.onerror = () => setImageError(true);
+    }).catch(() => setImageError(true));
 
     // Load existing regions
-    api.preprocessing.getPHIRegions(screenshotId).then((data: { regions: PHIRegion[] }) => {
+    preprocessingService.getPHIRegions(screenshotId).then((data: { regions: PHIRegion[] }) => {
       setRegions(data.regions || []);
     }).catch(() => {
       setRegions([]);
@@ -307,7 +308,7 @@ export const PHIRegionEditor = ({
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await api.preprocessing.savePHIRegions(screenshotId, { regions, preset: "manual" });
+      await preprocessingService.savePHIRegions(screenshotId, { regions, preset: "manual" });
       toast.success(`Saved ${regions.length} PHI region(s)`);
       onRegionsSaved();
     } catch (err) {
@@ -325,7 +326,7 @@ export const PHIRegionEditor = ({
 
     setIsRedacting(true);
     try {
-      await api.preprocessing.applyRedaction(screenshotId, { regions, redaction_method: redactionMethod });
+      await preprocessingService.applyRedaction(screenshotId, { regions, redaction_method: redactionMethod });
       toast.success("Redaction applied");
       onRedactionApplied();
       onClose();
@@ -344,7 +345,7 @@ export const PHIRegionEditor = ({
   const handleSaveAndNext = async () => {
     setIsSaving(true);
     try {
-      await api.preprocessing.savePHIRegions(screenshotId, { regions, preset: "manual" });
+      await preprocessingService.savePHIRegions(screenshotId, { regions, preset: "manual" });
       toast.success(`Saved ${regions.length} PHI region(s)`);
       onRegionsSaved();
       onSaveAndNext?.();

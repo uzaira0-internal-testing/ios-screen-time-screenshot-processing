@@ -1,4 +1,4 @@
-import { usePreprocessingStore } from "@/store/preprocessingStore";
+import { usePreprocessingStore } from "@/hooks/usePreprocessingWithDI";
 
 const STAGE_LABELS: Record<string, string> = {
   device_detection: "Device Detection",
