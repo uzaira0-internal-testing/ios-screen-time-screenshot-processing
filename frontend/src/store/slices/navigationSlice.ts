@@ -43,8 +43,8 @@ export const createNavigationSlice = (
     set({ isLoading: true, error: null });
     try {
       const navParams: NavigationParams = {
-        group_id: groupId,
-        processing_status: processingStatus,
+        ...(groupId != null && { group_id: groupId }),
+        ...(processingStatus != null && { processing_status: processingStatus }),
         ...filterToApiParams(verificationFilter),
         direction: "next",
       };
@@ -78,8 +78,8 @@ export const createNavigationSlice = (
     set({ isLoading: true, error: null });
     try {
       const navParams: NavigationParams = {
-        group_id: groupId,
-        processing_status: processingStatus,
+        ...(groupId != null && { group_id: groupId }),
+        ...(processingStatus != null && { processing_status: processingStatus }),
         ...filterToApiParams(verificationFilter),
         direction: "prev",
       };
@@ -107,8 +107,8 @@ export const createNavigationSlice = (
   loadScreenshotList: async (params?: ScreenshotListParams) => {
     try {
       const listParams: ScreenshotListParams = {
-        group_id: groupId,
-        processing_status: processingStatus,
+        ...(groupId != null && { group_id: groupId }),
+        ...(processingStatus != null && { processing_status: processingStatus }),
         ...filterToApiParams(get().verificationFilter),
         page_size: 100,
         sort_by: "id",
@@ -221,7 +221,7 @@ export const createNavigationSlice = (
 
       const newScreenshot = {
         ...updatedScreenshot,
-        extracted_title: editedTitle,
+        extracted_title: editedTitle ?? null,
       };
 
       set({ currentScreenshot: newScreenshot });

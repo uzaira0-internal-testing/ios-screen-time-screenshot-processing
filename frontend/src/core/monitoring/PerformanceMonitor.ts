@@ -8,7 +8,7 @@ export interface ProcessingMetrics {
   endTime: number;
   duration: number;
   success: boolean;
-  error?: string;
+  error?: string | undefined;
 }
 
 export interface MemoryMetrics {

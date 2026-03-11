@@ -14,10 +14,10 @@ interface CropAdjustModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCropApplied: () => void;
-  initialCrop?: CropRect;
-  inline?: boolean;
-  onApplyAndNext?: () => void;
-  recentCrops?: CropRect[];
+  initialCrop?: CropRect | undefined;
+  inline?: boolean | undefined;
+  onApplyAndNext?: (() => void) | undefined;
+  recentCrops?: CropRect[] | undefined;
 }
 
 type DragMode = "none" | "move" | "top" | "bottom" | "left" | "right" | "tl" | "tr" | "bl" | "br";

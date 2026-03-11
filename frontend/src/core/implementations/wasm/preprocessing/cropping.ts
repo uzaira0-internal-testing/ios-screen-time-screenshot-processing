@@ -5,7 +5,7 @@ export interface CropResult {
   wasCropped: boolean;
   originalDimensions: { width: number; height: number };
   croppedDimensions: { width: number; height: number };
-  deviceModel?: string;
+  deviceModel?: string | undefined;
 }
 
 /**

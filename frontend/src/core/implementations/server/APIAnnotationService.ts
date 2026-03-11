@@ -12,15 +12,15 @@ export class APIAnnotationService implements IAnnotationService {
   }
 
   async create(data: AnnotationCreate): Promise<Annotation> {
-    // Transform null values to undefined for API compatibility
+    // Transform undefined values to null for API compatibility
     const apiData = {
       ...data,
-      extracted_title: data.extracted_title ?? undefined,
-      extracted_total: data.extracted_total ?? undefined,
-      grid_upper_left: data.grid_upper_left ?? undefined,
-      grid_lower_right: data.grid_lower_right ?? undefined,
-      time_spent_seconds: data.time_spent_seconds ?? undefined,
-      notes: data.notes ?? undefined,
+      extracted_title: data.extracted_title ?? null,
+      extracted_total: data.extracted_total ?? null,
+      grid_upper_left: data.grid_upper_left ?? null,
+      grid_lower_right: data.grid_lower_right ?? null,
+      time_spent_seconds: data.time_spent_seconds ?? null,
+      notes: data.notes ?? null,
     };
     return api.annotations.create(apiData) as Promise<Annotation>;
   }

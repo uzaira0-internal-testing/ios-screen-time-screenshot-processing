@@ -119,8 +119,8 @@ export const createScreenshotSlice = (
         // Fetch navigation state from server if list not loaded
         try {
           const navParams: NavigationParams = {
-            group_id: groupId,
-            processing_status: processingStatus,
+            ...(groupId != null && { group_id: groupId }),
+            ...(processingStatus != null && { processing_status: processingStatus }),
             ...filterToApiParams(verificationFilter),
             direction: "current", // Just get position info, don't navigate
           };
@@ -212,8 +212,8 @@ export const createScreenshotSlice = (
         // If no list loaded yet, fetch navigation state from server
         try {
           const navParams: NavigationParams = {
-            group_id: groupId,
-            processing_status: processingStatus,
+            ...(groupId != null && { group_id: groupId }),
+            ...(processingStatus != null && { processing_status: processingStatus }),
             ...filterToApiParams(verificationFilter),
             direction: "current", // Just get position info, don't navigate
           };

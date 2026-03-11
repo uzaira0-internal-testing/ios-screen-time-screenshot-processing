@@ -70,9 +70,9 @@ export const ConsensusComparisonPage = () => {
       setResolving(true);
       await api.consensus.resolveDispute(comparison.screenshot_id, {
         hourly_values: resolutionValues.hourly_values,
-        extracted_title: resolutionValues.extracted_title || undefined,
-        extracted_total: resolutionValues.extracted_total || undefined,
-        resolution_notes: resolutionValues.resolution_notes || undefined,
+        ...(resolutionValues.extracted_title && { extracted_title: resolutionValues.extracted_title }),
+        ...(resolutionValues.extracted_total && { extracted_total: resolutionValues.extracted_total }),
+        ...(resolutionValues.resolution_notes && { resolution_notes: resolutionValues.resolution_notes }),
       });
       toast.success("Dispute resolved successfully");
       setShowResolveModal(false);

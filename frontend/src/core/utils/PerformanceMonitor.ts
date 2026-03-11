@@ -1,6 +1,6 @@
 export interface PerformanceMetrics {
   duration: number;
-  memoryUsed?: number;
+  memoryUsed?: number | undefined;
   timestamp: number;
 }
 

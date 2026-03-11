@@ -31,9 +31,7 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  userId: localStorage.getItem("userId")
-    ? parseInt(localStorage.getItem("userId")!, 10)
-    : null,
+  userId: (() => { const v = localStorage.getItem("userId"); return v ? parseInt(v, 10) : null; })(),
   username: localStorage.getItem("username"),
   role: localStorage.getItem("userRole"),
   sitePassword: localStorage.getItem("sitePassword"),

@@ -5,7 +5,7 @@ import { retrieveImageBlob } from "../storage/opfsBlobStorage";
 export interface SyncConfig {
   serverUrl: string;
   username: string;
-  sitePassword?: string;
+  sitePassword?: string | undefined;
 }
 
 export interface HealthCheckResult {

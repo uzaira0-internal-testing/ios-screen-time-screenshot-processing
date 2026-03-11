@@ -183,12 +183,13 @@ function analyzeBarHeight(
 }
 
 /**
- * Line extraction mode enum.
+ * Line extraction mode.
  */
-export enum LineExtractionMode {
-  HORIZONTAL = "HORIZONTAL",
-  VERTICAL = "VERTICAL",
-}
+export const LineExtractionMode = {
+  HORIZONTAL: "HORIZONTAL",
+  VERTICAL: "VERTICAL",
+} as const;
+export type LineExtractionMode = (typeof LineExtractionMode)[keyof typeof LineExtractionMode];
 
 /**
  * Extracts horizontal or vertical line position.

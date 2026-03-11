@@ -308,8 +308,8 @@ export function createPreprocessingStore(service: IPreprocessingService) {
     set({ isRunningStage: true, stageProgress: null, _pollCount: 0, _queuedCount: 0, _completedBaseline: baseline, _pollStage: stage });
     try {
       const options: RunStageOptions = {
-        group_id: selectedGroupId || undefined,
-        screenshot_ids: screenshotIds,
+        ...(selectedGroupId && { group_id: selectedGroupId }),
+        ...(screenshotIds && { screenshot_ids: screenshotIds }),
         phi_pipeline_preset: phiPreset,
         phi_redaction_method: redactionMethod,
       };

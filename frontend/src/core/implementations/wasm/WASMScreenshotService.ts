@@ -121,7 +121,7 @@ export class WASMScreenshotService implements IScreenshotService {
     try {
       // Create screenshot record without ID (let IndexedDB auto-increment)
       // Omit id by using Partial and type assertion
-      const screenshotData: Omit<Screenshot, "id"> & { id?: number; content_hash?: string } = {
+      const screenshotData: Omit<Screenshot, "id"> & { id?: number; content_hash?: string | null } = {
         file_path: options?.originalFilepath || file.name,
         image_type: imageType,
         uploaded_at: uploadedAt,
@@ -154,7 +154,7 @@ export class WASMScreenshotService implements IScreenshotService {
         processing_time_seconds: null,
         alignment_score_status: null,
         // Content hash for dedup (null when crypto.subtle unavailable)
-        content_hash: contentHash ?? undefined,
+        content_hash: contentHash ?? null,
       };
 
       // Save to IndexedDB - this will assign a unique auto-incremented ID
@@ -195,9 +195,9 @@ export class WASMScreenshotService implements IScreenshotService {
       success: screenshot.processing_status === "completed",
       processing_status: screenshot.processing_status,
       skipped: screenshot.processing_status === "skipped",
-      extracted_title: screenshot.extracted_title,
-      extracted_total: screenshot.extracted_total,
-      extracted_hourly_data: screenshot.extracted_hourly_data,
+      extracted_title: screenshot.extracted_title ?? null,
+      extracted_total: screenshot.extracted_total ?? null,
+      extracted_hourly_data: screenshot.extracted_hourly_data ?? null,
       issues: screenshot.processing_issues || [],
       has_blocking_issues: screenshot.has_blocking_issues,
       is_daily_total: false,
@@ -261,8 +261,8 @@ export class WASMScreenshotService implements IScreenshotService {
       success: processingStatus === "completed",
       processing_status: processingStatus,
       skipped: false,
-      extracted_title: screenshot.extracted_title, // Preserve existing
-      extracted_total: screenshot.extracted_total, // Preserve existing
+      extracted_title: screenshot.extracted_title ?? null, // Preserve existing
+      extracted_total: screenshot.extracted_total ?? null, // Preserve existing
       extracted_hourly_data: hourlyData,
       issues: [],
       has_blocking_issues: false,
@@ -508,16 +508,16 @@ export class WASMScreenshotService implements IScreenshotService {
             result.hourlyData || screenshot.extracted_hourly_data || null,
           grid_upper_left_x:
             result.gridCoordinates?.upper_left?.x ??
-            screenshot.grid_upper_left_x,
+            screenshot.grid_upper_left_x ?? null,
           grid_upper_left_y:
             result.gridCoordinates?.upper_left?.y ??
-            screenshot.grid_upper_left_y,
+            screenshot.grid_upper_left_y ?? null,
           grid_lower_right_x:
             result.gridCoordinates?.lower_right?.x ??
-            screenshot.grid_lower_right_x,
+            screenshot.grid_lower_right_x ?? null,
           grid_lower_right_y:
             result.gridCoordinates?.lower_right?.y ??
-            screenshot.grid_lower_right_y,
+            screenshot.grid_lower_right_y ?? null,
           processing_status: processingStatus,
           processed_at: new Date().toISOString(),
         };
@@ -613,11 +613,11 @@ export class WASMScreenshotService implements IScreenshotService {
 
     // Build the query using Dexie's efficient indexed queries
     const result = await this.storageService.getScreenshotsPaginated({
-      group_id: params.group_id,
-      processing_status: params.processing_status,
-      verified_by_me: params.verified_by_me,
-      verified_by_others: params.verified_by_others,
-      search: params.search,
+      ...(params.group_id != null && { group_id: params.group_id }),
+      ...(params.processing_status != null && { processing_status: params.processing_status }),
+      ...(params.verified_by_me != null && { verified_by_me: params.verified_by_me }),
+      ...(params.verified_by_others != null && { verified_by_others: params.verified_by_others }),
+      ...(params.search != null && { search: params.search }),
       sort_by: sortBy,
       sort_order: sortOrder,
       page,
@@ -633,11 +633,11 @@ export class WASMScreenshotService implements IScreenshotService {
   ): Promise<NavigationResponse> {
     // Use optimized navigation that doesn't load all screenshots
     const result = await this.storageService.navigateScreenshots(screenshotId, {
-      group_id: params.group_id,
-      processing_status: params.processing_status,
-      verified_by_me: params.verified_by_me,
-      verified_by_others: params.verified_by_others,
-      direction: params.direction,
+      ...(params.group_id != null && { group_id: params.group_id }),
+      ...(params.processing_status != null && { processing_status: params.processing_status }),
+      ...(params.verified_by_me != null && { verified_by_me: params.verified_by_me }),
+      ...(params.verified_by_others != null && { verified_by_others: params.verified_by_others }),
+      ...(params.direction != null && { direction: params.direction }),
     });
 
     return result;

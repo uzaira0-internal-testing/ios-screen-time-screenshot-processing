@@ -23,7 +23,7 @@ export class WASMProcessingService implements IProcessingService {
     {
       resolve: (value: unknown) => void;
       reject: (error: Error) => void;
-      onProgress?: ProcessingProgressCallback;
+      onProgress?: ProcessingProgressCallback | undefined;
     }
   >();
 

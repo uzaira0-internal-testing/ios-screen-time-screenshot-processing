@@ -1,6 +1,8 @@
 export class DuplicateScreenshotError extends Error {
-  constructor(public readonly existingId: number) {
+  readonly existingId: number;
+  constructor(existingId: number) {
     super(`Duplicate image: already uploaded as screenshot #${existingId}`);
     this.name = "DuplicateScreenshotError";
+    this.existingId = existingId;
   }
 }

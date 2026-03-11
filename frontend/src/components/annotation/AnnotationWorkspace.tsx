@@ -28,9 +28,9 @@ type ProcessingMethod = "ocr_anchored" | "line_based";
 export type GraphDisplayMode = "separate" | "overlay";
 
 interface AnnotationWorkspaceProps {
-  groupId?: string;
-  processingStatus?: ProcessingStatus;
-  initialScreenshotId?: number;
+  groupId?: string | undefined;
+  processingStatus?: ProcessingStatus | undefined;
+  initialScreenshotId?: number | undefined;
 }
 
 export const AnnotationWorkspace = ({

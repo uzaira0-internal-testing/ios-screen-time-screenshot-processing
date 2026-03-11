@@ -67,9 +67,9 @@ export const HomePage = () => {
               const groupId = groupName.trim() || parsed.root_folder || undefined;
 
               await screenshotService.addScreenshots(file, imageType, {
-                groupId,
-                participantId: parsed.participant_id !== "unknown" ? parsed.participant_id : undefined,
-                screenshotDate: parsed.screenshot_date || undefined,
+                ...(groupId && { groupId }),
+                ...(parsed.participant_id !== "unknown" && { participantId: parsed.participant_id }),
+                ...(parsed.screenshot_date && { screenshotDate: parsed.screenshot_date }),
                 originalFilepath: parsed.original_filepath,
               });
               results.loaded++;

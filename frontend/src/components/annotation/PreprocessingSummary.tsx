@@ -17,7 +17,7 @@ interface PreprocessingData {
 }
 
 interface PreprocessingSummaryProps {
-  processingMetadata?: Record<string, unknown> | null;
+  processingMetadata?: Record<string, unknown> | null | undefined;
 }
 
 export const PreprocessingSummary = ({

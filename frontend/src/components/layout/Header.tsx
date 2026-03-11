@@ -15,7 +15,7 @@ export const Header = () => {
   const { mode: themeMode, setMode: setThemeMode } = useThemeStore();
   const features = useFeatures();
 
-  const ThemeIcon = THEME_OPTIONS.find((o) => o.value === themeMode)!.icon;
+  const ThemeIcon = (THEME_OPTIONS.find((o) => o.value === themeMode) ?? THEME_OPTIONS[0]!).icon;
 
   // Get current filter context from URL
   const groupId = searchParams.get("group");

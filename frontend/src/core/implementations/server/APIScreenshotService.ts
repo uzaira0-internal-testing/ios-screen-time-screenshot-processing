@@ -28,8 +28,8 @@ export class APIScreenshotService implements IScreenshotService {
     processingStatus?: string,
   ): Promise<Screenshot | null> {
     const result = await api.screenshots.getNext({
-      group: groupId,
-      processing_status: processingStatus,
+      ...(groupId && { group: groupId }),
+      ...(processingStatus && { processing_status: processingStatus }),
     });
     return result?.screenshot ?? null;
   }
@@ -40,7 +40,7 @@ export class APIScreenshotService implements IScreenshotService {
 
   async getAll(status?: string, skip = 0, limit = 50): Promise<Screenshot[]> {
     const result = await api.screenshots.list({
-      processing_status: status,
+      ...(status && { processing_status: status }),
       page: Math.floor(skip / limit) + 1,
       page_size: limit,
     });

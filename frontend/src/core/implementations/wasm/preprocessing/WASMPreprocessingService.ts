@@ -126,7 +126,10 @@ function normalizeEvents(events: PreprocessingEvent[]): PreprocessingEvent[] {
 // ---------------------------------------------------------------------------
 
 export class WASMPreprocessingService implements IPreprocessingService {
-  constructor(private storage: IndexedDBStorageService) {}
+  private storage: IndexedDBStorageService;
+  constructor(storage: IndexedDBStorageService) {
+    this.storage = storage;
+  }
 
   async getGroups(): Promise<Group[]> {
     const screenshots = await this.storage.getAllScreenshots();

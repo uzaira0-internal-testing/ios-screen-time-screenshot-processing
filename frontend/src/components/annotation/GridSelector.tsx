@@ -6,12 +6,12 @@ import { loadImage } from "@/utils/imageUtils";
 interface GridSelectorProps {
   imageUrl: string;
   onGridSelect: (coords: GridCoordinates) => void;
-  initialCoords?: GridCoordinates;
-  disabled?: boolean;
+  initialCoords?: GridCoordinates | undefined;
+  disabled?: boolean | undefined;
   // Screenshot info
-  imageType?: string;
-  extractedTitle?: string | null;
-  onTitleChange?: (title: string) => void;
+  imageType?: string | undefined;
+  extractedTitle?: string | null | undefined;
+  onTitleChange?: ((title: string) => void) | undefined;
 }
 
 type DragMode =

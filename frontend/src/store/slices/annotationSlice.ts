@@ -83,7 +83,7 @@ export const createAnnotationSlice = (
         hourly_values: currentAnnotation.hourly_values || {},
         grid_upper_left: currentAnnotation.grid_coords.upper_left,
         grid_lower_right: currentAnnotation.grid_coords.lower_right,
-        notes: notes || currentAnnotation.notes,
+        notes: notes || currentAnnotation.notes || null,
       });
 
       // Also save the title to the screenshot if it was edited

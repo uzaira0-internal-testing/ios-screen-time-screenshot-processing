@@ -162,7 +162,7 @@ export const api = {
   screenshots: {
     async getNext(params?: { group?: string; processing_status?: string }) {
       const { data, error } = await apiClient.GET("/api/v1/screenshots/next", {
-        params: { query: params },
+        params: { query: params ?? {} },
       });
       throwIfError(error, "Failed to get next screenshot");
       return data;
@@ -197,7 +197,7 @@ export const api = {
       sort_order?: string;
     }) {
       const { data, error } = await apiClient.GET("/api/v1/screenshots/list", {
-        params: { query: params },
+        params: { query: params ?? {} },
       });
       throwIfError(error, "Failed to list screenshots");
       return data;
@@ -328,7 +328,7 @@ export const api = {
       const { data, error } = await apiClient.GET(
         "/api/v1/annotations/history",
         {
-          params: { query: params },
+          params: { query: params ?? {} },
         },
       );
       throwIfError(error, "Failed to get annotation history");
