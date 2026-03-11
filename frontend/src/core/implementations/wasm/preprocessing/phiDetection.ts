@@ -178,6 +178,8 @@ async function getTesseractWorker() {
     // Use locally bundled worker to avoid CDN dependency (required for Tauri CSP + offline)
     tesseractWorker = await Tesseract.createWorker("eng", undefined, {
       workerPath: new URL("/tesseract-worker.min.js", window.location.origin).href,
+      corePath: new URL("/", window.location.origin).href,
+      langPath: new URL("/", window.location.origin).href,
     });
   }
   return tesseractWorker;
