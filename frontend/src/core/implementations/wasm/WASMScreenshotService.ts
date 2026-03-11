@@ -161,7 +161,13 @@ export class WASMScreenshotService implements IScreenshotService {
       const id = await this.storageService.saveScreenshot(
         screenshotData as Screenshot,
       );
-      await this.storageService.saveImageBlob(id, file);
+      try {
+        await this.storageService.saveImageBlob(id, file);
+      } catch (blobErr) {
+        // Roll back metadata to prevent orphaned records with no image blob
+        await this.storageService.deleteScreenshot(id).catch(() => {});
+        throw blobErr;
+      }
 
       const screenshot: Screenshot = { ...screenshotData, id };
 
