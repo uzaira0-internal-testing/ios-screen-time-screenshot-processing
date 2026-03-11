@@ -180,8 +180,9 @@ jobs:
 
           cd release-assets
 
-          # URL-encode spaces in filenames for GitHub download URLs
-          urlencode() { echo "$1" | sed 's/ /%20/g'; }
+          # GitHub replaces spaces with dots in release asset filenames,
+          # so the download URL must use dots (not %20).
+          sanitize() { echo "$1" | sed 's/ /./g'; }
 
           # --- macOS (universal) ---
           MAC_TARBALL=$(ls *.app.tar.gz 2>/dev/null | head -1 || true)
@@ -207,19 +208,19 @@ jobs:
           # Build JSON dynamically — only include platforms with artifacts + signatures
           PLATFORMS=""
           if [[ -n "$MAC_TARBALL" && -n "$MAC_SIG" ]]; then
-            MAC_URL="${BASE_URL}/$(urlencode "$MAC_TARBALL")"
+            MAC_URL="${BASE_URL}/$(sanitize "$MAC_TARBALL")"
             PLATFORMS="${PLATFORMS:+$PLATFORMS,}
               \"darwin-universal\": { \"signature\": \"${MAC_SIG}\", \"url\": \"${MAC_URL}\" },
               \"darwin-aarch64\": { \"signature\": \"${MAC_SIG}\", \"url\": \"${MAC_URL}\" },
               \"darwin-x86_64\": { \"signature\": \"${MAC_SIG}\", \"url\": \"${MAC_URL}\" }"
           fi
           if [[ -n "$WIN_EXE" && -n "$WIN_SIG" ]]; then
-            WIN_URL="${BASE_URL}/$(urlencode "$WIN_EXE")"
+            WIN_URL="${BASE_URL}/$(sanitize "$WIN_EXE")"
             PLATFORMS="${PLATFORMS:+$PLATFORMS,}
               \"windows-x86_64\": { \"signature\": \"${WIN_SIG}\", \"url\": \"${WIN_URL}\" }"
           fi
           if [[ -n "$LINUX_APPIMAGE" && -n "$LINUX_SIG" ]]; then
-            LINUX_URL="${BASE_URL}/$(urlencode "$LINUX_APPIMAGE")"
+            LINUX_URL="${BASE_URL}/$(sanitize "$LINUX_APPIMAGE")"
             PLATFORMS="${PLATFORMS:+$PLATFORMS,}
               \"linux-x86_64\": { \"signature\": \"${LINUX_SIG}\", \"url\": \"${LINUX_URL}\" }"
           fi
