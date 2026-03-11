@@ -13,8 +13,8 @@
     "window-state:allow-filename",
     "store:default",
     "notification:default",
-    "clipboard-manager:allow-read",
-    "clipboard-manager:allow-write",
+    "clipboard-manager:allow-read-text",
+    "clipboard-manager:allow-write-text",
     "os:default"
   ]
 }
