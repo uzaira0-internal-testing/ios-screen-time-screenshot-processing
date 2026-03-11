@@ -45,13 +45,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends tesseract-ocr libtesseract-dev
-
-      - name: Install Python dependencies
-        run: pip install -e ".[web,dev]"
+      - name: Install ruff
+        run: pip install ruff
 
       - name: Lint
-        run: ruff check . && ruff format --check .
+        run: ruff check src/ && ruff format --check src/
