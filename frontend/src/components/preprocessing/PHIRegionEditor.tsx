@@ -1,17 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { usePreprocessingPipelineService } from "@/core";
 import toast from "react-hot-toast";
-
-export interface PHIRegion {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  label: string;
-  source: string;
-  confidence: number;
-  text: string;
-}
+import type { PHIRegion } from "@/core/implementations/wasm/preprocessing/phiDetection";
+export type { PHIRegion };
 
 export interface RecentPHIConfig {
   regions: PHIRegion[];

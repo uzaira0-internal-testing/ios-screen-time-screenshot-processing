@@ -480,8 +480,7 @@ export function createPreprocessingStore(service: IPreprocessingService) {
 
     const interval = setInterval(async () => {
       set({ _pollCount: get()._pollCount + 1 });
-      await get().loadSummary();
-      await get().loadScreenshots();
+      await Promise.all([get().loadSummary(), get().loadScreenshots()]);
       const summary = get().summary;
       if (summary) {
         const stage = get()._pollStage;

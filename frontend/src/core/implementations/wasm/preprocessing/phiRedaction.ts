@@ -1,15 +1,7 @@
-export type RedactionMethod = "redbox" | "blackbox" | "pixelate";
+import type { PHIRegion } from "./phiDetection";
+export type { PHIRegion };
 
-export interface PHIRegion {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  label: string;
-  source: string;
-  confidence: number;
-  text: string;
-}
+export type RedactionMethod = "redbox" | "blackbox" | "pixelate";
 
 /**
  * Redact PHI regions in an image using the specified method.

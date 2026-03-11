@@ -37,4 +37,6 @@ export interface IPreprocessingService {
   applyRedaction(screenshotId: number, body: any): Promise<void>;
   getDetails(screenshotId: number): Promise<any>;
   getStageImageUrl(screenshotId: number, stage: string): Promise<string>;
+  /** Get the current image URL for a screenshot (latest processed version). */
+  getImageUrl(screenshotId: number): Promise<string>;
 }

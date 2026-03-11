@@ -16,6 +16,8 @@ import {
   deleteImageBlob,
   clearAllOpfsBlobs,
   getTotalBlobSize,
+  storeStageBlob,
+  retrieveStageBlob,
 } from "./opfsBlobStorage";
 
 import type { Collection, IndexableType } from "dexie";
@@ -352,6 +354,24 @@ export class IndexedDBStorageService implements IStorageService {
       return await retrieveImageBlob(screenshotId);
     } catch (error) {
       console.error("Failed to get image blob:", error);
+      throw error;
+    }
+  }
+
+  async saveStageBlob(screenshotId: number, stage: string, blob: Blob): Promise<void> {
+    try {
+      await storeStageBlob(screenshotId, stage, blob);
+    } catch (error) {
+      console.error(`Failed to save stage blob for ${stage}:`, error);
+      throw error;
+    }
+  }
+
+  async getStageBlob(screenshotId: number, stage: string): Promise<Blob | null> {
+    try {
+      return await retrieveStageBlob(screenshotId, stage);
+    } catch (error) {
+      console.error(`Failed to get stage blob for ${stage}:`, error);
       throw error;
     }
   }

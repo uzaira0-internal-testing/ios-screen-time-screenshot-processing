@@ -21,7 +21,7 @@ import type { IndexedDBStorageService } from "../storage/IndexedDBStorageService
 import type { Screenshot } from "@/types";
 import { detectDevice } from "./deviceDetection";
 import { cropScreenshot } from "./cropping";
-import { detectPHI, terminateNERWorker } from "./phiDetection";
+import { detectPHI, terminateNERWorker, terminateTesseractWorker } from "./phiDetection";
 import { redactImage } from "./phiRedaction";
 import type { PHIRegion } from "./phiRedaction";
 
@@ -200,9 +200,10 @@ export class WASMPreprocessingService implements IPreprocessingService {
       }
     }
 
-    // Clean up NER worker after PHI detection batch
+    // Clean up workers after PHI detection batch
     if (stage === "phi_detection") {
       terminateNERWorker();
+      terminateTesseractWorker();
     }
 
     return {
@@ -260,18 +261,23 @@ export class WASMPreprocessingService implements IPreprocessingService {
         const pp = getPreprocessing(screenshot);
 
         if (cropResult.wasCropped) {
-          // Save cropped blob
+          // Save cropped blob as current + stage snapshot
           await this.storage.saveImageBlob(id, cropResult.croppedBlob);
+          await this.storage.saveStageBlob(id, "cropping", cropResult.croppedBlob);
+        } else {
+          // Even if not cropped, save a snapshot so getStageImageUrl("cropping") works
+          await this.storage.saveStageBlob(id, "cropping", blob);
         }
 
+        const detectionEvent = pp.events.find(
+          (e) => e.stage === "device_detection" && e.event_id === pp.current_events.device_detection,
+        );
         const updated = addEvent(pp, stage, "completed", {
           was_cropped: cropResult.wasCropped,
           original_dimensions: cropResult.originalDimensions,
           cropped_dimensions: cropResult.croppedDimensions,
           device_model: cropResult.deviceModel,
-          is_ipad: getPreprocessing(screenshot).events.some(
-            (e) => e.stage === "device_detection" && (e.result as any)?.device_category === "ipad",
-          ),
+          is_ipad: (detectionEvent?.result as any)?.device_category === "ipad",
         });
 
         await this.storage.updateScreenshot(id, {
@@ -283,14 +289,11 @@ export class WASMPreprocessingService implements IPreprocessingService {
       case "phi_detection": {
         if (!blob) throw new Error("No image blob for PHI detection");
 
-        // Use the current image (possibly already cropped)
-        const currentBlob = await this.storage.getImageBlob(id);
-        const phiResult = await detectPHI(currentBlob ?? blob);
+        const phiResult = await detectPHI(blob);
 
         const pp = getPreprocessing(screenshot);
         const updated = addEvent(pp, stage, "completed", {
           phi_detected: phiResult.regions.length > 0,
-          phi_count: phiResult.regions.length,
           regions_count: phiResult.regions.length,
           phi_entities: phiResult.regions,
           ocr_text: phiResult.ocrText,
@@ -328,11 +331,11 @@ export class WASMPreprocessingService implements IPreprocessingService {
         }
 
         const method = (options.phi_redaction_method ?? "redbox") as "redbox" | "blackbox" | "pixelate";
-        const currentBlob = await this.storage.getImageBlob(id);
-        const redactedBlob = await redactImage(currentBlob ?? blob, regions, method);
+        const redactedBlob = await redactImage(blob, regions, method);
 
-        // Save redacted image
+        // Save redacted image as current + stage snapshot
         await this.storage.saveImageBlob(id, redactedBlob);
+        await this.storage.saveStageBlob(id, "phi_redaction", redactedBlob);
 
         const updated = addEvent(pp, stage, "completed", {
           phi_detected: true,
@@ -358,16 +361,23 @@ export class WASMPreprocessingService implements IPreprocessingService {
     for (const s of screenshots) {
       const pp = getPreprocessing(s);
       let changed = false;
+      let newStageStatus = { ...pp.stage_status };
+      let newCurrentEvents = { ...pp.current_events };
       for (const ds of downstreamStages) {
-        if (pp.stage_status[ds] && pp.stage_status[ds] !== "pending") {
-          pp.stage_status[ds] = "pending";
-          delete pp.current_events[ds];
+        if (newStageStatus[ds] && newStageStatus[ds] !== "pending") {
+          newStageStatus[ds] = "pending";
+          delete newCurrentEvents[ds];
           changed = true;
         }
       }
       if (changed) {
+        const updatedPp: PreprocessingMeta = {
+          ...pp,
+          stage_status: newStageStatus,
+          current_events: newCurrentEvents,
+        };
         await this.storage.updateScreenshot(s.id as number, {
-          processing_metadata: setPreprocessing(s, pp),
+          processing_metadata: setPreprocessing(s, updatedPp),
         });
         count++;
       }
@@ -385,15 +395,16 @@ export class WASMPreprocessingService implements IPreprocessingService {
 
     const downstream = STAGES.slice(stageIdx);
     const pp = getPreprocessing(screenshot);
+    const newStageStatus = { ...pp.stage_status };
 
     for (const ds of downstream) {
-      if (pp.stage_status[ds] && pp.stage_status[ds] !== "pending") {
-        pp.stage_status[ds] = "invalidated";
+      if (newStageStatus[ds] && newStageStatus[ds] !== "pending") {
+        newStageStatus[ds] = "invalidated";
       }
     }
 
     await this.storage.updateScreenshot(screenshotId, {
-      processing_metadata: setPreprocessing(screenshot, pp),
+      processing_metadata: setPreprocessing(screenshot, { ...pp, stage_status: newStageStatus }),
     });
   }
 
@@ -445,6 +456,7 @@ export class WASMPreprocessingService implements IPreprocessingService {
 
     const croppedBlob = await canvas.convertToBlob({ type: "image/png" });
     await this.storage.saveImageBlob(screenshotId, croppedBlob);
+    await this.storage.saveStageBlob(screenshotId, "cropping", croppedBlob);
 
     // Update cropping event
     const screenshot = await this.storage.getScreenshot(screenshotId);
@@ -482,7 +494,6 @@ export class WASMPreprocessingService implements IPreprocessingService {
     const pp = getPreprocessing(screenshot);
     const updated = addEvent(pp, "phi_detection", "completed", {
       phi_detected: body.regions?.length > 0,
-      phi_count: body.regions?.length ?? 0,
       regions_count: body.regions?.length ?? 0,
       phi_entities: body.regions ?? [],
       reviewed: true,
@@ -502,6 +513,7 @@ export class WASMPreprocessingService implements IPreprocessingService {
 
     const redactedBlob = await redactImage(blob, regions, method);
     await this.storage.saveImageBlob(screenshotId, redactedBlob);
+    await this.storage.saveStageBlob(screenshotId, "phi_redaction", redactedBlob);
 
     const screenshot = await this.storage.getScreenshot(screenshotId);
     if (screenshot) {
@@ -527,8 +539,17 @@ export class WASMPreprocessingService implements IPreprocessingService {
     };
   }
 
-  async getStageImageUrl(screenshotId: number, _stage: string): Promise<string> {
-    // In WASM mode, we always serve the current image blob (stages modify in place)
+  async getStageImageUrl(screenshotId: number, stage: string): Promise<string> {
+    // Try to load a per-stage snapshot first (saved after image-modifying stages)
+    const stageBlob = await this.storage.getStageBlob(screenshotId, stage);
+    if (stageBlob) {
+      return URL.createObjectURL(stageBlob);
+    }
+    // Fall back to current image
+    return this.getImageUrl(screenshotId);
+  }
+
+  async getImageUrl(screenshotId: number): Promise<string> {
     const blob = await this.storage.getImageBlob(screenshotId);
     if (!blob) throw new Error(`No image blob for screenshot ${screenshotId}`);
     return URL.createObjectURL(blob);

@@ -1,11 +1,8 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { usePreprocessingStore } from "@/hooks/usePreprocessingWithDI";
+import { usePreprocessingStore, useScreenshotImageUrl } from "@/hooks/usePreprocessingWithDI";
 import type { Stage, StageStatus, PreprocessingEventData } from "@/store/preprocessingStore";
 import type { Screenshot } from "@/types";
-import { config } from "@/config";
-
-const IMAGE_URL_PREFIX = config.apiBaseUrl + "/screenshots";
 
 type SortColumn = "id" | "participant" | "status";
 type SortDirection = "asc" | "desc";
@@ -77,6 +74,7 @@ const TableRow = memo(function TableRow({
   renderResultColumns,
 }: RowProps) {
   const badge = STATUS_BADGES[status] ?? STATUS_BADGES.pending;
+  const imageUrl = useScreenshotImageUrl(screenshot.id);
   return (
     <tr
       ref={isHighlighted ? highlightedRef : undefined}
@@ -93,13 +91,17 @@ const TableRow = memo(function TableRow({
           title="Open in review queue"
           aria-label={`Review screenshot ${screenshot.id} in queue`}
         >
-          <img
-            src={`${IMAGE_URL_PREFIX}/${screenshot.id}/image`}
-            alt={`Screenshot ${screenshot.id}`}
-            className="w-10 h-14 object-cover rounded bg-slate-200"
-            loading="lazy"
-            onError={(e) => { e.currentTarget.src = ""; }}
-          />
+          {imageUrl ? (
+            <img
+              src={imageUrl}
+              alt={`Screenshot ${screenshot.id}`}
+              className="w-10 h-14 object-cover rounded bg-slate-200"
+              loading="lazy"
+              onError={(e) => { e.currentTarget.src = ""; }}
+            />
+          ) : (
+            <div className="w-10 h-14 rounded bg-slate-200 dark:bg-slate-600 animate-pulse" />
+          )}
         </button>
       </td>
       <td className="px-3 py-2 font-mono text-slate-600 dark:text-slate-400">{screenshot.id}</td>

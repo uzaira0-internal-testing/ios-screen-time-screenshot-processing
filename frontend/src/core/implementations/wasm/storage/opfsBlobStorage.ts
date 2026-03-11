@@ -66,6 +66,56 @@ async function getOpfsRoot(): Promise<FileSystemDirectoryHandle | null> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Per-stage snapshot storage (e.g., "123_stage_cropping.img")
+// ---------------------------------------------------------------------------
+
+export async function storeStageBlob(id: number, stage: string, blob: Blob): Promise<void> {
+  const root = await getOpfsRoot();
+  if (root) {
+    const fileHandle = await root.getFileHandle(`${id}_stage_${stage}.img`, { create: true });
+    const writable = await fileHandle.createWritable();
+    try {
+      await writable.write(blob);
+    } catch (error) {
+      try { await writable.close(); } catch { /* prevent stream lock */ }
+      throw new Error(
+        `Failed to write stage blob for screenshot ${id}/${stage}: ${error instanceof Error ? error.message : error}`,
+      );
+    }
+    await writable.close();
+  } else {
+    // IndexedDB fallback — use a composite key
+    await db.imageBlobs.put({ screenshotId: -(id * 100 + stageIndex(stage)), blob, uploadedAt: new Date() });
+  }
+}
+
+export async function retrieveStageBlob(id: number, stage: string): Promise<Blob | null> {
+  const root = await getOpfsRoot();
+  if (root) {
+    try {
+      const fileHandle = await root.getFileHandle(`${id}_stage_${stage}.img`);
+      const file = await fileHandle.getFile();
+      return file;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "NotFoundError") {
+        return null;
+      }
+      console.error(`[opfsBlobStorage] Error retrieving stage blob for ${id}/${stage}:`, error);
+      return null;
+    }
+  } else {
+    const entry = await db.imageBlobs.get(-(id * 100 + stageIndex(stage)));
+    return entry?.blob ?? null;
+  }
+}
+
+/** Map stage names to numeric indices for IndexedDB fallback key encoding. */
+function stageIndex(stage: string): number {
+  const stages: Record<string, number> = { device_detection: 1, cropping: 2, phi_detection: 3, phi_redaction: 4 };
+  return stages[stage] ?? 0;
+}
+
 export async function storeImageBlob(id: number, blob: Blob): Promise<void> {
   const root = await getOpfsRoot();
   if (root) {

@@ -1,16 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { usePreprocessingStore } from "@/hooks/usePreprocessingWithDI";
+import { usePreprocessingStore, useScreenshotImageUrl } from "@/hooks/usePreprocessingWithDI";
 import { QueueNavigationBar } from "./QueueNavigationBar";
 import { PHIRegionEditor } from "./PHIRegionEditor";
 import { CropAdjustModal } from "./CropAdjustModal";
 import { getCurrentEvent } from "./StageReviewTable";
 import { getCropRectFromEvent } from "./CroppingTab";
 import { getRecentCropConfigs, getRecentPHIConfigs } from "./recentConfigHelpers";
-import { config } from "@/config";
 import type { PreprocessingEventData } from "@/store/preprocessingStore";
 import type { Screenshot } from "@/types";
-
-const IMAGE_URL_PREFIX = config.apiBaseUrl + "/screenshots";
 
 export const PreprocessingQueueView = () => {
   const queueIndex = usePreprocessingStore((s) => s.queueIndex);
@@ -176,17 +173,22 @@ function DeviceInfoPanel({
   event: PreprocessingEventData | null;
 }) {
   const result = event?.result as Record<string, unknown> | undefined;
+  const imageUrl = useScreenshotImageUrl(screenshot.id);
 
   return (
     <div className="flex-1 flex overflow-hidden bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 min-h-0">
       {/* Image */}
       <div className="flex-1 min-h-0 min-w-0 overflow-hidden flex items-center justify-center p-4">
-        <img
-          src={`${IMAGE_URL_PREFIX}/${screenshot.id}/image`}
-          alt={`Screenshot ${screenshot.id}`}
-          style={{ maxHeight: "calc(100vh - 14rem)" }}
-          className="max-w-full object-contain rounded"
-        />
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={`Screenshot ${screenshot.id}`}
+            style={{ maxHeight: "calc(100vh - 14rem)" }}
+            className="max-w-full object-contain rounded"
+          />
+        ) : (
+          <div className="w-48 h-64 rounded bg-slate-200 dark:bg-slate-600 animate-pulse" />
+        )}
       </div>
 
       {/* Metadata sidebar */}
@@ -257,15 +259,10 @@ function RedactionReviewPanel({
   const regionsRedacted = (redactResult?.regions_redacted as number) ?? 0;
   const method = (redactResult?.method as string) ?? "unknown";
 
-  // "after" = current file_path (redacted), "before" = cropping stage output
-  const afterUrl = `${IMAGE_URL_PREFIX}/${screenshot.id}/image`;
-  const beforeUrl = `${IMAGE_URL_PREFIX}/${screenshot.id}/stage-image?stage=cropping`;
+  const afterUrl = useScreenshotImageUrl(screenshot.id);
+  const beforeUrl = useScreenshotImageUrl(screenshot.id, "getStageImageUrl", "cropping");
 
   const [view, setView] = useState<"after" | "before">("after");
-
-  // Bust cache using redaction event ID (changes on each re-run)
-  const redactEid = (redactEvent as Record<string, unknown> | undefined)?.event_id ?? screenshot.id;
-  const cacheBuster = `?t=${redactEid}`;
 
   return (
     <div className="flex-1 flex overflow-hidden bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 min-h-0">
@@ -299,12 +296,16 @@ function RedactionReviewPanel({
         )}
 
         <div className="flex-1 min-h-0 overflow-hidden flex items-center justify-center p-4">
-          <img
-            src={`${view === "after" ? afterUrl : beforeUrl}${cacheBuster}`}
-            alt={`Screenshot ${screenshot.id} — ${view === "after" ? "redacted" : "original"}`}
-            style={{ maxHeight: "calc(100vh - 15rem)" }}
-            className="max-w-full object-contain rounded"
-          />
+          {(view === "after" ? afterUrl : beforeUrl) ? (
+            <img
+              src={(view === "after" ? afterUrl : beforeUrl)!}
+              alt={`Screenshot ${screenshot.id} — ${view === "after" ? "redacted" : "original"}`}
+              style={{ maxHeight: "calc(100vh - 15rem)" }}
+              className="max-w-full object-contain rounded"
+            />
+          ) : (
+            <div className="w-48 h-64 rounded bg-slate-200 dark:bg-slate-600 animate-pulse" />
+          )}
         </div>
       </div>
 

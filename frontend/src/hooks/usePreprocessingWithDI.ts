@@ -1,6 +1,7 @@
-import { createContext, useContext, useMemo, useEffect, useRef, createElement, type ReactNode } from "react";
+import { createContext, useContext, useMemo, useEffect, useRef, useState, createElement, type ReactNode } from "react";
 import { usePreprocessingPipelineService } from "@/core";
 import { createPreprocessingStore, type PreprocessingState } from "@/store/preprocessingStore";
+import type { IPreprocessingService } from "@/core/interfaces/IPreprocessingService";
 import { config } from "@/config";
 
 type PreprocessingStore = ReturnType<typeof createPreprocessingStore>;
@@ -40,10 +41,14 @@ export function PreprocessingProvider({ children }: { children: ReactNode }) {
     return newStore;
   }, [service]);
 
-  // Cleanup on unmount
+  // Cleanup on unmount: stop polling immediately, then clean up store after delay
   useEffect(() => {
     const currentKey = cacheKeyRef.current;
+    const currentStore = store;
     return () => {
+      // Stop polling immediately to prevent stale interval timers
+      currentStore.getState().stopPolling();
+
       if (!currentKey) return;
       setTimeout(() => {
         const entry = storeInstances.get(currentKey);
@@ -58,9 +63,13 @@ export function PreprocessingProvider({ children }: { children: ReactNode }) {
         }
       }, CLEANUP_DELAY_MS);
     };
-  }, []);
+  }, [store]);
 
-  return createElement(PreprocessingStoreContext.Provider, { value: store }, children);
+  return createElement(
+    serviceContext.Provider,
+    { value: service },
+    createElement(PreprocessingStoreContext.Provider, { value: store }, children),
+  );
 }
 
 /**
@@ -78,4 +87,65 @@ export function usePreprocessingStore<T>(selector?: (state: PreprocessingState) 
     return store(selector);
   }
   return store;
+}
+
+// ---------------------------------------------------------------------------
+// Image URL hooks — async blob URL loading with cleanup for WASM mode
+// ---------------------------------------------------------------------------
+
+const serviceContext = createContext<IPreprocessingService | null>(null);
+export { serviceContext as PreprocessingServiceContext };
+
+/**
+ * Load an image URL for a screenshot via the preprocessing service.
+ * In server mode this returns a static API URL; in WASM mode it creates
+ * an object URL from the blob store and revokes it on cleanup.
+ */
+export function useScreenshotImageUrl(
+  screenshotId: number | undefined,
+  method: "getImageUrl" | "getStageImageUrl" | "getOriginalImageUrl" = "getImageUrl",
+  stage?: string,
+): string | null {
+  const service = useContext(serviceContext);
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!service || screenshotId == null) {
+      setUrl(null);
+      return;
+    }
+
+    let revoked = false;
+    let objectUrl: string | null = null;
+
+    (async () => {
+      try {
+        let result: string;
+        if (method === "getStageImageUrl" && stage) {
+          result = await service.getStageImageUrl(screenshotId, stage);
+        } else if (method === "getOriginalImageUrl") {
+          result = await service.getOriginalImageUrl(screenshotId);
+        } else {
+          result = await service.getImageUrl(screenshotId);
+        }
+        if (!revoked) {
+          objectUrl = result;
+          setUrl(result);
+        } else if (result.startsWith("blob:")) {
+          URL.revokeObjectURL(result);
+        }
+      } catch {
+        if (!revoked) setUrl(null);
+      }
+    })();
+
+    return () => {
+      revoked = true;
+      if (objectUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [service, screenshotId, method, stage]);
+
+  return url;
 }

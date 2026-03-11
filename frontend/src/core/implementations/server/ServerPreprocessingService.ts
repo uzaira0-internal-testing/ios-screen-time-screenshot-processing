@@ -83,4 +83,8 @@ export class ServerPreprocessingService implements IPreprocessingService {
   async getStageImageUrl(screenshotId: number, stage: string): Promise<string> {
     return `${config.apiBaseUrl}/screenshots/${screenshotId}/stage-image?stage=${stage}`;
   }
+
+  async getImageUrl(screenshotId: number): Promise<string> {
+    return `${config.apiBaseUrl}/screenshots/${screenshotId}/image`;
+  }
 }

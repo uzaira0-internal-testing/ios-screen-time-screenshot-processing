@@ -155,6 +155,27 @@ async function runNER(text: string): Promise<NEREntity[]> {
 }
 
 // ---------------------------------------------------------------------------
+// Tesseract worker management — singleton, reused across screenshots
+// ---------------------------------------------------------------------------
+
+let tesseractWorker: Awaited<ReturnType<typeof import("tesseract.js").createWorker>> | null = null;
+
+async function getTesseractWorker() {
+  if (!tesseractWorker) {
+    const Tesseract = await import("tesseract.js");
+    tesseractWorker = await Tesseract.createWorker("eng");
+  }
+  return tesseractWorker;
+}
+
+export function terminateTesseractWorker(): void {
+  if (tesseractWorker) {
+    tesseractWorker.terminate();
+    tesseractWorker = null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // OCR helper — extract words with bounding boxes using Tesseract.js
 // ---------------------------------------------------------------------------
 
@@ -163,19 +184,15 @@ async function ocrWithBboxes(imageBlob: Blob): Promise<{
   fullText: string;
   confidence: number;
 }> {
-  // Dynamically import Tesseract to avoid bundling in server mode
-  const Tesseract = await import("tesseract.js");
-
   const imageBitmap = await createImageBitmap(imageBlob);
   const canvas = new OffscreenCanvas(imageBitmap.width, imageBitmap.height);
   const ctx = canvas.getContext("2d")!;
   ctx.drawImage(imageBitmap, 0, 0);
   imageBitmap.close();
 
-  const worker = await Tesseract.createWorker("eng");
+  const worker = await getTesseractWorker();
   // Tesseract.js v7 requires a canvas, not raw ImageData
   const result = await worker.recognize(canvas as unknown as HTMLCanvasElement);
-  await worker.terminate();
 
   const words: OCRWord[] = [];
   let fullText = "";
@@ -260,12 +277,13 @@ function offsetToRegion(
 function isAllowListed(text: string): boolean {
   const trimmed = text.trim();
   if (ALLOW_LIST.has(trimmed)) return true;
-  if (ALLOW_LIST_LOWER.has(trimmed.toLowerCase())) return true;
+  const trimmedLower = trimmed.toLowerCase();
+  if (ALLOW_LIST_LOWER.has(trimmedLower)) return true;
 
   // Check if the text is a substring of an allow-listed term
-  for (const allowed of ALLOW_LIST) {
-    if (allowed.toLowerCase().includes(trimmed.toLowerCase()) && trimmed.length >= 3) {
-      return true;
+  if (trimmed.length >= 3) {
+    for (const allowedLower of ALLOW_LIST_LOWER) {
+      if (allowedLower.includes(trimmedLower)) return true;
     }
   }
   return false;
