@@ -1,6 +1,6 @@
 [package]
 name = "ios-screen-time"
-version = "0.3.9"
+version = "0.3.10"
 edition = "2024"
 description = "iOS Screen Time Screenshot Processing desktop app"
 
