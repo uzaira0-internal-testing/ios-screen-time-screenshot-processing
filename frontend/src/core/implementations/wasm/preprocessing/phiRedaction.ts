@@ -58,12 +58,21 @@ export async function redactImage(
         const tinyH = Math.max(1, Math.ceil(rh / pixelSize));
         const tinyCanvas = new OffscreenCanvas(tinyW, tinyH);
         const tinyCtx = tinyCanvas.getContext("2d");
-        if (!tinyCtx) break; // Skip pixelation if context unavailable;
+        if (!tinyCtx) {
+          // Fall back to solid fill — never leave PHI unredacted
+          ctx.fillStyle = "black";
+          ctx.fillRect(rx, ry, rw, rh);
+          break;
+        }
 
         // Draw region scaled down
         const tempCanvas = new OffscreenCanvas(rw, rh);
         const tempCtx = tempCanvas.getContext("2d");
-        if (!tempCtx) break; // Skip pixelation if context unavailable
+        if (!tempCtx) {
+          ctx.fillStyle = "black";
+          ctx.fillRect(rx, ry, rw, rh);
+          break;
+        }
         tempCtx.putImageData(regionData, 0, 0);
 
         tinyCtx.drawImage(tempCanvas, 0, 0, tinyW, tinyH);

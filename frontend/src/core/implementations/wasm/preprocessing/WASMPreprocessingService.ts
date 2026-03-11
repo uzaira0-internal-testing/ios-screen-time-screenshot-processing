@@ -546,12 +546,21 @@ export class WASMPreprocessingService implements IPreprocessingService {
     };
   }
 
+  // Track blob URLs created from stage blobs so callers can revoke them
+  private stageBlobUrls = new Map<string, string>();
+
   async getStageImageUrl(screenshotId: number, stage: string): Promise<string> {
     // Only image-modifying stages (cropping, phi_redaction) save snapshots
     if (stage === "cropping" || stage === "phi_redaction") {
       const stageBlob = await this.storage.getStageBlob(screenshotId, stage);
       if (stageBlob) {
-        return URL.createObjectURL(stageBlob);
+        const key = `${screenshotId}:${stage}`;
+        // Revoke previous URL for this screenshot+stage to prevent leaks
+        const prev = this.stageBlobUrls.get(key);
+        if (prev) URL.revokeObjectURL(prev);
+        const url = URL.createObjectURL(stageBlob);
+        this.stageBlobUrls.set(key, url);
+        return url;
       }
     }
     // Fall back to current image

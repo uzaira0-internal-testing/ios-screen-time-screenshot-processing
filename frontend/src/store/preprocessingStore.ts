@@ -247,7 +247,8 @@ export function createPreprocessingStore(service: IPreprocessingService) {
             item.id !== prev[i]?.id ||
             item.processing_status !== prev[i]?.processing_status ||
             item.processed_at !== prev[i]?.processed_at ||
-            JSON.stringify(item.processing_metadata) !== JSON.stringify(prev[i]?.processing_metadata)
+            JSON.stringify((item.processing_metadata as any)?.preprocessing?.stage_status) !==
+              JSON.stringify((prev[i]?.processing_metadata as any)?.preprocessing?.stage_status)
           );
         if (changed) {
           set({ screenshots: next });
