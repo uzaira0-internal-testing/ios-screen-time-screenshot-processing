@@ -64,6 +64,7 @@ jobs:
         run: npx vite build
 
       - name: Validate updater config
+        shell: bash
         run: |
           PUBKEY=$(jq -r '.plugins.updater.pubkey' frontend/src-tauri/tauri.conf.json)
           if [[ "$PUBKEY" == "REPLACE_WITH_PUBLIC_KEY" ]]; then
