@@ -4,6 +4,7 @@ export const TOKENS = {
   CONSENSUS_SERVICE: "IConsensusService",
   STORAGE_SERVICE: "IStorageService",
   PROCESSING_SERVICE: "IProcessingService",
+  PREPROCESSING_PIPELINE_SERVICE: "IPreprocessingService",
   FEATURES: "Features",
 } as const;
 

@@ -7,6 +7,7 @@ import type {
   IConsensusService,
   IStorageService,
   IProcessingService,
+  IPreprocessingService,
 } from "../interfaces";
 
 function useServiceContainer() {
@@ -50,6 +51,11 @@ export function useProcessingService(): IProcessingService | null {
     return container.resolve<IProcessingService>(TOKENS.PROCESSING_SERVICE);
   }
   return null;
+}
+
+export function usePreprocessingPipelineService(): IPreprocessingService {
+  const container = useServiceContainer();
+  return container.resolve<IPreprocessingService>(TOKENS.PREPROCESSING_PIPELINE_SERVICE);
 }
 
 /**

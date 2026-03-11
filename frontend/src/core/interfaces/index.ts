@@ -17,3 +17,9 @@ export type {
   ProcessingProgress,
   ProcessingProgressCallback,
 } from "./IProcessingService";
+export type {
+  IPreprocessingService,
+  PreprocessingStage,
+  RunStageOptions,
+  RunStageResult,
+} from "./IPreprocessingService";

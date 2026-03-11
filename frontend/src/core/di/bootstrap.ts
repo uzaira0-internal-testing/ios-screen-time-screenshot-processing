@@ -7,6 +7,7 @@ import { APIScreenshotService } from "../implementations/server/APIScreenshotSer
 import { APIAnnotationService } from "../implementations/server/APIAnnotationService";
 import { APIConsensusService } from "../implementations/server/APIConsensusService";
 import { APIStorageService } from "../implementations/server/APIStorageService";
+import { ServerPreprocessingService } from "../implementations/server/ServerPreprocessingService";
 
 /**
  * Bootstrap services based on application mode.
@@ -59,6 +60,11 @@ function bootstrapServerServices(config: AppConfig): ServiceContainer {
   container.registerSingleton(
     TOKENS.STORAGE_SERVICE,
     () => new APIStorageService(),
+  );
+
+  container.registerSingleton(
+    TOKENS.PREPROCESSING_PIPELINE_SERVICE,
+    () => new ServerPreprocessingService(),
   );
 
   // Server mode has all server-dependent features
