@@ -71,6 +71,10 @@ jobs:
             exit 1
           fi
 
+      - name: Clean old bundle artifacts
+        shell: bash
+        run: find frontend/src-tauri/target -path '*/release/bundle' -type d -exec rm -rf {} + 2>/dev/null || true
+
       - name: Build Tauri
         working-directory: frontend
         run: npx @tauri-apps/cli build ${{ matrix.os == 'macos-latest' && '--target universal-apple-darwin' || '' }}
