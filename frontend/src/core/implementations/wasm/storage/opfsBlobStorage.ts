@@ -121,6 +121,9 @@ function stageIndex(stage: string): number {
 }
 
 export async function storeImageBlob(id: number, blob: Blob): Promise<void> {
+  // Invalidate any cached object URL for this ID — the underlying blob is changing
+  revokeObjectURL(id);
+
   const root = await getOpfsRoot();
   if (root) {
     const fileHandle = await root.getFileHandle(`${id}.img`, { create: true });

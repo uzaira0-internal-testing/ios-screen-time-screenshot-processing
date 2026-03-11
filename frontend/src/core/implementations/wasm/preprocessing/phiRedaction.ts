@@ -26,7 +26,8 @@ export async function redactImage(
   const { width, height } = bitmap;
 
   const canvas = new OffscreenCanvas(width, height);
-  const ctx = canvas.getContext("2d")!;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error(`Failed to get 2D context for ${width}x${height} OffscreenCanvas`);
 
   // Draw original image
   ctx.drawImage(bitmap, 0, 0);
@@ -56,11 +57,13 @@ export async function redactImage(
         const tinyW = Math.max(1, Math.ceil(rw / pixelSize));
         const tinyH = Math.max(1, Math.ceil(rh / pixelSize));
         const tinyCanvas = new OffscreenCanvas(tinyW, tinyH);
-        const tinyCtx = tinyCanvas.getContext("2d")!;
+        const tinyCtx = tinyCanvas.getContext("2d");
+        if (!tinyCtx) break; // Skip pixelation if context unavailable;
 
         // Draw region scaled down
         const tempCanvas = new OffscreenCanvas(rw, rh);
-        const tempCtx = tempCanvas.getContext("2d")!;
+        const tempCtx = tempCanvas.getContext("2d");
+        if (!tempCtx) break; // Skip pixelation if context unavailable
         tempCtx.putImageData(regionData, 0, 0);
 
         tinyCtx.drawImage(tempCanvas, 0, 0, tinyW, tinyH);

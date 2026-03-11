@@ -16,6 +16,8 @@ export interface PHIDetectionResult {
   regions: PHIRegion[];
   ocrText: string;
   ocrConfidence: number;
+  /** Indicates whether the NER engine ran successfully. "skipped" means only regex ran. */
+  nerStatus: "success" | "failed" | "timeout" | "skipped";
 }
 
 // Word with bounding box from Tesseract.js
@@ -43,7 +45,8 @@ interface NEREntity {
 const REGEX_PATTERNS: Array<{ label: string; pattern: RegExp }> = [
   { label: "email", pattern: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g },
   { label: "phone", pattern: /(\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g },
-  { label: "ssn", pattern: /\b\d{3}[-.]?\d{2}[-.]?\d{4}\b/g },
+  // SSN with IRS validation: exclude 000/666/9xx area numbers, 00 group, 0000 serial
+  { label: "ssn", pattern: /\b(?!000|666|9\d{2})\d{3}[-.]?(?!00)\d{2}[-.]?(?!0000)\d{4}\b/g },
   { label: "mrn", pattern: /(?:MRN|Medical Record|Record #)[:\s]*(\d{6,10})/gi },
   { label: "study_id", pattern: /(?:GNSM|STUDY)[_-]?\d{4}(?:[_-]\d+)?/gi },
   { label: "zip", pattern: /\b\d{5}(?:-\d{4})?\b/g },
@@ -97,9 +100,14 @@ const MIN_BBOX_AREA = 100;
 let nerWorker: Worker | null = null;
 let nerRequestId = 0;
 const pendingNER = new Map<number, {
-  resolve: (entities: NEREntity[]) => void;
+  resolve: (result: NERResult) => void;
   reject: (err: Error) => void;
 }>();
+
+interface NERResult {
+  entities: NEREntity[];
+  status: "success" | "failed" | "timeout" | "skipped";
+}
 
 function getNERWorker(): Worker {
   if (!nerWorker) {
@@ -114,11 +122,22 @@ function getNERWorker(): Worker {
       if (pending) {
         pendingNER.delete(id);
         if (error) {
-          pending.resolve([]); // Graceful fallback — regex still runs
+          console.warn(`[phiDetection] NER failed for request ${id}: ${error} — falling back to regex-only`);
+          pending.resolve({ entities: [], status: "failed" });
         } else {
-          pending.resolve(entities);
+          pending.resolve({ entities, status: "success" });
         }
       }
+    };
+    nerWorker.onerror = (e: ErrorEvent) => {
+      console.error("[phiDetection] NER worker error:", e.message);
+      // Reject all pending requests
+      for (const [id, pending] of pendingNER) {
+        pending.resolve({ entities: [], status: "failed" });
+        pendingNER.delete(id);
+      }
+      // Worker is broken — reset so it gets recreated on next call
+      nerWorker = null;
     };
     // Pre-initialize the pipeline
     nerWorker.postMessage({ type: "init" });
@@ -126,21 +145,22 @@ function getNERWorker(): Worker {
   return nerWorker;
 }
 
-async function runNER(text: string): Promise<NEREntity[]> {
-  if (!text.trim()) return [];
+async function runNER(text: string): Promise<NERResult> {
+  if (!text.trim()) return { entities: [], status: "skipped" };
 
   const worker = getNERWorker();
   const id = ++nerRequestId;
 
   return new Promise((resolve) => {
-    pendingNER.set(id, { resolve, reject: () => resolve([]) });
+    pendingNER.set(id, { resolve, reject: () => resolve({ entities: [], status: "failed" }) });
     worker.postMessage({ text, id });
 
     // Timeout after 30s (model download + inference)
     setTimeout(() => {
       if (pendingNER.has(id)) {
         pendingNER.delete(id);
-        resolve([]); // Graceful fallback
+        console.warn(`[phiDetection] NER timed out after 30s for request ${id} — falling back to regex-only`);
+        resolve({ entities: [], status: "timeout" });
       }
     }, 30000);
   });
@@ -178,7 +198,11 @@ async function ocrWithBboxes(imageBlob: Blob): Promise<{
 }> {
   const imageBitmap = await createImageBitmap(imageBlob);
   const canvas = new OffscreenCanvas(imageBitmap.width, imageBitmap.height);
-  const ctx = canvas.getContext("2d")!;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    imageBitmap.close();
+    throw new Error(`Failed to get 2D context for ${imageBitmap.width}x${imageBitmap.height} OffscreenCanvas`);
+  }
   ctx.drawImage(imageBitmap, 0, 0);
   imageBitmap.close();
 
@@ -290,14 +314,16 @@ export async function detectPHI(imageBlob: Blob): Promise<PHIDetectionResult> {
   const { words, fullText, confidence } = await ocrWithBboxes(imageBlob);
 
   if (!fullText.trim()) {
-    return { regions: [], ocrText: "", ocrConfidence: 0 };
+    return { regions: [], ocrText: "", ocrConfidence: 0, nerStatus: "skipped" };
   }
 
   // Step 2 & 3: Run NER and regex in parallel
-  const [nerEntities, regexMatches] = await Promise.all([
+  const [nerResult, regexMatches] = await Promise.all([
     runNER(fullText),
     Promise.resolve(findRegexMatches(fullText)),
   ]);
+
+  const nerEntities = nerResult.entities;
 
   const regions: PHIRegion[] = [];
 
@@ -360,6 +386,7 @@ export async function detectPHI(imageBlob: Blob): Promise<PHIDetectionResult> {
     regions,
     ocrText: fullText,
     ocrConfidence: confidence,
+    nerStatus: nerResult.status,
   };
 }
 

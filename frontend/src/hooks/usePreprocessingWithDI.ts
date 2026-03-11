@@ -136,7 +136,8 @@ export function useScreenshotImageUrl(
           // LRU cache. Revoking cached URLs would corrupt the cache for other consumers.
           URL.revokeObjectURL(result);
         }
-      } catch {
+      } catch (err) {
+        console.error(`[useScreenshotImageUrl] Failed to load image for screenshot ${screenshotId}:`, err);
         if (!revoked) setUrl(null);
       }
     })();

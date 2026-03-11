@@ -49,8 +49,8 @@ export const PreprocessingQueueView = () => {
   }, [queuePrev, queueNext, exitQueue]);
 
   const handleRefresh = () => {
-    loadScreenshots();
-    loadSummary();
+    loadScreenshots().catch(() => {});
+    loadSummary().catch(() => {});
   };
 
   // Hooks must be called unconditionally — compute all derived values here

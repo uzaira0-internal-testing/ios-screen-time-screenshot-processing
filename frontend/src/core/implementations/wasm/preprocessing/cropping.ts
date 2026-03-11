@@ -88,8 +88,8 @@ export async function cropScreenshot(imageBlob: Blob): Promise<CropResult> {
   const cropCoords = findProfileCropCoords(width, height);
 
   if (!cropCoords) {
-    // Detection said it needs cropping but no profile matched -- should not happen,
-    // but handle gracefully by returning uncropped.
+    // Detection said it needs cropping but no profile matched — tolerance mismatch.
+    console.warn(`[cropping] Device detection indicated cropping needed but no crop profile found for ${width}x${height}`);
     bitmap.close();
     return {
       croppedBlob: imageBlob,
@@ -104,7 +104,8 @@ export async function cropScreenshot(imageBlob: Blob): Promise<CropResult> {
 
   // 4. Create canvas with crop dimensions
   const canvas = new OffscreenCanvas(cropWidth, cropHeight);
-  const ctx = canvas.getContext("2d")!;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error(`Failed to get 2D context for ${cropWidth}x${cropHeight} OffscreenCanvas`);
 
   // 5. Draw cropped region
   ctx.drawImage(

@@ -36,6 +36,8 @@ async function initPipeline() {
     } catch (err) {
       console.error("[nerWorker] Failed to initialize NER pipeline:", err);
       self.postMessage({ type: "error", error: String(err) });
+      // Reset so the next request retries initialization
+      initPromise = null;
     }
   })();
 

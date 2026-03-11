@@ -232,7 +232,8 @@ export class WASMPreprocessingService implements IPreprocessingService {
           height = bmp.height;
           bmp.close();
         } else {
-          // Fall back to stored dimensions
+          // Fall back to stored dimensions — likely missing blob
+          console.warn(`[WASM] device_detection: No image blob for screenshot ${id}, using stored dimensions`);
           width = (screenshot as any).image_width ?? 0;
           height = (screenshot as any).image_height ?? 0;
         }
@@ -299,6 +300,7 @@ export class WASMPreprocessingService implements IPreprocessingService {
           phi_entities: phiResult.regions,
           ocr_text: phiResult.ocrText,
           ocr_confidence: phiResult.ocrConfidence,
+          ner_status: phiResult.nerStatus,
           reviewed: false,
         });
 
@@ -451,7 +453,11 @@ export class WASMPreprocessingService implements IPreprocessingService {
     const cropHeight = bitmap.height - crop.top - crop.bottom;
 
     const canvas = new OffscreenCanvas(cropWidth, cropHeight);
-    const ctx = canvas.getContext("2d")!;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      bitmap.close();
+      throw new Error(`Failed to get 2D context for ${cropWidth}x${cropHeight} OffscreenCanvas`);
+    }
     ctx.drawImage(bitmap, crop.left, crop.top, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
     bitmap.close();
 
@@ -490,7 +496,7 @@ export class WASMPreprocessingService implements IPreprocessingService {
 
   async savePHIRegions(screenshotId: number, body: any): Promise<void> {
     const screenshot = await this.storage.getScreenshot(screenshotId);
-    if (!screenshot) return;
+    if (!screenshot) throw new Error(`Screenshot ${screenshotId} not found`);
 
     const pp = getPreprocessing(screenshot);
     const updated = addEvent(pp, "phi_detection", "completed", {

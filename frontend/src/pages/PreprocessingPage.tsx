@@ -90,8 +90,8 @@ export const PreprocessingPage = () => {
               }
             }
           }
-        }).catch(() => {
-          // Screenshot not found - ignore
+        }).catch((err) => {
+          console.error(`[PreprocessingPage] Failed to load screenshot ${id} from deep-link:`, err);
         });
       }
     }

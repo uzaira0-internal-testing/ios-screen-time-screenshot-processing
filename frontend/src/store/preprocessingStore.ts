@@ -195,9 +195,9 @@ export function createPreprocessingStore(service: IPreprocessingService) {
   setFilter: (filter) => set({ filter }),
   setSelectedGroupId: (groupId) => {
     set({ selectedGroupId: groupId, screenshots: [], summary: null });
-    // Auto-load when group changes
-    get().loadScreenshots();
-    get().loadSummary();
+    // Auto-load when group changes — catch to prevent unhandled rejections
+    get().loadScreenshots().catch(() => {});
+    get().loadSummary().catch(() => {});
   },
   setPhiPreset: (preset) => set({ phiPreset: preset }),
   setRedactionMethod: (method) => set({ redactionMethod: method }),
@@ -216,6 +216,7 @@ export function createPreprocessingStore(service: IPreprocessingService) {
       }
     } catch (err) {
       console.error("Failed to load groups:", err);
+      toast.error("Failed to load groups");
     }
   },
 
@@ -245,7 +246,8 @@ export function createPreprocessingStore(service: IPreprocessingService) {
           next.some((item: any, i: number) =>
             item.id !== prev[i]?.id ||
             item.processing_status !== prev[i]?.processing_status ||
-            item.processed_at !== prev[i]?.processed_at
+            item.processed_at !== prev[i]?.processed_at ||
+            JSON.stringify(item.processing_metadata) !== JSON.stringify(prev[i]?.processing_metadata)
           );
         if (changed) {
           set({ screenshots: next });

@@ -116,6 +116,7 @@ export const PHIRegionEditor = ({
   // Load image and regions on open (inline mode is always "open")
   useEffect(() => {
     if (!isOpen && !inline) return;
+    let cancelled = false;
     setImageError(false);
     setImage(null);
     setRegions([]);
@@ -123,22 +124,22 @@ export const PHIRegionEditor = ({
 
     // Load the cropped image (not the redacted one)
     preprocessingService.getStageImageUrl(screenshotId, "cropping").then((imageUrl) => {
+      if (cancelled) return;
       const img = new Image();
       img.crossOrigin = "anonymous";
       img.src = imageUrl;
-      img.onload = () => setImage(img);
-      img.onerror = () => setImageError(true);
-    }).catch(() => setImageError(true));
+      img.onload = () => { if (!cancelled) setImage(img); };
+      img.onerror = () => { if (!cancelled) setImageError(true); };
+    }).catch(() => { if (!cancelled) setImageError(true); });
 
     // Load existing regions
     preprocessingService.getPHIRegions(screenshotId).then((data: { regions: PHIRegion[] }) => {
-      setRegions(data.regions || []);
+      if (!cancelled) setRegions(data.regions || []);
     }).catch(() => {
-      setRegions([]);
+      if (!cancelled) setRegions([]);
     });
 
-    // Note: blob URLs from getStageImageUrl may be LRU-cached — don't revoke here.
-    // The LRU cache in opfsBlobStorage manages lifecycle automatically.
+    return () => { cancelled = true; };
   }, [isOpen, inline, screenshotId]);
 
   // Calculate scale
