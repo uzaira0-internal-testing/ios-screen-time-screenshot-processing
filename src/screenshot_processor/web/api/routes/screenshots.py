@@ -5,6 +5,7 @@ import base64
 import hashlib
 import logging
 import re
+import secrets
 import uuid
 from pathlib import Path
 
@@ -119,13 +120,13 @@ async def enrich_screenshots_with_usernames(
 
 
 @router.get("/groups", response_model=list[GroupRead], tags=["Groups"])
-async def list_groups(repo: ScreenshotRepo):
+async def list_groups(repo: ScreenshotRepo, _user: CurrentUser):
     """List all groups with screenshot counts by processing_status."""
     return await repo.list_groups()
 
 
 @router.get("/groups/{group_id}", response_model=GroupRead, tags=["Groups"])
-async def get_group(group_id: str, repo: ScreenshotRepo):
+async def get_group(group_id: str, repo: ScreenshotRepo, _user: CurrentUser):
     """Get a single group by ID with screenshot counts."""
     group = await repo.get_group(group_id)
     if not group:
@@ -645,7 +646,7 @@ async def get_screenshot_navigation(
 
 
 @router.get("/{screenshot_id}/image")
-async def get_screenshot_image(screenshot_id: int, repo: ScreenshotRepo):
+async def get_screenshot_image(screenshot_id: int, repo: ScreenshotRepo, _user: CurrentUser):
     screenshot = await get_screenshot_or_404(repo, screenshot_id)
 
     # Path traversal protection: ensure file is within UPLOAD_DIR
@@ -1282,7 +1283,7 @@ async def upload_screenshot(
     settings = get_settings()
 
     # Validate API key
-    if api_key != settings.UPLOAD_API_KEY:
+    if not secrets.compare_digest(api_key.encode(), settings.UPLOAD_API_KEY.encode()):
         _raise_upload_error(UploadErrorCode.INVALID_API_KEY, "Invalid API key")
 
     # Validate callback URL if provided
@@ -1368,7 +1369,7 @@ async def upload_screenshots_batch(
     settings = get_settings()
 
     # Validate API key
-    if api_key != settings.UPLOAD_API_KEY:
+    if not secrets.compare_digest(api_key.encode(), settings.UPLOAD_API_KEY.encode()):
         _raise_upload_error(UploadErrorCode.INVALID_API_KEY, "Invalid API key")
 
     # Validate callback URL if provided
@@ -2287,6 +2288,7 @@ async def upload_browser(
 async def get_original_image(
     screenshot_id: int,
     repo: ScreenshotRepo,
+    _user: CurrentUser,
 ):
     """Serve the immutable original image (base_file_path) for crop editing."""
     screenshot = await get_screenshot_or_404(repo, screenshot_id)
@@ -2316,6 +2318,7 @@ async def get_original_image(
 async def get_stage_image(
     screenshot_id: int,
     repo: ScreenshotRepo,
+    _user: CurrentUser,
     stage: str = Query(..., description="Stage whose output to serve (e.g. 'cropping')"),
 ):
     """Serve the output image of a specific preprocessing stage.

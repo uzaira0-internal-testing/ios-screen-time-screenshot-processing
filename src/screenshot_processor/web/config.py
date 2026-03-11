@@ -142,6 +142,19 @@ class Settings(AuthSettingsMixin, BaseSettings):
         description="PHI redaction method: redbox, blackbox, pixelate",
     )
 
+    @field_validator("UPLOAD_API_KEY")
+    @classmethod
+    def reject_insecure_api_key(cls, v: str) -> str:
+        """Reject the insecure default API key in production."""
+        import logging as _logging
+
+        if v == "dev-upload-key-change-in-production":
+            _logging.getLogger(__name__).warning(
+                "UPLOAD_API_KEY is still the insecure default! "
+                "Set a strong random key in production: python -c 'import secrets; print(secrets.token_hex(32))'"
+            )
+        return v
+
     @field_validator("CORS_ORIGINS")
     @classmethod
     def parse_cors_origins(cls, v: str) -> list[str]:

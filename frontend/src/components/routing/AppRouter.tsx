@@ -35,6 +35,7 @@ const PreprocessingPage = React.lazy(() =>
 // Auth guard
 import { useAuthStore } from "@/store/authStore";
 import { useFeatures } from "@/core/hooks/useServices";
+import { useAuth } from "@/hooks/useAuth";
 import { PreprocessingProvider } from "@/hooks/usePreprocessingWithDI";
 
 interface ProtectedRouteProps {
@@ -67,6 +68,20 @@ const ServerOnlyFallback = (
     <span className="inline-block w-6 h-6 border-2 border-slate-300 border-t-primary-600 rounded-full animate-spin" />
   </div>
 );
+
+const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, isAdmin } = useAuth();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!isAdmin) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+};
 
 export const AppRouter: React.FC = () => {
   const features = useFeatures();
@@ -161,11 +176,11 @@ export const AppRouter: React.FC = () => {
       {/* Legacy routes */}
       <Route path="/history" element={<Navigate to="/" replace />} />
       <Route path="/disputed" element={<Navigate to="/consensus" replace />} />
-      {/* Admin (server only) */}
+      {/* Admin (server only, admin role required) */}
       <Route
         path="/admin"
         element={
-          <ProtectedRoute>
+          <AdminRoute>
             {features.admin ? (
               <React.Suspense fallback={ServerOnlyFallback}>
                 <AdminPage />
@@ -173,7 +188,7 @@ export const AppRouter: React.FC = () => {
             ) : (
               <Navigate to="/" replace />
             )}
-          </ProtectedRoute>
+          </AdminRoute>
         }
       />
       <Route

@@ -107,8 +107,8 @@ services:
       # PaddleOCR configuration (fallback with bounding boxes)
       PADDLEOCR_URL: http://cnrc-rtx4090.ad.bcm.edu:8081
       PADDLEOCR_TIMEOUT: "60"
-      # Access password (set to enable login protection)
-      ACCESS_PASSWORD: ${ACCESS_PASSWORD:-}
+      # Site password (set to require password on login)
+      SITE_PASSWORD: ${SITE_PASSWORD:-}
     # Override CMD to use --reload for hot reloading
     command: >
       sh -c "
