@@ -311,9 +311,7 @@ class ScreenshotProcessingService:
                     final_hourly_values = optimized_bar_result.hourly_values
                     final_alignment_score = optimized_bar_result.alignment_score
             elif is_bogus:
-                logger.warning(
-                    f"Rejecting optimization: bar_total=0 but ocr_total={opt_result.ocr_total_minutes}"
-                )
+                logger.warning(f"Rejecting optimization: bar_total=0 but ocr_total={opt_result.ocr_total_minutes}")
 
         # Step 4: Return complete result
         return ProcessingResult(

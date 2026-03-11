@@ -247,7 +247,9 @@ class QueueRepository:
 
         # Combine status counts into a single query using conditional aggregation
         status_counts_stmt = select(
-            func.count(Screenshot.id).filter(Screenshot.processing_status == ProcessingStatus.COMPLETED).label("auto_processed"),
+            func.count(Screenshot.id)
+            .filter(Screenshot.processing_status == ProcessingStatus.COMPLETED)
+            .label("auto_processed"),
             func.count(Screenshot.id).filter(Screenshot.processing_status == ProcessingStatus.PENDING).label("pending"),
             func.count(Screenshot.id).filter(Screenshot.processing_status == ProcessingStatus.FAILED).label("failed"),
             func.count(Screenshot.id).filter(Screenshot.processing_status == ProcessingStatus.SKIPPED).label("skipped"),

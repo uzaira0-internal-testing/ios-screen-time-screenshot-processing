@@ -335,6 +335,7 @@ async def resolve_dispute(
     screenshot.resolved_by_user_id = current_user.id
 
     from sqlalchemy.orm.attributes import flag_modified
+
     flag_modified(screenshot, "extracted_hourly_data")
     flag_modified(screenshot, "resolved_hourly_data")
     await screenshot_repo.db.commit()

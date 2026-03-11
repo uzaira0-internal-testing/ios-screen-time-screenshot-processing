@@ -45,7 +45,9 @@ def detect_device(image_path: Path | str) -> DeviceDetectionResult:
 
         return DeviceDetectionResult(
             detected=result.detected,
-            device_category=result.device_category.value if hasattr(result.device_category, "value") else str(result.device_category),
+            device_category=result.device_category.value
+            if hasattr(result.device_category, "value")
+            else str(result.device_category),
             device_model=result.device_model,
             confidence=result.confidence,
             is_ipad=result.is_ipad,

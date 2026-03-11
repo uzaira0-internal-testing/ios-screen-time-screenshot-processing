@@ -17,30 +17,22 @@ class AnnotationRepository:
 
     async def get_by_id(self, annotation_id: int) -> Annotation | None:
         """Get annotation by ID."""
-        result = await self.db.execute(
-            select(Annotation).where(Annotation.id == annotation_id)
-        )
+        result = await self.db.execute(select(Annotation).where(Annotation.id == annotation_id))
         return result.scalar_one_or_none()
 
     async def get_by_id_for_update(self, annotation_id: int) -> Annotation | None:
         """Get annotation by ID with row lock for safe concurrent updates."""
-        result = await self.db.execute(
-            select(Annotation).where(Annotation.id == annotation_id).with_for_update()
-        )
+        result = await self.db.execute(select(Annotation).where(Annotation.id == annotation_id).with_for_update())
         return result.scalar_one_or_none()
 
     async def get_by_id_with_issues(self, annotation_id: int) -> Annotation | None:
         """Get annotation by ID with issues eagerly loaded."""
         result = await self.db.execute(
-            select(Annotation)
-            .options(selectinload(Annotation.issues))
-            .where(Annotation.id == annotation_id)
+            select(Annotation).options(selectinload(Annotation.issues)).where(Annotation.id == annotation_id)
         )
         return result.scalar_one_or_none()
 
-    async def get_by_user_and_screenshot(
-        self, user_id: int, screenshot_id: int
-    ) -> Annotation | None:
+    async def get_by_user_and_screenshot(self, user_id: int, screenshot_id: int) -> Annotation | None:
         """Get annotation by user and screenshot."""
         result = await self.db.execute(
             select(Annotation).where(
@@ -52,9 +44,7 @@ class AnnotationRepository:
         )
         return result.scalar_one_or_none()
 
-    async def list_by_user(
-        self, user_id: int, skip: int = 0, limit: int = 100
-    ) -> list[Annotation]:
+    async def list_by_user(self, user_id: int, skip: int = 0, limit: int = 100) -> list[Annotation]:
         """Get annotations by user with pagination."""
         result = await self.db.execute(
             select(Annotation)
@@ -69,9 +59,7 @@ class AnnotationRepository:
     async def list_by_screenshot(self, screenshot_id: int) -> list[Annotation]:
         """Get all annotations for a screenshot."""
         result = await self.db.execute(
-            select(Annotation)
-            .options(selectinload(Annotation.user))
-            .where(Annotation.screenshot_id == screenshot_id)
+            select(Annotation).options(selectinload(Annotation.user)).where(Annotation.screenshot_id == screenshot_id)
         )
         return list(result.scalars().all())
 
@@ -80,9 +68,7 @@ class AnnotationRepository:
     ) -> list[Annotation]:
         """Get annotations for a screenshot, optionally filtered by user IDs."""
         stmt = (
-            select(Annotation)
-            .options(selectinload(Annotation.user))
-            .where(Annotation.screenshot_id == screenshot_id)
+            select(Annotation).options(selectinload(Annotation.user)).where(Annotation.screenshot_id == screenshot_id)
         )
         if user_ids:
             stmt = stmt.where(Annotation.user_id.in_(user_ids))
@@ -98,4 +84,3 @@ class AnnotationRepository:
     async def delete(self, annotation: Annotation) -> None:
         """Delete an annotation."""
         await self.db.delete(annotation)
-

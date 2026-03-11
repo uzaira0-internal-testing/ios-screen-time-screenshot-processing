@@ -42,12 +42,14 @@ QueueStateStatus = QueueStateStatusEnum
 
 class IssueSeverity(StrEnum):
     """Issue severity levels"""
+
     BLOCKING = "blocking"
     NON_BLOCKING = "non_blocking"
 
 
 class IssueType(StrEnum):
     """Processing issue types"""
+
     GRID_DETECTION_FAILED = "grid_detection_failed"
     OCR_EXTRACTION_FAILED = "ocr_extraction_failed"
     ALIGNMENT_WARNING = "alignment_warning"
@@ -772,7 +774,9 @@ class ScreenshotUploadRequest(BaseModel):
     device_type: str | None = Field(None, max_length=50)
     source_id: str | None = Field(None, max_length=100)
     filename: str | None = Field(None, max_length=255)
-    original_filepath: str | None = Field(None, max_length=1000, description="Original file path on source system for traceability")
+    original_filepath: str | None = Field(
+        None, max_length=1000, description="Original file path on source system for traceability"
+    )
     screenshot_date: date | None = Field(None, description="Date the screenshot was taken (YYYY-MM-DD)")
 
     # New fields for improved reliability

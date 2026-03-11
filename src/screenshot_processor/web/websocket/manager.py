@@ -36,7 +36,10 @@ class ConnectionManager:
             "username": username,
             "connected_at": datetime.now(UTC).isoformat(),
         }
-        logger.info("User connected", extra={"user_id": user_id, "username": username, "total_connections": len(self.active_connections)})
+        logger.info(
+            "User connected",
+            extra={"user_id": user_id, "username": username, "total_connections": len(self.active_connections)},
+        )
 
         await self.broadcast_except(
             WebSocketEvent.create(
@@ -59,7 +62,10 @@ class ConnectionManager:
             username = self.user_metadata[user_id].get("username")
             del self.user_metadata[user_id]
 
-        logger.info("User disconnected", extra={"user_id": user_id, "username": username, "total_connections": len(self.active_connections)})
+        logger.info(
+            "User disconnected",
+            extra={"user_id": user_id, "username": username, "total_connections": len(self.active_connections)},
+        )
 
         return username
 

@@ -106,6 +106,7 @@ def get_hybrid_ocr_config() -> OCRConfig:
     try:
         from ..web.config import get_settings
         from ..web.database.models import OCREngineType
+
         settings = get_settings()
         return OCRConfig(
             engine_type=settings.OCR_ENGINE_TYPE,
@@ -121,6 +122,7 @@ def get_hybrid_ocr_config() -> OCRConfig:
     except Exception:
         # Fallback for standalone usage (GUI, CLI) without web config
         import os
+
         return OCRConfig(
             use_hybrid=True,
             hybrid_enable_hunyuan=True,

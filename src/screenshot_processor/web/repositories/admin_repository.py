@@ -100,9 +100,7 @@ class AdminRepository:
             select(
                 User,
                 func.count(Annotation.id).label("annotations_count"),
-                func.coalesce(func.avg(Annotation.time_spent_seconds), 0).label(
-                    "avg_time"
-                ),
+                func.coalesce(func.avg(Annotation.time_spent_seconds), 0).label("avg_time"),
             )
             .outerjoin(Annotation, Annotation.user_id == User.id)
             .group_by(User.id)
@@ -177,9 +175,7 @@ class AdminRepository:
 
     async def get_screenshot_ids_for_group(self, group_id: str) -> list[int]:
         """Get all screenshot IDs belonging to a group."""
-        result = await self.db.execute(
-            select(Screenshot.id).where(Screenshot.group_id == group_id)
-        )
+        result = await self.db.execute(select(Screenshot.id).where(Screenshot.group_id == group_id))
         return [row[0] for row in result.fetchall()]
 
     async def delete_group_cascade(self, group_id: str, screenshot_ids: list[int]) -> GroupDeleteCounts:
@@ -200,31 +196,23 @@ class AdminRepository:
 
         if screenshot_ids:
             # Delete annotations
-            result = await self.db.execute(
-                delete(Annotation).where(Annotation.screenshot_id.in_(screenshot_ids))
-            )
+            result = await self.db.execute(delete(Annotation).where(Annotation.screenshot_id.in_(screenshot_ids)))
             annotations_deleted = result.rowcount
 
             # Delete consensus results
             result = await self.db.execute(
-                delete(ConsensusResult).where(
-                    ConsensusResult.screenshot_id.in_(screenshot_ids)
-                )
+                delete(ConsensusResult).where(ConsensusResult.screenshot_id.in_(screenshot_ids))
             )
             consensus_deleted = result.rowcount
 
             # Delete user queue states
             result = await self.db.execute(
-                delete(UserQueueState).where(
-                    UserQueueState.screenshot_id.in_(screenshot_ids)
-                )
+                delete(UserQueueState).where(UserQueueState.screenshot_id.in_(screenshot_ids))
             )
             queue_states_deleted = result.rowcount
 
             # Delete screenshots
-            await self.db.execute(
-                delete(Screenshot).where(Screenshot.group_id == group_id)
-            )
+            await self.db.execute(delete(Screenshot).where(Screenshot.group_id == group_id))
 
         # Delete the group itself
         await self.db.execute(delete(Group).where(Group.id == group_id))
@@ -332,9 +320,7 @@ class AdminRepository:
             .where(Screenshot.processing_status == ProcessingStatus.PROCESSING)
             .values(
                 processing_status=ProcessingStatus.FAILED,
-                processing_issues=[
-                    "Marked as failed by admin: stuck in PROCESSING status"
-                ],
+                processing_issues=["Marked as failed by admin: stuck in PROCESSING status"],
                 processed_at=datetime.now(timezone.utc),
             )
         )
@@ -369,9 +355,7 @@ class AdminRepository:
         screenshot_ids_subquery = select(Screenshot.id)
 
         orphaned_annotations_result = await self.db.execute(
-            select(func.count(Annotation.id)).where(
-                not_(Annotation.screenshot_id.in_(screenshot_ids_subquery))
-            )
+            select(func.count(Annotation.id)).where(not_(Annotation.screenshot_id.in_(screenshot_ids_subquery)))
         )
         orphaned_annotations = orphaned_annotations_result.scalar() or 0
 
@@ -383,9 +367,7 @@ class AdminRepository:
         orphaned_consensus = orphaned_consensus_result.scalar() or 0
 
         orphaned_queue_result = await self.db.execute(
-            select(func.count(UserQueueState.id)).where(
-                not_(UserQueueState.screenshot_id.in_(screenshot_ids_subquery))
-            )
+            select(func.count(UserQueueState.id)).where(not_(UserQueueState.screenshot_id.in_(screenshot_ids_subquery)))
         )
         orphaned_queue_states = orphaned_queue_result.scalar() or 0
 
@@ -406,23 +388,17 @@ class AdminRepository:
         screenshot_ids_subquery = select(Screenshot.id)
 
         result1 = await self.db.execute(
-            delete(Annotation).where(
-                not_(Annotation.screenshot_id.in_(screenshot_ids_subquery))
-            )
+            delete(Annotation).where(not_(Annotation.screenshot_id.in_(screenshot_ids_subquery)))
         )
         deleted_annotations = result1.rowcount
 
         result2 = await self.db.execute(
-            delete(ConsensusResult).where(
-                not_(ConsensusResult.screenshot_id.in_(screenshot_ids_subquery))
-            )
+            delete(ConsensusResult).where(not_(ConsensusResult.screenshot_id.in_(screenshot_ids_subquery)))
         )
         deleted_consensus = result2.rowcount
 
         result3 = await self.db.execute(
-            delete(UserQueueState).where(
-                not_(UserQueueState.screenshot_id.in_(screenshot_ids_subquery))
-            )
+            delete(UserQueueState).where(not_(UserQueueState.screenshot_id.in_(screenshot_ids_subquery)))
         )
         deleted_queue_states = result3.rowcount
 

@@ -104,7 +104,9 @@ def preprocess_screenshot_file(
         phi_count = detection_result.regions_count
 
         if detection_result.phi_detected:
-            redaction_result = redact_phi(cropped_bytes, detection_result.regions, redaction_method=phi_redaction_method)
+            redaction_result = redact_phi(
+                cropped_bytes, detection_result.regions, redaction_method=phi_redaction_method
+            )
             final_bytes = redaction_result.image_bytes
             phi_redacted = redaction_result.regions_redacted > 0
 
@@ -157,7 +159,9 @@ def preprocess_screenshot_sync(
         settings = get_settings()
 
     # Resolve effective values: explicit overrides > settings defaults
-    effective_phi_detection = phi_detection_enabled if phi_detection_enabled is not None else getattr(settings, "PHI_DETECTION_ENABLED", True)
+    effective_phi_detection = (
+        phi_detection_enabled if phi_detection_enabled is not None else getattr(settings, "PHI_DETECTION_ENABLED", True)
+    )
     effective_phi_preset = phi_pipeline_preset or getattr(settings, "PHI_PIPELINE_PRESET", "hipaa_compliant")
     effective_phi_method = phi_redaction_method or getattr(settings, "PHI_REDACTION_METHOD", "redbox")
 
@@ -229,7 +233,10 @@ def preprocess_screenshot_sync(
             preprocessed_path.write_bytes(result.image_bytes)
             preprocessed_file_path = str(preprocessed_path)
             preprocessing_metadata["preprocessed_file_path"] = preprocessed_file_path
-            logger.info("Saved preprocessed image", extra={"screenshot_id": screenshot.id, "preprocessed_path": str(preprocessed_path)})
+            logger.info(
+                "Saved preprocessed image",
+                extra={"screenshot_id": screenshot.id, "preprocessed_path": str(preprocessed_path)},
+            )
         except Exception as e:
             logger.error("Failed to save preprocessed image", extra={"screenshot_id": screenshot.id, "error": str(e)})
 
@@ -247,7 +254,12 @@ def preprocess_screenshot_sync(
 
     logger.info(
         "Preprocessing complete",
-        extra={"screenshot_id": screenshot.id, "was_cropped": result.was_cropped, "phi_detected": result.phi_detected, "phi_redacted": result.phi_redacted},
+        extra={
+            "screenshot_id": screenshot.id,
+            "was_cropped": result.was_cropped,
+            "phi_detected": result.phi_detected,
+            "phi_redacted": result.phi_redacted,
+        },
     )
 
     return {
@@ -318,17 +330,19 @@ def append_event(
     prev_event_id = current.get(stage)
 
     event_id = len(events) + 1
-    events.append({
-        "event_id": event_id,
-        "stage": stage,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "source": source,
-        "params": params,
-        "result": result,
-        "output_file": output_file,
-        "input_file": input_file,
-        "supersedes": prev_event_id,
-    })
+    events.append(
+        {
+            "event_id": event_id,
+            "stage": stage,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "source": source,
+            "params": params,
+            "result": result,
+            "output_file": output_file,
+            "input_file": input_file,
+            "supersedes": prev_event_id,
+        }
+    )
 
     # Update current state
     current[stage] = event_id
@@ -363,17 +377,19 @@ def append_error_event(
     stage_status = pp["stage_status"]
 
     event_id = len(events) + 1
-    events.append({
-        "event_id": event_id,
-        "stage": stage,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "source": source,
-        "params": params,
-        "result": {"error": error_message},
-        "output_file": None,
-        "input_file": input_file,
-        "supersedes": None,
-    })
+    events.append(
+        {
+            "event_id": event_id,
+            "stage": stage,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "source": source,
+            "params": params,
+            "result": {"error": error_message},
+            "output_file": None,
+            "input_file": input_file,
+            "supersedes": None,
+        }
+    )
 
     stage_status[stage] = "failed"
     return event_id
@@ -386,7 +402,7 @@ def invalidate_downstream(screenshot: Any, from_stage: str) -> None:
     current = pp["current_events"]
 
     idx = STAGE_ORDER.index(from_stage)
-    for downstream in STAGE_ORDER[idx + 1:]:
+    for downstream in STAGE_ORDER[idx + 1 :]:
         if current.get(downstream) is not None:
             stage_status[downstream] = "invalidated"
             current[downstream] = None

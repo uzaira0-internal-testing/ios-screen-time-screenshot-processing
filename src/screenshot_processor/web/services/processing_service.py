@@ -83,7 +83,15 @@ def process_screenshot_file(
             detection_method = GridDetectionMethod.LINE_BASED
 
     # Process
-    logger.info("Processing screenshot file", extra={"file_path": file_path, "method": detection_method.value, "fallback": use_fallback, "max_shift": max_shift})
+    logger.info(
+        "Processing screenshot file",
+        extra={
+            "file_path": file_path,
+            "method": detection_method.value,
+            "fallback": use_fallback,
+            "max_shift": max_shift,
+        },
+    )
     result = service.process(
         image_path=file_path,
         image_type=image_type,
@@ -175,13 +183,18 @@ async def process_screenshot_async(
     # Block if current user already verified
     if current_user_id and screenshot.verified_by_user_ids:
         if current_user_id in screenshot.verified_by_user_ids:
-            logger.info("Screenshot verified by user, skipping reprocess", extra={"screenshot_id": screenshot.id, "user_id": current_user_id})
+            logger.info(
+                "Screenshot verified by user, skipping reprocess",
+                extra={"screenshot_id": screenshot.id, "user_id": current_user_id},
+            )
             return {
                 "success": False,
                 "skipped": True,
                 "skip_reason": "verified_by_user",
                 "message": "This screenshot has been verified by you and cannot be reprocessed.",
-                "processing_status": screenshot.processing_status.value if screenshot.processing_status else "completed",
+                "processing_status": screenshot.processing_status.value
+                if screenshot.processing_status
+                else "completed",
             }
 
     # Process file
@@ -198,6 +211,7 @@ async def process_screenshot_async(
     # Update model and commit
     update_screenshot_from_result(screenshot, result)
     from sqlalchemy.orm.attributes import flag_modified
+
     flag_modified(screenshot, "extracted_hourly_data")
     flag_modified(screenshot, "processing_issues")
     await db.commit()
@@ -240,6 +254,7 @@ def process_screenshot_sync(
 
     update_screenshot_from_result(screenshot, result)
     from sqlalchemy.orm.attributes import flag_modified
+
     flag_modified(screenshot, "extracted_hourly_data")
     flag_modified(screenshot, "processing_issues")
     db.commit()
@@ -263,6 +278,4 @@ async def reprocess_screenshot(
     max_shift: int = 0,
 ) -> dict:
     """Reprocess an existing screenshot with optional new parameters."""
-    return await process_screenshot_async(
-        db, screenshot, grid_coords, processing_method, current_user_id, max_shift
-    )
+    return await process_screenshot_async(db, screenshot, grid_coords, processing_method, current_user_id, max_shift)

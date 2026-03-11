@@ -90,10 +90,27 @@ async def update_user(
 
         # Audit logging
         if role is not None and role != old_role:
-            logger.info("Admin changed user role", extra={"audit": True, "admin_username": admin.username, "username": user.username, "old_role": str(old_role), "new_role": role})
+            logger.info(
+                "Admin changed user role",
+                extra={
+                    "audit": True,
+                    "admin_username": admin.username,
+                    "username": user.username,
+                    "old_role": str(old_role),
+                    "new_role": role,
+                },
+            )
         if is_active is not None and is_active != old_active:
             status_str = "activated" if is_active else "deactivated"
-            logger.info("Admin changed user status", extra={"audit": True, "admin_username": admin.username, "username": user.username, "action": status_str})
+            logger.info(
+                "Admin changed user status",
+                extra={
+                    "audit": True,
+                    "admin_username": admin.username,
+                    "username": user.username,
+                    "action": status_str,
+                },
+            )
 
         return UserUpdateResponse(
             id=user.id,
@@ -181,7 +198,16 @@ async def delete_group(
         # Cascade delete all DB rows
         counts = await repo.delete_group_cascade(group_id, screenshot_ids)
 
-        logger.info("Admin deleted group", extra={"audit": True, "admin_username": admin.username, "group_id": group_id, "screenshots_deleted": counts.screenshots_deleted, "annotations_deleted": counts.annotations_deleted})
+        logger.info(
+            "Admin deleted group",
+            extra={
+                "audit": True,
+                "admin_username": admin.username,
+                "group_id": group_id,
+                "screenshots_deleted": counts.screenshots_deleted,
+                "annotations_deleted": counts.annotations_deleted,
+            },
+        )
 
         return DeleteGroupResponse(
             success=True,
@@ -230,9 +256,7 @@ async def recalculate_ocr_totals(
     Admin only.
     """
     try:
-        screenshots = await repo.get_screenshots_missing_ocr_total(
-            group_id=group_id, limit=limit
-        )
+        screenshots = await repo.get_screenshots_missing_ocr_total(group_id=group_id, limit=limit)
 
         total_missing = len(screenshots)
         processed = 0
@@ -245,14 +269,19 @@ async def recalculate_ocr_totals(
                 # Load the image
                 file_path = screenshot.file_path
                 if not Path(file_path).exists():
-                    logger.warning("Screenshot file not found", extra={"screenshot_id": screenshot.id, "file_path": file_path})
+                    logger.warning(
+                        "Screenshot file not found", extra={"screenshot_id": screenshot.id, "file_path": file_path}
+                    )
                     failed += 1
                     continue
 
                 # Read and process the image
                 img = cv2.imread(file_path)
                 if img is None:
-                    logger.warning("Could not read screenshot image", extra={"screenshot_id": screenshot.id, "file_path": file_path})
+                    logger.warning(
+                        "Could not read screenshot image",
+                        extra={"screenshot_id": screenshot.id, "file_path": file_path},
+                    )
                     failed += 1
                     continue
 
@@ -265,7 +294,9 @@ async def recalculate_ocr_totals(
                 if total and total.strip():
                     screenshot.extracted_total = total.strip()
                     updated += 1
-                    logger.info("Extracted OCR total", extra={"screenshot_id": screenshot.id, "extracted_total": total.strip()})
+                    logger.info(
+                        "Extracted OCR total", extra={"screenshot_id": screenshot.id, "extracted_total": total.strip()}
+                    )
                 else:
                     logger.info("No OCR total found", extra={"screenshot_id": screenshot.id})
 
@@ -275,7 +306,16 @@ async def recalculate_ocr_totals(
 
         await repo.db.commit()
 
-        logger.info("Admin recalculated OCR totals", extra={"audit": True, "admin_username": admin.username, "processed": processed, "updated": updated, "failed": failed})
+        logger.info(
+            "Admin recalculated OCR totals",
+            extra={
+                "audit": True,
+                "admin_username": admin.username,
+                "processed": processed,
+                "updated": updated,
+                "failed": failed,
+            },
+        )
 
         return RecalculateOcrTotalResponse(
             success=True,
@@ -384,7 +424,14 @@ async def _bulk_reprocess_task(
 
     _bulk_reprocess_status[status_key].in_progress = False
     _bulk_reprocess_status[status_key].completed_at = time.time()
-    logger.info("Bulk reprocess complete", extra={"group_id": group_id, "succeeded": _bulk_reprocess_status[status_key].succeeded, "failed": _bulk_reprocess_status[status_key].failed})
+    logger.info(
+        "Bulk reprocess complete",
+        extra={
+            "group_id": group_id,
+            "succeeded": _bulk_reprocess_status[status_key].succeeded,
+            "failed": _bulk_reprocess_status[status_key].failed,
+        },
+    )
 
 
 @router.post("/bulk-reprocess", response_model=BulkReprocessResponse)
@@ -408,9 +455,7 @@ async def bulk_reprocess_screenshots(
     Admin only.
     """
     try:
-        screenshot_ids = await repo.get_screenshot_ids_for_reprocess(
-            group_id=group_id, limit=limit
-        )
+        screenshot_ids = await repo.get_screenshot_ids_for_reprocess(group_id=group_id, limit=limit)
 
         if not screenshot_ids:
             return BulkReprocessResponse(
@@ -424,12 +469,21 @@ async def bulk_reprocess_screenshots(
         from screenshot_processor.web.tasks import reprocess_screenshot_task
 
         task_group = celery_group(
-            reprocess_screenshot_task.s(sid, processing_method, max_shift)
-            for sid in screenshot_ids
+            reprocess_screenshot_task.s(sid, processing_method, max_shift) for sid in screenshot_ids
         )
         task_group.apply_async()
 
-        logger.info("Admin queued bulk reprocess via Celery", extra={"audit": True, "admin_username": admin.username, "count": len(screenshot_ids), "group_id": group_id, "processing_method": processing_method, "max_shift": max_shift})
+        logger.info(
+            "Admin queued bulk reprocess via Celery",
+            extra={
+                "audit": True,
+                "admin_username": admin.username,
+                "count": len(screenshot_ids),
+                "group_id": group_id,
+                "processing_method": processing_method,
+                "max_shift": max_shift,
+            },
+        )
 
         return BulkReprocessResponse(
             success=True,
@@ -513,15 +567,24 @@ async def retry_stuck_screenshots(
             from celery import group as celery_group
             from screenshot_processor.web.tasks import process_screenshot_task
 
-            task_group = celery_group(
-                process_screenshot_task.s(sid) for sid in screenshot_ids
-            )
+            task_group = celery_group(process_screenshot_task.s(sid) for sid in screenshot_ids)
             task_group.apply_async()
             requeued = len(screenshot_ids)
 
             logger.info("Requeued PENDING screenshots to Celery", extra={"count": requeued})
 
-        logger.info("Admin retried stuck screenshots", extra={"audit": True, "admin_username": admin.username, "group_id": group_id, "pending_count": stuck_counts.pending_count, "processing_count": stuck_counts.processing_count, "marked_failed": marked_failed, "requeued": requeued})
+        logger.info(
+            "Admin retried stuck screenshots",
+            extra={
+                "audit": True,
+                "admin_username": admin.username,
+                "group_id": group_id,
+                "pending_count": stuck_counts.pending_count,
+                "processing_count": stuck_counts.processing_count,
+                "marked_failed": marked_failed,
+                "requeued": requeued,
+            },
+        )
 
         return RetryStuckResponse(
             success=True,
@@ -587,7 +650,16 @@ async def cleanup_orphaned_entries(request: Request, repo: AdminRepo, admin: Use
     try:
         counts = await repo.cleanup_orphaned_entries()
 
-        logger.info("Admin cleaned up orphaned entries", extra={"audit": True, "admin_username": admin.username, "deleted_annotations": counts.deleted_annotations, "deleted_consensus": counts.deleted_consensus, "deleted_queue_states": counts.deleted_queue_states})
+        logger.info(
+            "Admin cleaned up orphaned entries",
+            extra={
+                "audit": True,
+                "admin_username": admin.username,
+                "deleted_annotations": counts.deleted_annotations,
+                "deleted_consensus": counts.deleted_consensus,
+                "deleted_queue_states": counts.deleted_queue_states,
+            },
+        )
 
         return CleanupResponse(
             success=True,

@@ -111,7 +111,11 @@ router = APIRouter(prefix="/annotations", tags=["Annotations"])
 
 @router.post("/", response_model=AnnotationRead, status_code=status.HTTP_201_CREATED)
 async def create_or_update_annotation(
-    annotation_data: AnnotationCreate, db: DatabaseSession, current_user: CurrentUser, repo: AnnotationRepo, screenshot_repo: ScreenshotRepo
+    annotation_data: AnnotationCreate,
+    db: DatabaseSession,
+    current_user: CurrentUser,
+    repo: AnnotationRepo,
+    screenshot_repo: ScreenshotRepo,
 ):
     """
     Create or update an annotation (upsert).
@@ -168,7 +172,9 @@ async def create_or_update_annotation(
             return AnnotationRead.model_validate(existing)
         else:
             # CREATE new annotation
-            logger.info("User creating annotation", extra={"username": current_user.username, "screenshot_id": screenshot.id})
+            logger.info(
+                "User creating annotation", extra={"username": current_user.username, "screenshot_id": screenshot.id}
+            )
             grid_upper_left_dict, grid_lower_right_dict = convert_grid_coords_to_dicts(annotation_data)
 
             new_annotation = Annotation(
@@ -210,7 +216,12 @@ async def create_or_update_annotation(
 
             logger.info(
                 "Annotation created",
-                extra={"annotation_id": new_annotation.id, "username": current_user.username, "screenshot_id": screenshot.id, "annotation_count": screenshot.current_annotation_count},
+                extra={
+                    "annotation_id": new_annotation.id,
+                    "username": current_user.username,
+                    "screenshot_id": screenshot.id,
+                    "annotation_count": screenshot.current_annotation_count,
+                },
             )
 
             if screenshot.current_annotation_count >= 2:
@@ -223,7 +234,9 @@ async def create_or_update_annotation(
         raise
     except Exception as e:
         await db.rollback()
-        logger.error("Failed to save annotation", extra={"screenshot_id": annotation_data.screenshot_id, "error": str(e)})
+        logger.error(
+            "Failed to save annotation", extra={"screenshot_id": annotation_data.screenshot_id, "error": str(e)}
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to save annotation",
@@ -298,7 +311,9 @@ async def update_annotation(
         await db.commit()
         await db.refresh(annotation)
 
-        logger.info("User updated annotation", extra={"username": current_user.username, "annotation_id": annotation_id})
+        logger.info(
+            "User updated annotation", extra={"username": current_user.username, "annotation_id": annotation_id}
+        )
 
         if annotation.screenshot_id:
             # Lock the screenshot before consensus analysis to prevent race conditions
@@ -320,7 +335,13 @@ async def update_annotation(
 
 
 @router.delete("/{annotation_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_annotation(annotation_id: int, db: DatabaseSession, current_user: CurrentUser, repo: AnnotationRepo, screenshot_repo: ScreenshotRepo):
+async def delete_annotation(
+    annotation_id: int,
+    db: DatabaseSession,
+    current_user: CurrentUser,
+    repo: AnnotationRepo,
+    screenshot_repo: ScreenshotRepo,
+):
     annotation = await repo.get_by_id(annotation_id)
 
     if not annotation:
@@ -361,7 +382,10 @@ async def delete_annotation(annotation_id: int, db: DatabaseSession, current_use
 
         await db.commit()
 
-        logger.info("User deleted annotation", extra={"username": current_user.username, "annotation_id": annotation_id, "screenshot_id": screenshot_id})
+        logger.info(
+            "User deleted annotation",
+            extra={"username": current_user.username, "annotation_id": annotation_id, "screenshot_id": screenshot_id},
+        )
 
     except HTTPException:
         raise

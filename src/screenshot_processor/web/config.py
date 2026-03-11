@@ -142,7 +142,6 @@ class Settings(AuthSettingsMixin, BaseSettings):
         description="PHI redaction method: redbox, blackbox, pixelate",
     )
 
-
     @field_validator("CORS_ORIGINS")
     @classmethod
     def parse_cors_origins(cls, v: str) -> list[str]:

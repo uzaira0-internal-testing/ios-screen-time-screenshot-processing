@@ -174,7 +174,9 @@ def find_screenshot_title(
             x_width = x_origin + int(info_rect[2]) * 12
             app_extract = img[title_origin_y : title_origin_y + app_height, x_origin:x_width]
             title_y_position = title_origin_y + app_height
-            logger.info(f"Title region: INFO at ({info_rect[0]},{info_rect[1]}) size {info_rect[2]}x{info_rect[3]}, extracting y={title_origin_y}:{title_origin_y+app_height}, x={x_origin}:{x_width}")
+            logger.info(
+                f"Title region: INFO at ({info_rect[0]},{info_rect[1]}) size {info_rect[2]}x{info_rect[3]}, extracting y={title_origin_y}:{title_origin_y + app_height}, x={x_origin}:{x_width}"
+            )
         else:
             logger.info("INFO not found, using fallback region")
             app_extract = img[info_rect[0] : info_rect[2], info_rect[1] : info_rect[3]]
@@ -205,10 +207,7 @@ def find_screenshot_title(
     # If longer, it's likely OCR garbage (e.g., HunyuanOCR returning numbered lists)
     MAX_TITLE_LENGTH = 50
     if len(title) > MAX_TITLE_LENGTH:
-        logger.warning(
-            f"Title too long ({len(title)} chars), likely OCR garbage. "
-            f"Truncating: '{title[:30]}...'"
-        )
+        logger.warning(f"Title too long ({len(title)} chars), likely OCR garbage. Truncating: '{title[:30]}...'")
         title = ""  # Treat as no title found rather than garbage
 
     logger.info(f"Found title: {title}, y_position: {title_y_position}")
