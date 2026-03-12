@@ -1,8 +1,22 @@
 import type { Screenshot } from "@/types";
 import type { PreprocessingEventData } from "@/store/preprocessingStore";
-import { StageReviewTable } from "./StageReviewTable";
+import { StageReviewTable, type ResultHeader } from "./StageReviewTable";
 
-const RESULT_HEADERS = ["Device", "Model", "Conf", "Orientation"];
+const RESULT_HEADERS: ResultHeader[] = [
+  { label: "Device", sortKey: "device_category" },
+  { label: "Model", sortKey: "device_model" },
+  { label: "Conf", sortKey: "confidence" },
+  { label: "Orientation", sortKey: "orientation" },
+];
+
+function getResultSortValue(_s: Screenshot, event: PreprocessingEventData | null, sortKey: string): string | number | null {
+  const result = event?.result as Record<string, unknown> | undefined;
+  if (!result) return null;
+  const val = result[sortKey];
+  if (val == null) return null;
+  if (typeof val === "number") return val;
+  return String(val);
+}
 
 function renderResultColumns(_s: Screenshot, event: PreprocessingEventData | null) {
   const result = event?.result as Record<string, unknown> | undefined;
@@ -59,6 +73,7 @@ export const DeviceDetectionTab = () => {
       stage="device_detection"
       resultHeaders={RESULT_HEADERS}
       renderResultColumns={renderResultColumns}
+      getResultSortValue={getResultSortValue}
     />
   );
 };

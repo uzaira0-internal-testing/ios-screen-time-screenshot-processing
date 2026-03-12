@@ -161,6 +161,22 @@ export const PreprocessingQueueView = () => {
     );
   }
 
+  if (activeStage === "ocr") {
+    return (
+      <div className="flex flex-col h-[calc(100vh-8rem)]">
+        <QueueNavigationBar currentScreenshot={currentScreenshot} />
+        <div className="flex-1 min-h-0">
+          <OCRReviewPanel
+            key={currentScreenshot.id}
+            screenshot={currentScreenshot}
+            event={event}
+            onNext={queueNext}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return null;
 };
 
@@ -361,6 +377,110 @@ function RedactionReviewPanel({
 
           {!redactEvent && (
             <p className="text-sm text-slate-400">Redaction has not been run yet for this screenshot.</p>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-3 border-t dark:border-slate-700 space-y-2">
+          <button
+            onClick={() => onNext()}
+            className="w-full px-3 py-2 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Read-only panel for OCR stage — shows image + extracted data */
+function OCRReviewPanel({
+  screenshot,
+  event,
+  onNext,
+}: {
+  screenshot: Screenshot;
+  event: PreprocessingEventData | null;
+  onNext: () => void;
+}) {
+  const result = event?.result as Record<string, unknown> | undefined;
+  const imageUrl = useScreenshotImageUrl(screenshot.id);
+  const status = result?.processing_status as string | undefined;
+  const issues = (result?.issues as string[]) ?? [];
+
+  return (
+    <div className="flex-1 flex overflow-hidden bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 min-h-0">
+      {/* Image */}
+      <div className="flex-1 min-h-0 min-w-0 overflow-hidden flex items-center justify-center p-4">
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={`Screenshot ${screenshot.id}`}
+            style={{ maxHeight: "calc(100vh - 14rem)" }}
+            className="max-w-full object-contain rounded"
+          />
+        ) : (
+          <div className="w-48 h-64 rounded bg-slate-200 dark:bg-slate-600 animate-pulse" />
+        )}
+      </div>
+
+      {/* Metadata sidebar */}
+      <div className="w-72 border-l dark:border-slate-700 flex flex-col">
+        <div className="p-4 space-y-4 flex-1 overflow-y-auto">
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">OCR Results</h3>
+
+          {result ? (
+            <div className="space-y-3 text-sm">
+              <div>
+                <span className="text-slate-500 dark:text-slate-400">Status:</span>{" "}
+                {status === "completed" ? (
+                  <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                    Completed
+                  </span>
+                ) : status === "failed" ? (
+                  <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                    Failed
+                  </span>
+                ) : (
+                  <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700">
+                    {status ?? "Unknown"}
+                  </span>
+                )}
+              </div>
+              <div>
+                <span className="text-slate-500 dark:text-slate-400">Method:</span>{" "}
+                <span className="text-slate-700 dark:text-slate-300">
+                  {(result.processing_method as string) || "\u2014"}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-500 dark:text-slate-400">Title:</span>{" "}
+                <span className="text-slate-700 dark:text-slate-300 font-mono text-xs">
+                  {(result.extracted_title as string) || "\u2014"}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-500 dark:text-slate-400">Total:</span>{" "}
+                <span className="text-slate-700 dark:text-slate-300 font-mono text-xs">
+                  {(result.extracted_total as string) || "\u2014"}
+                </span>
+              </div>
+              {issues.length > 0 && (
+                <div>
+                  <span className="text-slate-500 dark:text-slate-400">Issues:</span>
+                  <ul className="mt-1 space-y-1">
+                    {issues.map((issue, i) => (
+                      <li key={i} className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded px-2 py-1">
+                        {issue}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-400">OCR has not been run yet for this screenshot.</p>
           )}
         </div>
 

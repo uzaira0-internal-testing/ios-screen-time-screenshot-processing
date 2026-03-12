@@ -452,38 +452,52 @@ export class WASMPreprocessingService implements IPreprocessingService {
           gridDetectionError?: string;
         };
 
+        // Detect grid using the user's chosen method first, then fall back to the other
+        const fallbackMethod = ocrMethod === "line_based" ? "ocr_anchored" : "line_based";
+        let grid = await this.processing.detectGrid(blob, imageType, ocrMethod);
+        if (!grid) {
+          grid = await this.processing.detectGrid(blob, imageType, fallbackMethod);
+        }
+
+        if (!grid) {
+          // Both methods failed — record the failure
+          const ppOcr = getPreprocessing(screenshot);
+          const updated = addEvent(ppOcr, stage, "completed", {
+            processing_status: "failed",
+            processing_method: ocrMethod,
+            extracted_title: null,
+            extracted_total: null,
+            grid_detection_confidence: 0,
+            has_blocking_issues: true,
+            issues: ["Failed to detect grid with both line_based and ocr_anchored methods"],
+          });
+          await this.storage.updateScreenshot(id, {
+            processing_metadata: setPreprocessing(screenshot, updated),
+          });
+          break;
+        }
+
         try {
           ocrResult = await this.processing.processImage(blob, {
             imageType,
+            gridCoordinates: grid,
             maxShift: 5,
           });
         } catch (err) {
-          // processImage may throw on grid detection failure — try with the other method
-          const fallbackMethod = ocrMethod === "line_based" ? "ocr_anchored" : "line_based";
-          try {
-            const grid = await this.processing.detectGrid(blob, imageType, fallbackMethod);
-            if (grid) {
-              ocrResult = await this.processing.processImage(blob, { imageType, gridCoordinates: grid, maxShift: 5 });
-            } else {
-              throw err; // fallback also failed
-            }
-          } catch {
-            // Both methods failed — record the failure
-            const ppOcr = getPreprocessing(screenshot);
-            const updated = addEvent(ppOcr, stage, "completed", {
-              processing_status: "failed",
-              processing_method: ocrMethod,
-              extracted_title: null,
-              extracted_total: null,
-              grid_detection_confidence: 0,
-              has_blocking_issues: true,
-              issues: [err instanceof Error ? err.message : String(err)],
-            });
-            await this.storage.updateScreenshot(id, {
-              processing_metadata: setPreprocessing(screenshot, updated),
-            });
-            break;
-          }
+          const ppOcr = getPreprocessing(screenshot);
+          const updated = addEvent(ppOcr, stage, "completed", {
+            processing_status: "failed",
+            processing_method: ocrMethod,
+            extracted_title: null,
+            extracted_total: null,
+            grid_detection_confidence: 0,
+            has_blocking_issues: true,
+            issues: [err instanceof Error ? err.message : String(err)],
+          });
+          await this.storage.updateScreenshot(id, {
+            processing_metadata: setPreprocessing(screenshot, updated),
+          });
+          break;
         }
 
         const ppOcr = getPreprocessing(screenshot);

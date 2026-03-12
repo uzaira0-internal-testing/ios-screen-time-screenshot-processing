@@ -1,8 +1,33 @@
 import type { Screenshot } from "@/types";
 import type { PreprocessingEventData } from "@/store/preprocessingStore";
-import { StageReviewTable } from "./StageReviewTable";
+import { StageReviewTable, type ResultHeader } from "./StageReviewTable";
 
-const RESULT_HEADERS = ["Status", "Title", "Total", "Method", "Issues"];
+const RESULT_HEADERS: ResultHeader[] = [
+  { label: "Status", sortKey: "processing_status" },
+  { label: "Title", sortKey: "extracted_title" },
+  { label: "Total", sortKey: "extracted_total" },
+  { label: "Method", sortKey: "processing_method" },
+  { label: "Issues", sortKey: "issues_count" },
+];
+
+function getResultSortValue(_s: Screenshot, event: PreprocessingEventData | null, sortKey: string): string | number | null {
+  const result = event?.result as Record<string, unknown> | undefined;
+  if (!result) return null;
+  switch (sortKey) {
+    case "processing_status":
+      return (result.processing_status as string) || null;
+    case "extracted_title":
+      return (result.extracted_title as string) || null;
+    case "extracted_total":
+      return (result.extracted_total as string) || null;
+    case "processing_method":
+      return (result.processing_method as string) || null;
+    case "issues_count":
+      return ((result.issues as string[]) ?? []).length;
+    default:
+      return null;
+  }
+}
 
 function OCRTabInner() {
   const renderResultColumns = (_s: Screenshot, event: PreprocessingEventData | null) => {
@@ -60,6 +85,7 @@ function OCRTabInner() {
       stage="ocr"
       resultHeaders={RESULT_HEADERS}
       renderResultColumns={renderResultColumns}
+      getResultSortValue={getResultSortValue}
     />
   );
 }

@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { Screenshot } from "@/types";
 import type { PreprocessingEventData } from "@/store/preprocessingStore";
 import { usePreprocessingStore } from "@/hooks/usePreprocessingWithDI";
-import { StageReviewTable } from "./StageReviewTable";
+import { StageReviewTable, type ResultHeader } from "./StageReviewTable";
 import { CropAdjustModal } from "./CropAdjustModal";
 
 interface CropRect {
@@ -12,7 +12,39 @@ interface CropRect {
   bottom: number;
 }
 
-const RESULT_HEADERS = ["Device", "Cropped", "Patched", "Original Size", "Cropped Size", ""];
+const RESULT_HEADERS: ResultHeader[] = [
+  { label: "Device", sortKey: "crop_device" },
+  { label: "Cropped", sortKey: "was_cropped" },
+  { label: "Patched", sortKey: "was_patched" },
+  { label: "Original Size", sortKey: "original_area" },
+  { label: "Cropped Size", sortKey: "cropped_area" },
+  { label: "" },
+];
+
+function getResultSortValue(s: Screenshot, event: PreprocessingEventData | null, sortKey: string): string | number | null {
+  const result = event?.result as Record<string, unknown> | undefined;
+  if (!result) return null;
+  switch (sortKey) {
+    case "crop_device": {
+      const params = event?.params as Record<string, unknown> | undefined;
+      return (params?.auto_detected_device as string) || s.device_type || null;
+    }
+    case "was_cropped":
+      return result.was_cropped ? 1 : 0;
+    case "was_patched":
+      return result.was_patched ? 1 : 0;
+    case "original_area": {
+      const dims = result.original_dimensions as number[] | undefined;
+      return dims?.length === 2 ? dims[0]! * dims[1]! : null;
+    }
+    case "cropped_area": {
+      const dims = result.cropped_dimensions as number[] | undefined;
+      return dims?.length === 2 ? dims[0]! * dims[1]! : null;
+    }
+    default:
+      return null;
+  }
+}
 
 /** Extract crop bounds from a cropping event result. Auto-crop is right-aligned (removes left sidebar). */
 export function getCropRectFromEvent(event: PreprocessingEventData | null): CropRect | undefined {
@@ -132,6 +164,7 @@ function CroppingTabInner() {
         stage="cropping"
         resultHeaders={RESULT_HEADERS}
         renderResultColumns={renderResultColumns}
+        getResultSortValue={getResultSortValue}
       />
       {cropModalScreenshotId !== null && (
         <CropAdjustModal

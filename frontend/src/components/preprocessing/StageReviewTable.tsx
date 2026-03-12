@@ -4,13 +4,20 @@ import { usePreprocessingStore, useScreenshotImageUrl } from "@/hooks/usePreproc
 import type { Stage, StageStatus, PreprocessingEventData } from "@/store/preprocessingStore";
 import type { Screenshot } from "@/types";
 
-type SortColumn = "id" | "participant" | "status";
 type SortDirection = "asc" | "desc";
+
+export interface ResultHeader {
+  label: string;
+  /** If provided, column is sortable. This key is passed to getResultSortValue. */
+  sortKey?: string;
+}
 
 interface StageReviewTableProps {
   stage: Stage;
   renderResultColumns: (screenshot: Screenshot, event: PreprocessingEventData | null) => React.ReactNode;
-  resultHeaders: string[];
+  resultHeaders: ResultHeader[];
+  /** Return a comparable value for a result column. Strings are compared via localeCompare, numbers numerically. */
+  getResultSortValue?: (screenshot: Screenshot, event: PreprocessingEventData | null, sortKey: string) => string | number | null;
 }
 
 const STATUS_BADGES: Record<StageStatus, { label: string; classes: string }> = {
@@ -40,7 +47,7 @@ export function getCurrentEvent(screenshot: Screenshot, stage: Stage): Preproces
   return events.find((e) => e.event_id === eid) ?? null;
 }
 
-function SortIcon({ column, sortColumn, sortDirection }: { column: SortColumn; sortColumn: SortColumn; sortDirection: SortDirection }) {
+function SortIcon({ column, sortColumn, sortDirection }: { column: string; sortColumn: string; sortDirection: SortDirection }) {
   if (column !== sortColumn) {
     return <span className="text-slate-300 ml-1">&#8597;</span>;
   }
@@ -143,6 +150,7 @@ export const StageReviewTable = ({
   stage,
   renderResultColumns,
   resultHeaders,
+  getResultSortValue,
 }: StageReviewTableProps) => {
   const allScreenshots = usePreprocessingStore((s) => s.screenshots);
   const filter = usePreprocessingStore((s) => s.filter);
@@ -153,10 +161,10 @@ export const StageReviewTable = ({
   const setHighlightedScreenshotId = usePreprocessingStore((s) => s.setHighlightedScreenshotId);
   const enterQueue = usePreprocessingStore((s) => s.enterQueue);
 
-  const [sortColumn, setSortColumn] = useState<SortColumn>("id");
+  const [sortColumn, setSortColumn] = useState<string>("id");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
-  const handleSort = (column: SortColumn) => {
+  const handleSort = (column: string) => {
     if (sortColumn === column) {
       setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
     } else {
@@ -196,12 +204,28 @@ export const StageReviewTable = ({
           cmp = (STATUS_SORT_ORDER[sa] ?? 99) - (STATUS_SORT_ORDER[sb] ?? 99);
           break;
         }
+        default: {
+          // Result column sort via getResultSortValue callback
+          if (getResultSortValue) {
+            const eventA = getCurrentEvent(a, stage);
+            const eventB = getCurrentEvent(b, stage);
+            const valA = getResultSortValue(a, eventA, sortColumn);
+            const valB = getResultSortValue(b, eventB, sortColumn);
+            // nulls sort last
+            if (valA == null && valB == null) cmp = 0;
+            else if (valA == null) cmp = 1;
+            else if (valB == null) cmp = -1;
+            else if (typeof valA === "number" && typeof valB === "number") cmp = valA - valB;
+            else cmp = String(valA).localeCompare(String(valB));
+          }
+          break;
+        }
       }
       return sortDirection === "asc" ? cmp : -cmp;
     });
 
     return sorted;
-  }, [allScreenshots, filter, stage, getScreenshotStageStatus, isScreenshotException, sortColumn, sortDirection]);
+  }, [allScreenshots, filter, stage, getScreenshotStageStatus, isScreenshotException, sortColumn, sortDirection, getResultSortValue]);
 
   // Stable screenshot ID list for queue entry
   const screenshotIds = useMemo(() => screenshots.map((s) => s.id), [screenshots]);
@@ -252,9 +276,16 @@ export const StageReviewTable = ({
             <th className={`${sortableThClass} w-28`} onClick={() => handleSort("status")}>
               Status <SortIcon column="status" sortColumn={sortColumn} sortDirection={sortDirection} />
             </th>
-            {resultHeaders.map((h) => (
-              <th key={h} className="px-3 py-2">{h}</th>
-            ))}
+            {resultHeaders.map((h) => {
+              if (h.sortKey) {
+                return (
+                  <th key={h.label} className={sortableThClass} onClick={() => handleSort(h.sortKey!)}>
+                    {h.label} <SortIcon column={h.sortKey} sortColumn={sortColumn} sortDirection={sortDirection} />
+                  </th>
+                );
+              }
+              return <th key={h.label} className="px-3 py-2">{h.label}</th>;
+            })}
             <th className="px-3 py-2 w-16">Log</th>
           </tr>
         </thead>

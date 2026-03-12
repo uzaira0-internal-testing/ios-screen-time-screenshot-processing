@@ -2,10 +2,30 @@ import { useState } from "react";
 import type { Screenshot } from "@/types";
 import type { PreprocessingEventData } from "@/store/preprocessingStore";
 import { usePreprocessingStore } from "@/hooks/usePreprocessingWithDI";
-import { StageReviewTable } from "./StageReviewTable";
+import { StageReviewTable, type ResultHeader } from "./StageReviewTable";
 import { PHIRegionEditor } from "./PHIRegionEditor";
 
-const RESULT_HEADERS = ["Redacted", "Regions", "Method", ""];
+const RESULT_HEADERS: ResultHeader[] = [
+  { label: "Redacted", sortKey: "redacted" },
+  { label: "Regions", sortKey: "regions_redacted" },
+  { label: "Method", sortKey: "method" },
+  { label: "" },
+];
+
+function getResultSortValue(_s: Screenshot, event: PreprocessingEventData | null, sortKey: string): string | number | null {
+  const result = event?.result as Record<string, unknown> | undefined;
+  if (!result) return null;
+  switch (sortKey) {
+    case "redacted":
+      return result.redacted ? 1 : 0;
+    case "regions_redacted":
+      return (result.regions_redacted as number) ?? 0;
+    case "method":
+      return (result.method as string) || null;
+    default:
+      return null;
+  }
+}
 
 function PHIRedactionTabInner() {
   const [editorScreenshotId, setEditorScreenshotId] = useState<number | null>(null);
@@ -63,6 +83,7 @@ function PHIRedactionTabInner() {
         stage="phi_redaction"
         resultHeaders={RESULT_HEADERS}
         renderResultColumns={renderResultColumns}
+        getResultSortValue={getResultSortValue}
       />
       {editorScreenshotId !== null && (
         <PHIRegionEditor
