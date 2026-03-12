@@ -1,8 +1,9 @@
 /**
  * OCR Utilities - Canvas 2D API Implementation
  *
- * This is a DROP-IN REPLACEMENT for ocr.ts that uses Canvas 2D API
- * instead of OpenCV.js. All function signatures and behaviors are identical.
+ * Port of the server's ocr.py to Canvas 2D API + Tesseract.js.
+ * Follows the same flow: 1 full-image OCR (cached) + 1 small title crop OCR
+ * + 1 small total crop OCR = 3 recognize() calls total.
  *
  * ZERO OpenCV dependencies - pure Canvas 2D API.
  */
@@ -27,6 +28,56 @@ function getWordsFromPage(page: Page) {
     }
   }
   return words;
+}
+
+/** Cached full-image OCR result — equivalent to server's _full_image_ocr_data() */
+interface FullImageOCR {
+  text: string;
+  words: ReturnType<typeof getWordsFromPage>;
+  isDaily: boolean;
+}
+
+/**
+ * Run OCR on the header portion of the image and cache the result.
+ *
+ * Equivalent to server's `_full_image_ocr_data(img)` which runs
+ * `pytesseract.image_to_data(img, config="--psm 3")` once on the full image.
+ *
+ * We crop to just above the grid (when coords provided) since all text anchors
+ * ("INFO", "SCREEN", daily markers) are above the bar chart. Contrast is applied
+ * to strip visual noise, matching the server's preprocessing.
+ */
+export async function recognizeFullImage(
+  worker: TesseractWorker,
+  imageMat: CanvasMat,
+  gridUpperY?: number,
+): Promise<FullImageOCR> {
+  // Crop to just above the grid — all text anchors are in this header region
+  const cropHeight = gridUpperY
+    ? Math.min(gridUpperY + 20, imageMat.height)
+    : Math.ceil(imageMat.height * 0.45);
+  const cropped = extractRegion(imageMat, { x: 0, y: 0, width: imageMat.width, height: cropHeight });
+
+  // Apply contrast to strip visual noise (same as server's preprocessing)
+  const contrasted = adjustContrastBrightness(cropped, 2.0, 0);
+
+  const imageData = matToImageData(contrasted);
+  const { data } = await worker.recognize(imageDataToCanvas(imageData), {}, { blocks: true });
+  const text = data.text;
+  const words = getWordsFromPage(data);
+
+  const upper = text.toUpperCase();
+  let dailyCount = 0;
+  let appCount = 0;
+  for (const marker of PAGE_MARKER_WORDS_DAILY) {
+    if (upper.includes(marker)) dailyCount++;
+  }
+  for (const marker of PAGE_MARKER_WORDS_APP) {
+    if (upper.includes(marker)) appCount++;
+  }
+  const isDaily = dailyCount > appCount;
+
+  return { text, words, isDaily };
 }
 
 const PAGE_MARKER_WORDS_DAILY = [
@@ -55,70 +106,70 @@ const PAGE_MARKER_WORDS_APP = [
 
 /**
  * Determines if screenshot is a daily total page.
- *
- * Identical to OpenCV version.
- *
- * @param worker - Tesseract worker
- * @param imageMat - Source image
- * @returns True if daily total page
+ * Equivalent to server's is_daily_total_page().
  */
 export async function isDailyTotalPage(
   worker: TesseractWorker,
   imageMat: CanvasMat,
+  cachedOCR?: FullImageOCR,
 ): Promise<boolean> {
-  const imageData = matToImageData(imageMat);
+  if (cachedOCR) return cachedOCR.isDaily;
 
+  const ocr = await recognizeFullImage(worker, imageMat);
+  return ocr.isDaily;
+}
+
+/**
+ * OCR a small image region with contrast preprocessing.
+ * Equivalent to server's extract_all_text() which applies
+ * adjust_contrast_brightness(2.0, 0) then runs image_to_data().
+ */
+async function extractAllText(
+  worker: TesseractWorker,
+  region: CanvasMat,
+): Promise<string> {
+  const contrasted = adjustContrastBrightness(region, 2.0, 0);
+  const imageData = matToImageData(contrasted);
   const { data } = await worker.recognize(imageDataToCanvas(imageData));
 
-  const text = data.text.toUpperCase();
-
-  let dailyCount = 0;
-  let appCount = 0;
-
-  for (const marker of PAGE_MARKER_WORDS_DAILY) {
-    if (text.includes(marker)) {
-      dailyCount++;
+  let text = "";
+  if (data.text) {
+    for (const piece of data.text.split(/\s+/)) {
+      if (piece.length > 0) {
+        text = text + " " + piece;
+      }
     }
+    text = text.replace(/\|/g, "").trim();
   }
-
-  for (const marker of PAGE_MARKER_WORDS_APP) {
-    if (text.includes(marker)) {
-      appCount++;
-    }
-  }
-
-  return dailyCount > appCount;
+  return text;
 }
 
 /**
  * Finds screenshot title (app name or "Daily Total").
  *
- * Identical to OpenCV version.
- *
- * @param worker - Tesseract worker
- * @param imageMat - Source image
- * @returns Title and Y position
+ * Matches server's find_screenshot_title():
+ * 1. Use cached full-image OCR words to find "INFO" anchor
+ * 2. Compute title crop region relative to INFO
+ * 3. Run extractAllText() on the small crop
  */
 export async function findScreenshotTitle(
   worker: TesseractWorker,
   imageMat: CanvasMat,
+  cachedOCR?: FullImageOCR,
 ): Promise<{ title: string; titleYPosition: number | null }> {
-  const imageData = matToImageData(imageMat);
+  const ocr = cachedOCR ?? await recognizeFullImage(worker, imageMat);
 
-  const { data } = await worker.recognize(imageDataToCanvas(imageData));
-
-  const isDaily = await isDailyTotalPage(worker, imageMat);
-
-  if (isDaily) {
+  if (ocr.isDaily) {
     return { title: "Daily Total", titleYPosition: null };
   }
 
+  // Server: info_rect = [40, 300, 120, 2000] (left, top, width, height)
   let infoRect: Rect = { x: 40, y: 300, width: 120, height: 2000 };
   let foundInfo = false;
 
-  const words = getWordsFromPage(data);
-  if (words.length > 0) {
-    for (const word of words) {
+  // Server: iterate all words, find last "INFO" match
+  if (ocr.words.length > 0) {
+    for (const word of ocr.words) {
       if (word.text && word.text.toUpperCase().includes("INFO") && word.bbox) {
         infoRect = {
           x: word.bbox.x0,
@@ -127,7 +178,7 @@ export async function findScreenshotTitle(
           height: word.bbox.y1 - word.bbox.y0,
         };
         foundInfo = true;
-        break;
+        // Server doesn't break — takes the last match
       }
     }
   }
@@ -136,6 +187,7 @@ export async function findScreenshotTitle(
   let appExtractRect: Rect;
 
   if (foundInfo) {
+    // Server: app_height = info_rect[3] * 7
     const appHeight = infoRect.height * 7;
     const titleOriginY = infoRect.y + infoRect.height;
     const xOrigin = infoRect.x + Math.floor(1.5 * infoRect.width);
@@ -150,17 +202,21 @@ export async function findScreenshotTitle(
 
     titleYPosition = titleOriginY + appHeight;
   } else {
+    // Server fallback: img[info_rect[0]:info_rect[2], info_rect[1]:info_rect[3]]
+    // which is img[40:120, 300:2000]
     appExtractRect = infoRect;
   }
 
+  // Server: app_find = extract_all_text(app_extract, ocr_config)
   const appExtract = extractRegion(imageMat, appExtractRect);
+  let title = await extractAllText(worker, appExtract);
 
-  const appExtractImageData = matToImageData(appExtract);
-  const { data: titleData } = await worker.recognize(imageDataToCanvas(appExtractImageData));
+  // Server: title.strip("#_ ")
+  title = title.replace(/^[#_ ]+|[#_ ]+$/g, "");
 
-  let title = "";
-  if (titleData.text) {
-    title = titleData.text.replace(/\|/g, "").trim();
+  // Server: MAX_TITLE_LENGTH = 50
+  if (title.length > 50) {
+    title = "";
   }
 
   return { title, titleYPosition };
@@ -169,27 +225,24 @@ export async function findScreenshotTitle(
 /**
  * Finds total usage time from screenshot.
  *
- * Identical to OpenCV version.
- *
- * @param worker - Tesseract worker
- * @param imageMat - Source image
- * @returns Total usage string (e.g., "2h 30m")
+ * Matches server's find_screenshot_total_usage():
+ * 1. Use cached full-image OCR words to find "SCREEN" anchor
+ * 2. Compute total crop region relative to SCREEN
+ * 3. Run extractAllText() on the small crop
+ * 4. Apply normalization and regex fallback
  */
 export async function findScreenshotTotalUsage(
   worker: TesseractWorker,
   imageMat: CanvasMat,
+  cachedOCR?: FullImageOCR,
 ): Promise<string> {
-  const imageData = matToImageData(imageMat);
-
-  const { data } = await worker.recognize(imageDataToCanvas(imageData));
-
-  const isDaily = await isDailyTotalPage(worker, imageMat);
+  const ocr = cachedOCR ?? await recognizeFullImage(worker, imageMat);
 
   let totalRect: Rect | null = null;
 
-  const words = getWordsFromPage(data);
-  if (words.length > 0) {
-    for (const word of words) {
+  // Server: iterate all words, find last "SCREEN" match
+  if (ocr.words.length > 0) {
+    for (const word of ocr.words) {
       if (
         word.text &&
         word.text.toUpperCase().includes("SCREEN") &&
@@ -201,7 +254,7 @@ export async function findScreenshotTotalUsage(
           width: word.bbox.x1 - word.bbox.x0,
           height: word.bbox.y1 - word.bbox.y0,
         };
-        break;
+        // Server doesn't break — takes the last match
       }
     }
   }
@@ -209,7 +262,8 @@ export async function findScreenshotTotalUsage(
   let totalExtractRect: Rect;
 
   if (totalRect) {
-    if (isDaily) {
+    if (ocr.isDaily) {
+      // Server: daily page extraction
       const yOrigin = totalRect.y + totalRect.height + 95;
       const height = Math.floor(totalRect.height * 5);
       const xOrigin = totalRect.x - 50;
@@ -218,42 +272,49 @@ export async function findScreenshotTotalUsage(
       totalExtractRect = {
         x: Math.max(0, xOrigin),
         y: Math.max(0, yOrigin),
-        width: Math.min(width, imageMat.width - xOrigin),
-        height: Math.min(height, imageMat.height - yOrigin),
+        width: Math.min(width, imageMat.width - Math.max(0, xOrigin)),
+        height: Math.min(height, imageMat.height - Math.max(0, yOrigin)),
       };
     } else {
+      // Server: app page extraction — narrow region on left side
       const height = Math.floor(totalRect.height * 6);
       const yOrigin = totalRect.y + totalRect.height + 50;
-      const xOrigin = totalRect.x - 50;
-      const width = Math.floor(totalRect.width * 4);
+      const xOrigin = Math.max(0, totalRect.x - 20);
+      const maxWidth = Math.floor(imageMat.width / 3);
+      const width = Math.min(Math.floor(totalRect.width * 3), maxWidth);
 
       totalExtractRect = {
-        x: Math.max(0, xOrigin),
+        x: xOrigin,
         y: Math.max(0, yOrigin),
         width: Math.min(width, imageMat.width - xOrigin),
-        height: Math.min(height, imageMat.height - yOrigin),
+        height: Math.min(height, imageMat.height - Math.max(0, yOrigin)),
       };
     }
-  } else if (isDaily) {
-    totalExtractRect = { x: 325, y: 30, width: 100, height: 420 };
+  } else if (ocr.isDaily) {
+    // Server fallback: img[325:425, 30:450]
+    totalExtractRect = { x: 30, y: 325, width: 420, height: 100 };
   } else {
-    totalExtractRect = { x: 250, y: 30, width: 100, height: 420 };
+    // Server fallback: img[250:350, 30:450]
+    totalExtractRect = { x: 30, y: 250, width: 420, height: 100 };
   }
 
+  // Server: total_find = extract_all_text(total_extract, ocr_config)
   const totalExtract = extractRegion(imageMat, totalExtractRect);
+  let total = await extractAllText(worker, totalExtract);
 
-  const contrastAdjusted = adjustContrastBrightness(totalExtract, 2.0, 0);
+  // Server: text_piece.replace("Os", "0s")
+  total = total.replace(/Os/g, "0s");
 
-  const totalExtractImageData = matToImageData(contrastAdjusted);
-  const { data: totalData } = await worker.recognize(imageDataToCanvas(totalExtractImageData));
-
-  let total = "";
-  if (totalData.text) {
-    total = totalData.text.replace(/Os/g, "0s").replace(/\|/g, "").trim();
+  // Server: _normalize_ocr_digits(total) then _extract_time_from_text(total)
+  total = normalizeOcrDigits(total);
+  const extracted = extractTimeFromText(total);
+  if (extracted) {
+    total = extracted;
   }
 
+  // Server: regex fallback if no time pattern found
   if (!total || !/\d+\s*[hms]/.test(total)) {
-    const regexTotal = await findScreenshotTotalUsageRegex(worker, imageMat);
+    const regexTotal = findTotalUsageRegex(ocr.text);
     if (regexTotal) {
       return regexTotal;
     }
@@ -263,52 +324,90 @@ export async function findScreenshotTotalUsage(
 }
 
 /**
- * Finds total usage using regex fallback.
- *
- * Identical to OpenCV version.
- *
- * @param worker - Tesseract worker
- * @param imageMat - Source image
- * @returns Total usage string
+ * Normalize common OCR digit misreadings.
+ * Port of server's _normalize_ocr_digits().
  */
-async function findScreenshotTotalUsageRegex(
-  worker: TesseractWorker,
-  imageMat: CanvasMat,
-): Promise<string> {
-  const imageData = matToImageData(imageMat);
+function normalizeOcrDigits(text: string): string {
+  let result = text;
 
-  const { data } = await worker.recognize(imageDataToCanvas(imageData));
+  // I, l, | -> 1
+  result = result.replace(/([Il|])(\s*[hm]\b)/g, "1$2");
+  result = result.replace(/(\d)([Il|])(\s*[hms]\b)/g, "$11$3");
+  result = result.replace(/([Il|])(\d)/g, "1$2");
 
-  const fullImageText = data.text.replace(/Os/g, "0s");
+  // O -> 0
+  result = result.replace(/(O)(\s*[hms]\b)/g, "0$2");
+  result = result.replace(/(\d)(O)(\s*[hms]\b)/g, "$10$3");
+  result = result.replace(/(O)(\d)/g, "0$2");
+  result = result.replace(/(\d)(O)(\d)/g, "$10$3");
 
-  const hourMinPattern = /(\d{1,2})\s*h\s+(\d{1,2})\s*m/;
-  const minSecPattern = /(\d{1,2})\s*m\s+([0O]|\d{1,2})\s*s/;
-  const minOnlyPattern = /(\d{1,2})\s*m\b/;
-  const hoursOnlyPattern = /(\d{1,2})\s*h\b/;
-  const secOnlyPattern = /([0O]|\d{1,2})\s*s\b/;
+  // A -> 4
+  result = result.replace(/(A)(\s*[hm]\b)/g, "4$2");
+  result = result.replace(/(\d)(A)(\s*[hms]\b)/g, "$14$3");
 
-  let match = fullImageText.match(hourMinPattern);
+  // S -> 5 (not when it's the 's' seconds unit)
+  result = result.replace(/(S)(\s*[hm]\b)/g, "5$2");
+  result = result.replace(/(\d)(S)(\s*[hm]\b)/g, "$15$3");
+  result = result.replace(/(S)(\d)/g, "5$2");
+
+  // G, b -> 6
+  result = result.replace(/([Gb])(\s*[hms]\b)/g, "6$2");
+  result = result.replace(/(\d)([Gb])(\s*[hms]\b)/g, "$16$3");
+
+  // B -> 8
+  result = result.replace(/(B)(\s*[hms]\b)/g, "8$2");
+  result = result.replace(/(\d)(B)(\s*[hms]\b)/g, "$18$3");
+
+  // g, q -> 9
+  result = result.replace(/([gq])(\s*[hms]\b)/g, "9$2");
+  result = result.replace(/(\d)([gq])(\s*[hms]\b)/g, "$19$3");
+
+  // Z -> 2
+  result = result.replace(/(Z)(\s*[hms]\b)/g, "2$2");
+  result = result.replace(/(\d)(Z)(\s*[hms]\b)/g, "$12$3");
+
+  // T -> 7
+  result = result.replace(/(T)(\s*[hms]\b)/g, "7$2");
+  result = result.replace(/(\d)(T)(\s*[hms]\b)/g, "$17$3");
+
+  return result;
+}
+
+/**
+ * Extract time duration from text.
+ * Port of server's _extract_time_from_text().
+ */
+function extractTimeFromText(rawText: string): string {
+  const text = normalizeOcrDigits(rawText);
+
+  let match = text.match(/(\d{1,2})\s*h\s*(\d{1,2})\s*m/);
   if (match && match[1] && match[2]) {
     return `${match[1]}h ${match[2]}m`;
   }
 
-  match = fullImageText.match(minSecPattern);
+  // Fallback: "Xh YY" where OCR missed the 'm'
+  match = text.match(/(\d{1,2})\s*h\s+(\d{1,2})(?!\s*[hms])/);
+  if (match && match[1] && match[2]) {
+    return `${match[1]}h ${match[2]}m`;
+  }
+
+  match = text.match(/(\d{1,2})\s*m\s*([0O]|\d{1,2})\s*s/);
   if (match && match[1] && match[2]) {
     const seconds = match[2].replace(/O/g, "0");
     return `${match[1]}m ${seconds}s`;
   }
 
-  match = fullImageText.match(hoursOnlyPattern);
+  match = text.match(/(\d{1,2})\s*h\b/);
   if (match && match[1]) {
     return `${match[1]}h`;
   }
 
-  match = fullImageText.match(minOnlyPattern);
+  match = text.match(/(\d{1,2})\s*m\b/);
   if (match && match[1]) {
     return `${match[1]}m`;
   }
 
-  match = fullImageText.match(secOnlyPattern);
+  match = text.match(/([0O]|\d{1,2})\s*s\b/);
   if (match && match[1]) {
     const seconds = match[1].replace(/O/g, "0");
     return `${seconds}s`;
@@ -317,18 +416,15 @@ async function findScreenshotTotalUsageRegex(
   return "";
 }
 
+/** Extract a time duration from text using regex patterns (no OCR call). */
+function findTotalUsageRegex(rawText: string): string {
+  const text = rawText.replace(/Os/g, "0s");
+  return extractTimeFromText(text);
+}
+
 /**
  * Extracts text from specific ROI coordinates.
- *
- * Identical to OpenCV version.
- *
- * @param worker - Tesseract worker
- * @param imageMat - Source image
- * @param roiX - ROI X coordinate
- * @param roiY - ROI Y coordinate
- * @param roiWidth - ROI width
- * @param roiHeight - ROI height
- * @returns Extracted text and PM flag
+ * Port of server's get_text().
  */
 export async function getText(
   worker: TesseractWorker,
@@ -381,48 +477,20 @@ export async function getText(
   return { text1, text2: secondDate, isPM };
 }
 
-/**
- * Cleans date string.
- *
- * @param dateString - Raw date string
- * @returns Cleaned date string
- */
 function cleanDateString(dateString: string | undefined): string {
   if (!dateString) return "";
   return dateString.replace(/[^a-zA-Z0-9\s]/g, "");
 }
 
-/**
- * Checks if string is a valid date.
- *
- * @param str - String to check
- * @returns True if valid date
- */
 function isDate(str: string): boolean {
   const months = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
   ];
   const pattern = new RegExp(`^(${months.join("|")})\\s+\\d{1,2}$`);
   return pattern.test(str);
 }
 
-/**
- * Gets the day before a given date.
- *
- * @param dateString - Date string (e.g., "Jan 15")
- * @returns Previous day string
- */
 function getDayBefore(dateString: string): string {
   if (!isDate(dateString)) {
     throw new Error("Invalid date string");
@@ -437,18 +505,8 @@ function getDayBefore(dateString: string): string {
   }
 
   const months = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
   ];
   const monthIndex = months.indexOf(monthStr);
 

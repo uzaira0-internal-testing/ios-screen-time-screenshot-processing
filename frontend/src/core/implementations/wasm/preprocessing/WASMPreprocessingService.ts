@@ -434,11 +434,6 @@ export class WASMPreprocessingService implements IPreprocessingService {
 
         const ocrMethod = (options.ocr_method ?? "line_based") as "ocr_anchored" | "line_based";
 
-        // Initialize the processing service if needed
-        if (!this.processing.isInitialized()) {
-          await this.processing.initialize();
-        }
-
         // Determine image type from screenshot metadata
         const metadata = screenshot as unknown as Record<string, unknown>;
         const imageType = (metadata.image_type as "battery" | "screen_time") ?? "screen_time";
@@ -452,7 +447,9 @@ export class WASMPreprocessingService implements IPreprocessingService {
           gridDetectionError?: string;
         };
 
-        // Detect grid using the user's chosen method first, then fall back to the other
+        // Detect grid using the user's chosen method first, then fall back to the other.
+        // Line-based detection doesn't need Tesseract, so we skip initialize() here —
+        // it will be called lazily before processImage() which needs OCR for title/total.
         const fallbackMethod = ocrMethod === "line_based" ? "ocr_anchored" : "line_based";
         let grid = await this.processing.detectGrid(blob, imageType, ocrMethod);
         if (!grid) {
@@ -478,6 +475,10 @@ export class WASMPreprocessingService implements IPreprocessingService {
         }
 
         try {
+          // Initialize Tesseract now — processImage needs it for title/total OCR
+          if (!this.processing.isInitialized()) {
+            await this.processing.initialize();
+          }
           ocrResult = await this.processing.processImage(blob, {
             imageType,
             gridCoordinates: grid,

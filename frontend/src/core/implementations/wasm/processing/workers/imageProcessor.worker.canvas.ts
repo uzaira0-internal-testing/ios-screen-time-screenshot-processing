@@ -21,7 +21,7 @@ import type {
 } from "./types";
 
 import { imageDataToMat, convertDarkMode } from "../imageUtils.canvas";
-import { findScreenshotTitle, findScreenshotTotalUsage } from "../ocr.canvas";
+import { findScreenshotTitle, findScreenshotTotalUsage, recognizeFullImage } from "../ocr.canvas";
 import { extractHourlyData } from "../barExtraction.canvas";
 import { detectGrid } from "../gridDetection.canvas";
 import { detectGridLineBased } from "../lineBasedDetection.canvas";
@@ -126,7 +126,10 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
   });
 
   try {
-    if (!initialized && type !== "INITIALIZE") {
+    // Auto-initialize Tesseract for messages that need OCR.
+    // Skip for INITIALIZE (handled explicitly) and line_based DETECT_GRID (no OCR needed).
+    const isLineBased = type === "DETECT_GRID" && (payload as DetectGridMessage["payload"])?.method === "line_based";
+    if (!initialized && type !== "INITIALIZE" && !isLineBased) {
       console.log("[Worker.onmessage] Not initialized, calling initialize()");
       await initialize();
       console.log("[Worker.onmessage] Initialize complete");
@@ -242,11 +245,19 @@ async function handleProcessImage(
     );
   }
 
-  postProgress("ocr_title", 40, "Extracting title...");
+  // Run OCR on header area (above the grid) once and share the result.
+  // By using grid coordinates to crop precisely, we OCR a much smaller region.
+  postProgress("ocr_title", 40, "Running OCR...");
+  const gridUpperY = gridCoordinates.upper_left.y;
+  console.log("[Worker.handleProcessImage] Running header OCR (above grid y=" + gridUpperY + ")...");
+  const fullOCR = await recognizeFullImage(tesseractWorker, darkModeConverted, gridUpperY);
+  console.log("[Worker.handleProcessImage] Header OCR done, isDaily:", fullOCR.isDaily);
+
   console.log("[Worker.handleProcessImage] Extracting title...");
   const { title } = await findScreenshotTitle(
     tesseractWorker,
     darkModeConverted,
+    fullOCR,
   );
   console.log("[Worker.handleProcessImage] Title extracted:", title);
 
@@ -255,6 +266,7 @@ async function handleProcessImage(
   const total = await findScreenshotTotalUsage(
     tesseractWorker,
     darkModeConverted,
+    fullOCR,
   );
   console.log("[Worker.handleProcessImage] Total extracted:", total);
 
