@@ -2008,7 +2008,11 @@ async def run_phi_detection_stage(
 
     task_group = celery_group(
         phi_detection_task.s(
-            sid, preset=request.phi_pipeline_preset, llm_endpoint=request.llm_endpoint, llm_model=request.llm_model, llm_api_key=request.llm_api_key
+            sid,
+            preset=request.phi_pipeline_preset,
+            llm_endpoint=request.llm_endpoint,
+            llm_model=request.llm_model,
+            llm_api_key=request.llm_api_key,
         )
         for sid in ids
     )
