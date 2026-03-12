@@ -335,9 +335,13 @@ export function createPreprocessingStore(service: IPreprocessingService) {
         options.ocr_method = ocrMethod;
       }
       if (config.isLocalMode) {
-        // WASM mode: report per-screenshot progress via callback
+        // WASM mode: report per-screenshot progress via callback.
+        // Also refresh table data so rows update live during processing.
         options.onProgress = (completed, total) => {
           set({ stageProgress: { completed, total } });
+          // Refresh screenshots + summary from IndexedDB (already updated by processStage)
+          get().loadScreenshots();
+          get().loadSummary();
         };
         options.abortSignal = abortController.signal;
       }
