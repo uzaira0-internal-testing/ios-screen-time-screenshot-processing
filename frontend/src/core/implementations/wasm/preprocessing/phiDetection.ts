@@ -212,8 +212,9 @@ async function ocrWithBboxes(imageBlob: Blob): Promise<{
   imageBitmap.close();
 
   const worker = await getTesseractWorker();
-  // Tesseract.js types expect HTMLCanvasElement but OffscreenCanvas works at runtime
-  const result = await worker.recognize(canvas as unknown as HTMLCanvasElement);
+  // Tesseract.js types expect HTMLCanvasElement but OffscreenCanvas works at runtime.
+  // blocks: true is required — Tesseract.js v7 defaults blocks to false.
+  const result = await worker.recognize(canvas as unknown as HTMLCanvasElement, {}, { blocks: true });
 
   const words: OCRWord[] = [];
   let fullText = "";
