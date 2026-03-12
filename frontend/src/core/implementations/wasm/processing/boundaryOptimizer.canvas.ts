@@ -8,7 +8,7 @@
 
 import type { GridCoordinates, HourlyData } from "@/types";
 import type { CanvasMat } from "./canvasImageUtils";
-import { extractHourlyData } from "./barExtraction.canvas";
+import { extractHourlyData, preprocessForExtraction, extractHourlyDataFromPreprocessed } from "./barExtraction.canvas";
 
 // ---------------------------------------------------------------------------
 // Parse OCR total string to minutes
@@ -174,6 +174,10 @@ export function optimizeBoundaries(
   const origW = initialBounds.lower_right.x - initialBounds.upper_left.x;
   const origH = initialBounds.lower_right.y - initialBounds.upper_left.y;
 
+  // Preprocess the image ONCE (clone → color filter → darken → reduce → scale 4×).
+  // Then each shift iteration only does cheap ROI extraction + bar height analysis.
+  const scaled = preprocessForExtraction(image, initialBounds, isBattery);
+
   // Try different shifts: Y step=1 (fine), X/width step=2 (coarser)
   for (let shiftX = -maxShift; shiftX <= maxShift; shiftX += 2) {
     for (let shiftY = -maxShift; shiftY <= maxShift; shiftY += 1) {
@@ -194,7 +198,7 @@ export function optimizeBoundaries(
           lower_right: { x: newX + newW, y: newY + origH },
         };
 
-        const hourlyData = extractHourlyData(image, testBounds, isBattery);
+        const hourlyData = extractHourlyDataFromPreprocessed(scaled, testBounds);
         const barTotal = sumHourlyData(hourlyData);
         const diff = Math.abs(barTotal - targetMinutes);
 

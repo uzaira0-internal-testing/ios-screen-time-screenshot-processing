@@ -24,9 +24,84 @@ const MAX_MINUTES = 60;
 const LOWER_GRID_BUFFER = 2;
 
 /**
- * Extracts hourly usage data from bar graph.
+ * Preprocesses an image for bar extraction (expensive, do once).
  *
- * Identical to OpenCV version.
+ * Steps: battery color filter → darken → reduce to 2 colors → scale up 4×.
+ * The result can then be used with extractHourlyDataFromPreprocessed()
+ * for fast ROI extraction at different grid offsets.
+ */
+export function preprocessForExtraction(
+  imageMat: CanvasMat,
+  gridCoords: GridCoordinates,
+  isBattery: boolean,
+): CanvasMat {
+  const { upper_left, lower_right } = gridCoords;
+  const roiX = upper_left.x;
+  const roiY = upper_left.y;
+  const roiWidth = lower_right.x - upper_left.x;
+  const roiHeight = lower_right.y - upper_left.y;
+
+  let processedImg = clone(imageMat);
+
+  if (isBattery) {
+    const darkBlueRemoved = removeAllBut(processedImg, [255, 121, 0], 30);
+    processedImg = darkBlueRemoved;
+
+    const roiRegion = extractROI(processedImg, {
+      x: roiX, y: roiY, width: roiWidth, height: roiHeight,
+    });
+
+    let darkBlueSum = 0;
+    const roiPixels = roiRegion.imageData.data;
+    for (let i = 0; i < roiPixels.length; i += 4) {
+      darkBlueSum += 255 - roiPixels[i]!;
+      darkBlueSum += 255 - roiPixels[i + 1]!;
+      darkBlueSum += 255 - roiPixels[i + 2]!;
+    }
+
+    if (darkBlueSum < 10) {
+      processedImg = clone(imageMat);
+      const lightBlueRemoved = removeAllBut(processedImg, [0, 255 - 121, 255], 30);
+      processedImg = lightBlueRemoved;
+    }
+  }
+
+  const darkened = darkenNonWhite(processedImg);
+  const reduced = reduceColorCount(darkened, 2);
+  return scaleUp(reduced, SCALE_AMOUNT);
+}
+
+/**
+ * Extracts hourly data from an already-preprocessed (scaled) image.
+ * This is the fast path — just ROI extraction + bar height analysis.
+ */
+export function extractHourlyDataFromPreprocessed(
+  scaled: CanvasMat,
+  gridCoords: GridCoordinates,
+): HourlyData {
+  const roiX = gridCoords.upper_left.x * SCALE_AMOUNT;
+  const roiY = gridCoords.upper_left.y * SCALE_AMOUNT;
+  const roiWidth = (gridCoords.lower_right.x - gridCoords.upper_left.x) * SCALE_AMOUNT;
+  const roiHeight = (gridCoords.lower_right.y - gridCoords.upper_left.y) * SCALE_AMOUNT;
+
+  const roi = extractROI(scaled, { x: roiX, y: roiY, width: roiWidth, height: roiHeight });
+
+  const hourlyData: HourlyData = {};
+  const sliceWidthFloat = roiWidth / NUM_HOURS;
+
+  for (let hour = 0; hour < NUM_HOURS; hour++) {
+    const sliceX = Math.floor(hour * sliceWidthFloat);
+    const sliceWidth = Math.floor(sliceWidthFloat);
+    const slice = extractROI(roi, { x: sliceX, y: 0, width: sliceWidth, height: roiHeight });
+    const middleColumn = Math.floor(sliceWidth / 2);
+    hourlyData[hour] = analyzeBarHeight(slice, middleColumn, roiHeight);
+  }
+
+  return hourlyData;
+}
+
+/**
+ * Extracts hourly usage data from bar graph.
  *
  * Algorithm:
  * 1. Extract grid region
@@ -36,99 +111,14 @@ const LOWER_GRID_BUFFER = 2;
  * 5. Scale up 4x for better accuracy
  * 6. Divide into 24 hourly slices
  * 7. Analyze bar height in each slice
- *
- * @param imageMat - Source image as CanvasMat
- * @param gridCoords - Grid coordinates (upper_left, lower_right)
- * @param isBattery - True for battery screenshots, false for screen time
- * @returns Hourly data object mapping hour (0-23) to minutes (0-60)
  */
 export function extractHourlyData(
   imageMat: CanvasMat,
   gridCoords: GridCoordinates,
   isBattery: boolean,
 ): HourlyData {
-  const { upper_left, lower_right } = gridCoords;
-
-  const roiX = upper_left.x;
-  const roiY = upper_left.y;
-  const roiWidth = lower_right.x - upper_left.x;
-  const roiHeight = lower_right.y - upper_left.y;
-
-  let processedImg = clone(imageMat);
-
-  if (isBattery) {
-    // Check for dark blue bars ([255, 121, 0] in BGR = [0, 121, 255] in RGB)
-    const darkBlueRemoved = removeAllBut(processedImg, [255, 121, 0], 30);
-    processedImg = darkBlueRemoved;
-
-    const roiRegion = extractROI(processedImg, {
-      x: roiX,
-      y: roiY,
-      width: roiWidth,
-      height: roiHeight,
-    });
-
-    // Calculate sum of dark blue pixels (inverted, so 255 - value)
-    let darkBlueSum = 0;
-    const roiPixels = roiRegion.imageData.data;
-    for (let i = 0; i < roiPixels.length; i += 4) {
-      darkBlueSum += 255 - roiPixels[i]!; // R
-      darkBlueSum += 255 - roiPixels[i + 1]!; // G
-      darkBlueSum += 255 - roiPixels[i + 2]!; // B
-    }
-
-    // If no dark blue bars found, try light blue bars
-    if (darkBlueSum < 10) {
-      processedImg = clone(imageMat);
-      // Light blue: [0, 255-121, 255] in RGB = [0, 134, 255]
-      const lightBlueRemoved = removeAllBut(
-        processedImg,
-        [0, 255 - 121, 255],
-        30,
-      );
-      processedImg = lightBlueRemoved;
-    }
-  }
-
-  const darkened = darkenNonWhite(processedImg);
-
-  const reduced = reduceColorCount(darkened, 2);
-
-  const scaled = scaleUp(reduced, SCALE_AMOUNT);
-
-  const scaledRoiX = roiX * SCALE_AMOUNT;
-  const scaledRoiY = roiY * SCALE_AMOUNT;
-  const scaledRoiWidth = roiWidth * SCALE_AMOUNT;
-  const scaledRoiHeight = roiHeight * SCALE_AMOUNT;
-
-  const roi = extractROI(scaled, {
-    x: scaledRoiX,
-    y: scaledRoiY,
-    width: scaledRoiWidth,
-    height: scaledRoiHeight,
-  });
-
-  const hourlyData: HourlyData = {};
-  const sliceWidthFloat = scaledRoiWidth / NUM_HOURS;
-
-  for (let hour = 0; hour < NUM_HOURS; hour++) {
-    const sliceX = Math.floor(hour * sliceWidthFloat);
-    const sliceWidth = Math.floor(sliceWidthFloat);
-
-    const slice = extractROI(roi, {
-      x: sliceX,
-      y: 0,
-      width: sliceWidth,
-      height: scaledRoiHeight,
-    });
-
-    const middleColumn = Math.floor(sliceWidth / 2);
-    const minutes = analyzeBarHeight(slice, middleColumn, scaledRoiHeight);
-
-    hourlyData[hour] = minutes;
-  }
-
-  return hourlyData;
+  const scaled = preprocessForExtraction(imageMat, gridCoords, isBattery);
+  return extractHourlyDataFromPreprocessed(scaled, gridCoords);
 }
 
 /**
