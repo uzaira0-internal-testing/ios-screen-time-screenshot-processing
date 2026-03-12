@@ -524,16 +524,27 @@ export class WASMPreprocessingService implements IPreprocessingService {
           processing_method: ocrMethod,
           extracted_title: ocrResult.title,
           extracted_total: ocrResult.total,
+          grid_coordinates: ocrResult.gridCoordinates ?? null,
+          extracted_hourly_data: ocrResult.hourlyData ?? null,
           grid_detection_confidence: ocrResult.gridDetectionFailed ? 0 : 1,
           has_blocking_issues: ocrResult.gridDetectionFailed ?? false,
           issues: ocrResult.gridDetectionError ? [ocrResult.gridDetectionError] : [],
         });
 
-        // Also update the screenshot's extracted data for the annotation view
+        // Save all extracted data to the screenshot record so the annotation
+        // queue can read grid coordinates, hourly data, title, and total.
+        const gridCoords = ocrResult.gridCoordinates as { upper_left: { x: number; y: number }; lower_right: { x: number; y: number } } | undefined;
         await this.storage.updateScreenshot(id, {
           processing_metadata: setPreprocessing(screenshot, updated),
           extracted_title: ocrResult.title,
           extracted_total: ocrResult.total,
+          extracted_hourly_data: ocrResult.hourlyData as Record<string, number> | null,
+          grid_upper_left_x: gridCoords?.upper_left?.x ?? null,
+          grid_upper_left_y: gridCoords?.upper_left?.y ?? null,
+          grid_lower_right_x: gridCoords?.lower_right?.x ?? null,
+          grid_lower_right_y: gridCoords?.lower_right?.y ?? null,
+          processing_status: ocrResult.gridDetectionFailed ? "failed" : "completed",
+          processed_at: new Date().toISOString(),
         } as Partial<Screenshot>);
         break;
       }

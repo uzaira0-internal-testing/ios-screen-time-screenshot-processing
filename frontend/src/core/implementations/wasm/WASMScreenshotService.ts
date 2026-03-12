@@ -289,14 +289,17 @@ export class WASMScreenshotService implements IScreenshotService {
       throw new Error("Image blob not found for screenshot " + screenshotId);
     }
 
-    // For line_based, detect grid first with that method, then process with those coords
+    // Detect grid with the requested method, then fall back to the other if it fails
     let gridCoordinates: GridCoordinates | undefined;
-    if (method === "line_based") {
-      const detected = await this.processingService.detectGrid(imageBlob, screenshot.image_type, "line_based");
-      if (detected) {
-        gridCoordinates = detected;
+    const fallbackMethod = method === "line_based" ? "ocr_anchored" : "line_based";
+    const detected = await this.processingService.detectGrid(imageBlob, screenshot.image_type, method);
+    if (detected) {
+      gridCoordinates = detected;
+    } else {
+      const fallback = await this.processingService.detectGrid(imageBlob, screenshot.image_type, fallbackMethod);
+      if (fallback) {
+        gridCoordinates = fallback;
       }
-      // If line-based fails, fall through to process without grid (will auto-detect with OCR)
     }
 
     const processConfig: { imageType: typeof screenshot.image_type; gridCoordinates?: GridCoordinates; maxShift?: number } = {
