@@ -52,6 +52,7 @@ export async function recognizeFullImage(
   imageMat: CanvasMat,
   gridUpperY?: number,
 ): Promise<FullImageOCR> {
+  const _t0 = performance.now();
   // Crop to just above the grid — all text anchors are in this header region
   const cropHeight = gridUpperY
     ? Math.min(gridUpperY + 20, imageMat.height)
@@ -62,7 +63,17 @@ export async function recognizeFullImage(
   const contrasted = adjustContrastBrightness(cropped, 2.0, 0);
 
   const imageData = matToImageData(contrasted);
-  const { data } = await worker.recognize(imageDataToCanvas(imageData), {}, { blocks: true });
+  const _t1 = performance.now();
+  console.log(`[BENCH] recognizeFullImage prep (crop+contrast+toImageData): ${(_t1 - _t0).toFixed(0)}ms`);
+
+  const canvas = imageDataToCanvas(imageData);
+  const _t2 = performance.now();
+  console.log(`[BENCH] recognizeFullImage imageDataToCanvas: ${(_t2 - _t1).toFixed(0)}ms`);
+
+  const { data } = await worker.recognize(canvas, {}, { blocks: true });
+  const _t3 = performance.now();
+  console.log(`[BENCH] recognizeFullImage worker.recognize(): ${(_t3 - _t2).toFixed(0)}ms`);
+
   const text = data.text;
   const words = getWordsFromPage(data);
 
@@ -127,10 +138,15 @@ export async function isDailyTotalPage(
 async function extractAllText(
   worker: TesseractWorker,
   region: CanvasMat,
+  label?: string,
 ): Promise<string> {
+  const _et0 = performance.now();
   const contrasted = adjustContrastBrightness(region, 2.0, 0);
   const imageData = matToImageData(contrasted);
+  const _et1 = performance.now();
   const { data } = await worker.recognize(imageDataToCanvas(imageData));
+  const _et2 = performance.now();
+  console.log(`[BENCH] extractAllText(${label ?? "?"}): prep=${(_et1 - _et0).toFixed(0)}ms, recognize=${(_et2 - _et1).toFixed(0)}ms, region=${region.width}x${region.height}`);
 
   let text = "";
   if (data.text) {
@@ -209,7 +225,7 @@ export async function findScreenshotTitle(
 
   // Server: app_find = extract_all_text(app_extract, ocr_config)
   const appExtract = extractRegion(imageMat, appExtractRect);
-  let title = await extractAllText(worker, appExtract);
+  let title = await extractAllText(worker, appExtract, "title");
 
   // Server: title.strip("#_ ")
   title = title.replace(/^[#_ ]+|[#_ ]+$/g, "");
@@ -300,7 +316,7 @@ export async function findScreenshotTotalUsage(
 
   // Server: total_find = extract_all_text(total_extract, ocr_config)
   const totalExtract = extractRegion(imageMat, totalExtractRect);
-  let total = await extractAllText(worker, totalExtract);
+  let total = await extractAllText(worker, totalExtract, "total");
 
   // Server: text_piece.replace("Os", "0s")
   total = total.replace(/Os/g, "0s");

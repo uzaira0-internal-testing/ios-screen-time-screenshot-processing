@@ -215,70 +215,71 @@ async function handleProcessImage(
     throw new Error("Worker not initialized - Tesseract not available");
   }
 
+  const t0 = performance.now();
+
   postProgress("preprocessing", 10, "Preprocessing image...");
-  console.log("[Worker.handleProcessImage] Converting to CanvasMat");
 
   const mat = imageDataToMat(payload.imageData);
   const darkModeConverted = convertDarkMode(mat);
-  console.log("[Worker.handleProcessImage] Dark mode conversion complete");
+  const t1 = performance.now();
+  console.log(`[BENCH] Preprocessing (mat + dark mode): ${(t1 - t0).toFixed(0)}ms`);
 
   let gridCoordinates = payload.gridCoordinates;
 
   if (!gridCoordinates) {
     postProgress("preprocessing", 30, "Detecting grid...");
-    console.log("[Worker.handleProcessImage] No grid provided, detecting...");
+    const tGrid0 = performance.now();
     const detectedGrid = await detectGrid(
       tesseractWorker,
       darkModeConverted,
     );
+    console.log(`[BENCH] Grid detection: ${(performance.now() - tGrid0).toFixed(0)}ms`);
 
     if (!detectedGrid) {
       throw new Error("Failed to detect grid automatically");
     }
 
     gridCoordinates = detectedGrid;
-    console.log("[Worker.handleProcessImage] Grid detected:", gridCoordinates);
-  } else {
-    console.log(
-      "[Worker.handleProcessImage] Using provided grid:",
-      gridCoordinates,
-    );
   }
 
   // Run OCR on header area (above the grid) once and share the result.
-  // By using grid coordinates to crop precisely, we OCR a much smaller region.
   postProgress("ocr_title", 40, "Running OCR...");
   const gridUpperY = gridCoordinates.upper_left.y;
-  console.log("[Worker.handleProcessImage] Running header OCR (above grid y=" + gridUpperY + ")...");
-  const fullOCR = await recognizeFullImage(tesseractWorker, darkModeConverted, gridUpperY);
-  console.log("[Worker.handleProcessImage] Header OCR done, isDaily:", fullOCR.isDaily);
+  const imgW = darkModeConverted.width;
+  const cropH = Math.min(gridUpperY + 20, darkModeConverted.height);
+  console.log(`[BENCH] Header OCR region: ${imgW}x${cropH} = ${(imgW * cropH / 1000000).toFixed(2)}M pixels`);
 
-  console.log("[Worker.handleProcessImage] Extracting title...");
+  const t2 = performance.now();
+  const fullOCR = await recognizeFullImage(tesseractWorker, darkModeConverted, gridUpperY);
+  const t3 = performance.now();
+  console.log(`[BENCH] recognizeFullImage: ${(t3 - t2).toFixed(0)}ms (found ${fullOCR.words.length} words, isDaily=${fullOCR.isDaily})`);
+
+  const t4 = performance.now();
   const { title } = await findScreenshotTitle(
     tesseractWorker,
     darkModeConverted,
     fullOCR,
   );
-  console.log("[Worker.handleProcessImage] Title extracted:", title);
+  const t5 = performance.now();
+  console.log(`[BENCH] findScreenshotTitle: ${(t5 - t4).toFixed(0)}ms (title="${title}")`);
 
   postProgress("ocr_total", 60, "Extracting total usage...");
-  console.log("[Worker.handleProcessImage] Extracting total...");
+  const t6 = performance.now();
   const total = await findScreenshotTotalUsage(
     tesseractWorker,
     darkModeConverted,
     fullOCR,
   );
-  console.log("[Worker.handleProcessImage] Total extracted:", total);
+  const t7 = performance.now();
+  console.log(`[BENCH] findScreenshotTotalUsage: ${(t7 - t6).toFixed(0)}ms (total="${total}")`);
 
   postProgress("ocr_hourly", 80, "Extracting hourly data...");
-  console.log("[Worker.handleProcessImage] Extracting hourly data...");
+  const t8 = performance.now();
 
   const maxShift = payload.maxShift ?? 0;
   let hourlyData;
 
   if (maxShift > 0 && total) {
-    // Boundary optimization: shift grid to match OCR total
-    console.log(`[Worker.handleProcessImage] Optimizing boundaries (maxShift=${maxShift}, total=${total})`);
     const optResult = optimizeBoundaries(
       darkModeConverted,
       gridCoordinates,
@@ -288,13 +289,6 @@ async function handleProcessImage(
     );
     hourlyData = optResult.hourlyData;
     gridCoordinates = optResult.bounds;
-    console.log("[Worker.handleProcessImage] Optimization result:", {
-      converged: optResult.converged,
-      shift: `(${optResult.shiftX}, ${optResult.shiftY}, ${optResult.shiftWidth})`,
-      barTotal: optResult.barTotalMinutes,
-      ocrTotal: optResult.ocrTotalMinutes,
-      iterations: optResult.iterations,
-    });
   } else {
     hourlyData = extractHourlyData(
       darkModeConverted,
@@ -303,7 +297,9 @@ async function handleProcessImage(
     );
   }
 
-  console.log("[Worker.handleProcessImage] Hourly data extracted:", hourlyData);
+  const t9 = performance.now();
+  console.log(`[BENCH] Hourly data extraction: ${(t9 - t8).toFixed(0)}ms`);
+  console.log(`[BENCH] TOTAL processImage: ${(t9 - t0).toFixed(0)}ms`);
 
   postProgress("complete", 100, "Processing complete");
 
