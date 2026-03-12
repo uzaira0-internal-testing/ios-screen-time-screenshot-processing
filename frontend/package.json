@@ -1,6 +1,6 @@
 {
   "name": "screenshot-annotation-frontend",
-  "version": "1.0.0",
+  "version": "0.3.28",
   "type": "module",
   "scripts": {
     "dev": "bun run server/dev.ts",

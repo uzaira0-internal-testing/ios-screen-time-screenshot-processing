@@ -16,9 +16,12 @@ import {
   Monitor,
   Unplug,
   CheckCircle2,
+  Sliders,
+  RotateCcw,
 } from "lucide-react";
 import { useSyncStore } from "@/core/implementations/wasm/sync";
 import { useThemeStore, THEME_OPTIONS } from "@/store/themeStore";
+import { useSettingsStore } from "@/store/settingsStore";
 import { Card } from "@/components/ui/Card";
 import { Toggle } from "@/components/ui/Toggle";
 
@@ -234,6 +237,132 @@ function SyncSection() {
   );
 }
 
+const MAX_SHIFT_OPTIONS = [
+  { value: 0, label: "Off" },
+  { value: 5, label: "Normal" },
+  { value: 10, label: "Aggressive" },
+] as const;
+
+const GRID_METHOD_OPTIONS = [
+  { value: "line_based" as const, label: "Line-Based" },
+  { value: "ocr_anchored" as const, label: "OCR-Anchored" },
+] as const;
+
+function ProcessingSection() {
+  const { skipDailyTotals, gridDetectionMethod, maxShift, autoProcessOnUpload, set: setSetting, reset } = useSettingsStore();
+
+  return (
+    <Card padding="lg">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <Sliders className="w-6 h-6 text-primary-700 dark:text-primary-400" />
+          <div>
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+              Processing
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Configure how screenshots are processed
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={reset}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 rounded-md hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors focus-ring"
+        >
+          <RotateCcw className="w-3 h-3" />
+          Reset Defaults
+        </button>
+      </div>
+
+      <div className="space-y-5">
+        {/* Skip Daily Totals */}
+        <div className="flex items-center justify-between py-3 border-b border-slate-200 dark:border-slate-700">
+          <div>
+            <div className="font-medium text-slate-900 dark:text-slate-100">
+              Skip Daily Total Images
+            </div>
+            <div className="text-sm text-slate-600 dark:text-slate-400">
+              Automatically skip daily total screenshots during preprocessing
+            </div>
+          </div>
+          <Toggle
+            checked={skipDailyTotals}
+            onChange={(checked) => setSetting("skipDailyTotals", checked)}
+            label="Skip daily totals"
+          />
+        </div>
+
+        {/* Grid Detection Method */}
+        <div className="py-3 border-b border-slate-200 dark:border-slate-700">
+          <div className="font-medium text-slate-900 dark:text-slate-100 mb-1">
+            Grid Detection Method
+          </div>
+          <div className="text-sm text-slate-600 dark:text-slate-400 mb-3">
+            Method used to detect the graph grid boundaries
+          </div>
+          <div className="flex gap-2">
+            {GRID_METHOD_OPTIONS.map(({ value, label }) => (
+              <button
+                key={value}
+                onClick={() => setSetting("gridDetectionMethod", value)}
+                className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors focus-ring ${
+                  gridDetectionMethod === value
+                    ? "bg-primary-50 dark:bg-primary-900/30 border-primary-300 dark:border-primary-700 text-primary-700 dark:text-primary-400"
+                    : "bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Boundary Optimizer */}
+        <div className="py-3 border-b border-slate-200 dark:border-slate-700">
+          <div className="font-medium text-slate-900 dark:text-slate-100 mb-1">
+            Boundary Optimizer
+          </div>
+          <div className="text-sm text-slate-600 dark:text-slate-400 mb-3">
+            How aggressively to optimize grid alignment with OCR total
+          </div>
+          <div className="flex gap-2">
+            {MAX_SHIFT_OPTIONS.map(({ value, label }) => (
+              <button
+                key={value}
+                onClick={() => setSetting("maxShift", value)}
+                className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors focus-ring ${
+                  maxShift === value
+                    ? "bg-primary-50 dark:bg-primary-900/30 border-primary-300 dark:border-primary-700 text-primary-700 dark:text-primary-400"
+                    : "bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Auto-Process on Upload */}
+        <div className="flex items-center justify-between py-3">
+          <div>
+            <div className="font-medium text-slate-900 dark:text-slate-100">
+              Auto-Process on Upload
+            </div>
+            <div className="text-sm text-slate-600 dark:text-slate-400">
+              Automatically run OCR processing when screenshots are uploaded
+            </div>
+          </div>
+          <Toggle
+            checked={autoProcessOnUpload}
+            onChange={(checked) => setSetting("autoProcessOnUpload", checked)}
+            label="Auto-process on upload"
+          />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 export const SettingsPage: React.FC = () => {
   const isLocalMode = config.isLocalMode;
   const modeLabel = config.isTauri ? "Desktop" : "Local (WASM)";
@@ -322,6 +451,9 @@ export const SettingsPage: React.FC = () => {
           </div>
         </Card>
 
+        {/* Processing settings */}
+        <ProcessingSection />
+
         {/* Sync section (WASM mode only) */}
         {isLocalMode && <SyncSection />}
 
@@ -364,7 +496,7 @@ export const SettingsPage: React.FC = () => {
           <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">About</h2>
           <div className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
             <p>
-              <strong>Version:</strong> 1.0.0
+              <strong>Version:</strong> {config.appVersion}
             </p>
             <p>
               <strong>Build:</strong>{" "}

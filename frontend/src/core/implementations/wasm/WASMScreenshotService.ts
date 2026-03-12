@@ -171,6 +171,18 @@ export class WASMScreenshotService implements IScreenshotService {
 
       const screenshot: Screenshot = { ...screenshotData, id };
 
+      // Auto-process if enabled in settings (fire-and-forget)
+      try {
+        const { autoProcessOnUpload } = await import("@/store/settingsStore").then(m => m.useSettingsStore.getState());
+        if (autoProcessOnUpload) {
+          this.processIfNeeded(screenshot).catch((err) =>
+            console.warn("[WASMScreenshotService] Auto-process failed:", err)
+          );
+        }
+      } catch {
+        // Settings store not available — skip auto-process
+      }
+
       return screenshot;
     } finally {
       if (contentHash) {

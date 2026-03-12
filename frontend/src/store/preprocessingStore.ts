@@ -9,6 +9,7 @@ import type {
 } from "@/types";
 import type { IPreprocessingService, RunStageOptions } from "@/core/interfaces/IPreprocessingService";
 import { config } from "@/config";
+import { useSettingsStore } from "@/store/settingsStore";
 import toast from "react-hot-toast";
 
 // Local types not in backend schema (UI-only concerns)
@@ -65,7 +66,7 @@ interface PreprocessingState {
   llmEndpoint: string;
   llmModel: string;
   llmApiKey: string;
-  ocrMethod: string;
+
 
   // Event log detail
   selectedScreenshotId: number | null;
@@ -110,7 +111,7 @@ interface PreprocessingState {
   setLlmEndpoint: (endpoint: string) => void;
   setLlmModel: (model: string) => void;
   setLlmApiKey: (key: string) => void;
-  setOcrMethod: (method: string) => void;
+
 
   loadGroups: () => Promise<void>;
   loadScreenshots: () => Promise<void>;
@@ -173,7 +174,6 @@ export function createPreprocessingStore(service: IPreprocessingService) {
   llmEndpoint: "http://10.23.7.55:1234/v1",
   llmModel: "openai/gpt-oss-20b",
   llmApiKey: "",
-  ocrMethod: "line_based",
   selectedScreenshotId: null,
   eventLog: null,
   isLoading: false,
@@ -216,7 +216,6 @@ export function createPreprocessingStore(service: IPreprocessingService) {
   setLlmEndpoint: (endpoint) => set({ llmEndpoint: endpoint }),
   setLlmModel: (model) => set({ llmModel: model }),
   setLlmApiKey: (key) => set({ llmApiKey: key }),
-  setOcrMethod: (method) => set({ ocrMethod: method }),
 
   loadGroups: async () => {
     try {
@@ -311,7 +310,7 @@ export function createPreprocessingStore(service: IPreprocessingService) {
   },
 
   runStage: async (stage, screenshotIds) => {
-    const { selectedGroupId, phiPreset, redactionMethod, llmEnabled, llmEndpoint, llmModel, llmApiKey, ocrMethod } = get();
+    const { selectedGroupId, phiPreset, redactionMethod, llmEnabled, llmEndpoint, llmModel, llmApiKey } = get();
     if (!selectedGroupId && !screenshotIds) return;
 
     // Capture how many are already completed before this batch starts
@@ -332,7 +331,10 @@ export function createPreprocessingStore(service: IPreprocessingService) {
         if (llmApiKey) options.llm_api_key = llmApiKey;
       }
       if (stage === "ocr") {
-        options.ocr_method = ocrMethod;
+        const settings = useSettingsStore.getState();
+        options.ocr_method = settings.gridDetectionMethod;
+        options.max_shift = settings.maxShift;
+        options.skip_daily_totals = settings.skipDailyTotals;
       }
       if (config.isLocalMode) {
         // WASM mode: report per-screenshot progress via callback.

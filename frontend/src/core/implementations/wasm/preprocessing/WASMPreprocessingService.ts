@@ -498,7 +498,7 @@ export class WASMPreprocessingService implements IPreprocessingService {
           ocrResult = await this.processing.processImage(blob, {
             imageType,
             gridCoordinates: grid,
-            maxShift: 5,
+            maxShift: options.max_shift ?? 5,
           });
           console.log(`[BENCH] OCR stage - processImage: ${(performance.now() - _procT0).toFixed(0)}ms`);
           console.log(`[BENCH] OCR stage - TOTAL: ${(performance.now() - _ocrT0).toFixed(0)}ms`);
@@ -516,6 +516,25 @@ export class WASMPreprocessingService implements IPreprocessingService {
           await this.storage.updateScreenshot(id, {
             processing_metadata: setPreprocessing(screenshot, updated),
           });
+          break;
+        }
+
+        // Auto-skip daily total images if setting is enabled
+        if (options.skip_daily_totals && ocrResult.title === "Daily Total") {
+          const ppSkip = getPreprocessing(screenshot);
+          const skippedEvent = addEvent(ppSkip, stage, "completed", {
+            processing_status: "skipped",
+            processing_method: ocrMethod,
+            extracted_title: "Daily Total",
+            extracted_total: null,
+            is_daily_total: true,
+          });
+          await this.storage.updateScreenshot(id, {
+            processing_metadata: setPreprocessing(screenshot, skippedEvent),
+            extracted_title: "Daily Total",
+            processing_status: "skipped",
+            processed_at: new Date().toISOString(),
+          } as Partial<Screenshot>);
           break;
         }
 

@@ -44,7 +44,6 @@ export const LoginForm = () => {
     useSyncStore.getState().initConfig().then(() => {
       const { serverUrl: savedUrl, sitePassword: savedPw } = useSyncStore.getState();
       if (savedUrl) {
-        setConnectToServer(true);
         setServerUrl(savedUrl);
         setSitePassword(savedPw);
       }

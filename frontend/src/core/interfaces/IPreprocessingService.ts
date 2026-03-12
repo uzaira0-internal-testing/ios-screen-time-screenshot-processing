@@ -32,6 +32,8 @@ export interface RunStageOptions {
   llm_model?: string;
   llm_api_key?: string;
   ocr_method?: string;
+  max_shift?: number;
+  skip_daily_totals?: boolean;
   /** Called after each screenshot completes (WASM mode only). */
   onProgress?: (completed: number, total: number) => void;
   /** Signal to abort processing (WASM mode only). */

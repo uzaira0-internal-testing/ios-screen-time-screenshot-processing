@@ -202,8 +202,6 @@ export const PreprocessingPage = () => {
   const setLlmModel = usePreprocessingStore((s) => s.setLlmModel);
   const llmApiKey = usePreprocessingStore((s) => s.llmApiKey);
   const setLlmApiKey = usePreprocessingStore((s) => s.setLlmApiKey);
-  const ocrMethod = usePreprocessingStore((s) => s.ocrMethod);
-  const setOcrMethod = usePreprocessingStore((s) => s.setOcrMethod);
   const stopPolling = usePreprocessingStore((s) => s.stopPolling);
   const setHighlightedScreenshotId = usePreprocessingStore((s) => s.setHighlightedScreenshotId);
   const setReturnUrl = usePreprocessingStore((s) => s.setReturnUrl);
@@ -387,33 +385,9 @@ export const PreprocessingPage = () => {
               )}
               {activeStage === "ocr" && (
                 <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Method:</span>
-                  <label className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="ocrMethod"
-                      value="line_based"
-                      checked={ocrMethod === "line_based"}
-                      onChange={() => setOcrMethod("line_based")}
-                      className="text-primary-600"
-                    />
-                    Line-Based
-                  </label>
-                  <label className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="ocrMethod"
-                      value="ocr_anchored"
-                      checked={ocrMethod === "ocr_anchored"}
-                      onChange={() => setOcrMethod("ocr_anchored")}
-                      className="text-primary-600"
-                    />
-                    OCR-Anchored
-                  </label>
-                  <span className="text-xs text-slate-400">
-                    {ocrMethod === "line_based"
-                      ? "Detects grid lines via pixel analysis (no OCR dependency)"
-                      : "Finds \"12AM\" and \"60\" text anchors via OCR"}
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    Grid detection method and optimizer settings can be changed in{" "}
+                    <a href="/settings" className="text-primary-600 dark:text-primary-400 hover:underline">Settings</a>
                   </span>
                 </div>
               )}

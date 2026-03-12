@@ -1,3 +1,6 @@
+// App version injected by Vite define at build time (from package.json)
+declare const __APP_VERSION__: string;
+
 // Runtime configuration injected by docker-entrypoint.sh via config.js
 declare global {
   interface Window {
@@ -45,5 +48,8 @@ export const config = {
   /** Whether running in a local-only mode (no backend server) */
   get isLocalMode(): boolean {
     return this.isTauri || !this.hasApi;
+  },
+  get appVersion(): string {
+    return typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
   },
 };
