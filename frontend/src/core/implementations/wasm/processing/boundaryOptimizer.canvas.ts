@@ -10,6 +10,62 @@ import type { GridCoordinates, HourlyData } from "@/types";
 import type { CanvasMat } from "./canvasImageUtils";
 import { extractHourlyData, preprocessForExtraction, extractHourlyDataFromPreprocessed } from "./barExtraction.canvas";
 
+const SCALE_AMOUNT = 4;
+const NUM_HOURS = 24;
+const MAX_MINUTES = 60;
+const LOWER_GRID_BUFFER = 2;
+
+/**
+ * Compute the sum of all 24 bar heights directly from the scaled image buffer.
+ * ZERO allocations — reads pixels via index math on the Uint8ClampedArray.
+ *
+ * This replaces extractHourlyDataFromPreprocessed + sumHourlyData in the
+ * optimizer's inner loop, avoiding 25 ImageData allocations per iteration.
+ */
+function computeBarTotalDirect(
+  data: Uint8ClampedArray,
+  scaledWidth: number,
+  roiX: number,
+  roiY: number,
+  roiWidth: number,
+  roiHeight: number,
+): number {
+  const sliceWidthFloat = roiWidth / NUM_HOURS;
+  const lowerBound = roiHeight - LOWER_GRID_BUFFER;
+  let totalMinutes = 0;
+
+  for (let hour = 0; hour < NUM_HOURS; hour++) {
+    const sliceX = Math.floor(hour * sliceWidthFloat);
+    const sliceW = Math.floor(sliceWidthFloat);
+    // Middle column in absolute scaled-image coordinates
+    const colX = roiX + sliceX + Math.floor(sliceW / 2);
+
+    // Scan top-to-bottom, same logic as analyzeBarHeight
+    let counter = 0;
+    for (let row = 0; row < roiHeight; row++) {
+      const absY = roiY + row;
+      const idx = (absY * scaledWidth + colX) * 4;
+      const r = data[idx]!;
+      const g = data[idx + 1]!;
+      const b = data[idx + 2]!;
+
+      // Black pixel (bar) — all channels 0
+      if (r === 0 && g === 0 && b === 0) {
+        counter++;
+      }
+
+      // White pixel (background) — reset if not near bottom
+      if (row < lowerBound && r >= 253 && g >= 253 && b >= 253) {
+        counter = 0;
+      }
+    }
+
+    totalMinutes += Math.floor((MAX_MINUTES * counter) / roiHeight);
+  }
+
+  return totalMinutes;
+}
+
 // ---------------------------------------------------------------------------
 // Parse OCR total string to minutes
 // ---------------------------------------------------------------------------
@@ -175,10 +231,13 @@ export function optimizeBoundaries(
   const origH = initialBounds.lower_right.y - initialBounds.upper_left.y;
 
   // Preprocess the image ONCE (clone → color filter → darken → reduce → scale 4×).
-  // Then each shift iteration only does cheap ROI extraction + bar height analysis.
   const scaled = preprocessForExtraction(image, initialBounds, isBattery);
+  const scaledData = scaled.imageData.data;
+  const scaledWidth = scaled.width;
 
   // Try different shifts: Y step=1 (fine), X/width step=2 (coarser)
+  // Inner loop uses computeBarTotalDirect for ZERO allocations — reads pixels
+  // directly from the scaled image's Uint8ClampedArray via index math.
   for (let shiftX = -maxShift; shiftX <= maxShift; shiftX += 2) {
     for (let shiftY = -maxShift; shiftY <= maxShift; shiftY += 1) {
       for (let shiftWidth = -maxShift; shiftWidth <= maxShift; shiftWidth += 2) {
@@ -193,13 +252,15 @@ export function optimizeBoundaries(
         if (newX + newW > imgW) continue;
         if (newY + origH > imgH) continue;
 
-        const testBounds: GridCoordinates = {
-          upper_left: { x: newX, y: newY },
-          lower_right: { x: newX + newW, y: newY + origH },
-        };
+        // Compute bar total directly from buffer — no ROI extraction needed
+        const roiX = newX * SCALE_AMOUNT;
+        const roiY = newY * SCALE_AMOUNT;
+        const roiWidth = newW * SCALE_AMOUNT;
+        const roiHeight = origH * SCALE_AMOUNT;
 
-        const hourlyData = extractHourlyDataFromPreprocessed(scaled, testBounds);
-        const barTotal = sumHourlyData(hourlyData);
+        const barTotal = computeBarTotalDirect(
+          scaledData, scaledWidth, roiX, roiY, roiWidth, roiHeight,
+        );
         const diff = Math.abs(barTotal - targetMinutes);
 
         // Tie-breaker: prefer smaller shifts (horizontal penalized 5x)
@@ -210,15 +271,19 @@ export function optimizeBoundaries(
 
         if (isBetter) {
           bestDiff = diff;
-          bestBounds = testBounds;
+          bestBounds = {
+            upper_left: { x: newX, y: newY },
+            lower_right: { x: newX + newW, y: newY + origH },
+          };
           bestBarTotal = barTotal;
           bestShiftX = shiftX;
           bestShiftY = shiftY;
           bestShiftWidth = shiftWidth;
-          bestHourlyData = hourlyData;
 
           // Early exit on exact match at origin
           if (diff === 0 && shiftPenalty === 0) {
+            // Only extract full hourly data for the winning result
+            bestHourlyData = extractHourlyDataFromPreprocessed(scaled, bestBounds);
             return {
               bounds: bestBounds,
               barTotalMinutes: bestBarTotal,
@@ -235,6 +300,9 @@ export function optimizeBoundaries(
       }
     }
   }
+
+  // Extract full hourly data only for the final best result
+  bestHourlyData = extractHourlyDataFromPreprocessed(scaled, bestBounds);
 
   // Apply 7→1 OCR correction
   const { correctedMinutes } = correctOcrTotalWithBarHint(ocrTotal, bestBarTotal);
