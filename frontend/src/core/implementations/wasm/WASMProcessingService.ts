@@ -319,5 +319,7 @@ export class WASMProcessingService implements IProcessingService {
       }
       this.pendingRequests.clear();
     }
+    // Recreate the worker so the service can be used again
+    this.initializeWorker();
   }
 }

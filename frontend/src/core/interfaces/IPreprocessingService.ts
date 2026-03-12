@@ -68,4 +68,6 @@ export interface IPreprocessingService {
   getStageImageUrl(screenshotId: number, stage: string): Promise<string>;
   /** Get the current image URL for a screenshot (latest processed version). */
   getImageUrl(screenshotId: number): Promise<string>;
+  /** Force-stop any in-progress processing (terminates workers). No-op in server mode. */
+  forceStop?(): void;
 }

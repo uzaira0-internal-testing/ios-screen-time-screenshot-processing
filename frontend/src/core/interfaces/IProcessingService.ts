@@ -48,4 +48,7 @@ export interface IProcessingService {
   initialize(): Promise<void>;
 
   isInitialized(): boolean;
+
+  /** Terminate the processing worker. It will be lazily recreated on next use. */
+  terminate(): void;
 }

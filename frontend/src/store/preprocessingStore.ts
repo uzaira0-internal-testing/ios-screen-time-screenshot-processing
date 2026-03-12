@@ -376,6 +376,8 @@ export function createPreprocessingStore(service: IPreprocessingService) {
   stopStage: () => {
     const ac = get()._abortController;
     if (ac) ac.abort();
+    // Force-terminate any in-flight processing workers (WASM mode)
+    if (service.forceStop) service.forceStop();
     get().stopPolling();
     set({ isRunningStage: false, stageProgress: null, _abortController: null });
     toast.success("Stage stopped");

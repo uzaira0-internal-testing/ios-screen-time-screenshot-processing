@@ -131,13 +131,13 @@ export const StageSummaryBar = () => {
         </button>
       )}
 
-      {/* Re-run button — shows when nothing is eligible (all completed or failed) */}
-      {!isRunningStage && eligible === 0 && (counts.completed > 0 || counts.exceptions > 0) && (
+      {/* Reset button — shows whenever there are completed/failed screenshots and not running */}
+      {!isRunningStage && (counts.completed > 0 || counts.exceptions > 0) && (
         <button
           onClick={() => resetStage(activeStage)}
           className="ml-auto px-4 py-1.5 text-sm font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded-md hover:bg-orange-100 transition-colors"
         >
-          Reset & Re-run {stageLabel} ({counts.completed + counts.exceptions})
+          Reset {stageLabel} ({counts.completed + counts.exceptions})
         </button>
       )}
 

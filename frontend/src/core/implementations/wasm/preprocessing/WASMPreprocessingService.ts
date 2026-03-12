@@ -135,6 +135,15 @@ export class WASMPreprocessingService implements IPreprocessingService {
     this.processing = processing;
   }
 
+  forceStop(): void {
+    // Terminate the processing worker (kills any in-flight OCR/grid detection).
+    // It will be lazily recreated on the next processImage/detectGrid call.
+    this.processing.terminate();
+    // Also terminate PHI detection workers
+    terminateNERWorker();
+    terminateTesseractWorker();
+  }
+
   async getGroups(): Promise<Group[]> {
     const screenshots = await this.storage.getAllScreenshots();
     // Group by group_id
