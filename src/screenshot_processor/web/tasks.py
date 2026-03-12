@@ -694,6 +694,98 @@ def phi_redaction_task(self, screenshot_id: int, method: str = "redbox") -> dict
         db.close()
 
 
+@celery_app.task(
+    bind=True,
+    max_retries=2,
+    default_retry_delay=30,
+    soft_time_limit=SOFT_TIME_LIMIT,
+    time_limit=HARD_TIME_LIMIT,
+)
+def ocr_stage_task(
+    self,
+    screenshot_id: int,
+    ocr_method: str = "line_based",
+    max_shift: int = 5,
+) -> dict:
+    """Run batch OCR processing stage (grid detection + title/total + hourly extraction)."""
+    from sqlalchemy.orm.attributes import flag_modified
+
+    from screenshot_processor.web.services.preprocessing_service import (
+        append_error_event,
+        append_event,
+        get_current_input_file,
+        init_preprocessing_metadata,
+        set_stage_running,
+    )
+
+    logger.info(
+        "OCR processing for screenshot",
+        extra={"screenshot_id": screenshot_id, "stage": "ocr", "method": ocr_method},
+    )
+    db = SessionLocal()
+    try:
+        screenshot = db.query(Screenshot).filter(Screenshot.id == screenshot_id).first()
+        if not screenshot:
+            return {"success": False, "error": "Screenshot not found"}
+
+        init_preprocessing_metadata(screenshot)
+        set_stage_running(screenshot, "ocr")
+        flag_modified(screenshot, "processing_metadata")
+        db.commit()
+
+        # Run OCR processing using the existing processing service
+        result = process_screenshot_sync(
+            db,
+            screenshot,
+            processing_method=ocr_method,
+            max_shift=max_shift,
+        )
+
+        result_data = {
+            "processing_status": result.get("processing_status", "unknown"),
+            "processing_method": result.get("processing_method", ocr_method),
+            "extracted_title": result.get("extracted_title"),
+            "extracted_total": result.get("extracted_total"),
+            "grid_detection_confidence": result.get("grid_detection_confidence", 0),
+            "alignment_score": result.get("alignment_score", 0),
+            "has_blocking_issues": result.get("has_blocking_issues", False),
+            "issues": result.get("issues", []),
+        }
+
+        input_file = get_current_input_file(screenshot, "ocr")
+        append_event(
+            screenshot,
+            "ocr",
+            "auto",
+            {"method": ocr_method, "max_shift": max_shift},
+            result_data,
+            input_file=input_file,
+        )
+        flag_modified(screenshot, "processing_metadata")
+        db.commit()
+
+        return {"success": True, "screenshot_id": screenshot_id, "stage": "ocr"}
+
+    except Exception as e:
+        db.rollback()
+        logger.error("OCR processing failed", extra={"screenshot_id": screenshot_id, "stage": "ocr", "error": str(e)})
+        try:
+            screenshot = db.query(Screenshot).filter(Screenshot.id == screenshot_id).first()
+            if screenshot:
+                init_preprocessing_metadata(screenshot)
+                append_error_event(screenshot, "ocr", "auto", {"method": ocr_method}, str(e))
+                flag_modified(screenshot, "processing_metadata")
+                db.commit()
+        except Exception as inner:
+            logger.warning(
+                "Failed to record ocr error event",
+                extra={"screenshot_id": screenshot_id, "inner_error": str(inner)},
+            )
+        return {"success": False, "error": str(e), "screenshot_id": screenshot_id}
+    finally:
+        db.close()
+
+
 @celery_app.task
 def health_check() -> dict:
     """Health check."""

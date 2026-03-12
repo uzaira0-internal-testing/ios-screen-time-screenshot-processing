@@ -7,6 +7,7 @@ const STAGE_LABELS: Record<Stage, string> = {
   cropping: "Cropping",
   phi_detection: "PHI Detection",
   phi_redaction: "PHI Redaction",
+  ocr: "OCR",
 };
 
 const STAGE_NUMBERS: Record<Stage, number> = {
@@ -14,6 +15,7 @@ const STAGE_NUMBERS: Record<Stage, number> = {
   cropping: 2,
   phi_detection: 3,
   phi_redaction: 4,
+  ocr: 5,
 };
 
 export const PreprocessingWizard = () => {

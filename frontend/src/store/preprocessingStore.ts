@@ -12,7 +12,7 @@ import { config } from "@/config";
 import toast from "react-hot-toast";
 
 // Local types not in backend schema (UI-only concerns)
-type Stage = "device_detection" | "cropping" | "phi_detection" | "phi_redaction";
+type Stage = "device_detection" | "cropping" | "phi_detection" | "phi_redaction" | "ocr";
 type StageStatus = "pending" | "completed" | "running" | "failed" | "invalidated";
 type FilterMode = "all" | "needs_review" | "invalidated" | "completed" | "pending";
 type PageMode = "pipeline" | "upload";
@@ -37,6 +37,7 @@ const STAGES: Stage[] = [
   "cropping",
   "phi_detection",
   "phi_redaction",
+  "ocr",
 ];
 
 interface PreprocessingState {
@@ -64,6 +65,7 @@ interface PreprocessingState {
   llmEndpoint: string;
   llmModel: string;
   llmApiKey: string;
+  ocrMethod: string;
 
   // Event log detail
   selectedScreenshotId: number | null;
@@ -108,6 +110,7 @@ interface PreprocessingState {
   setLlmEndpoint: (endpoint: string) => void;
   setLlmModel: (model: string) => void;
   setLlmApiKey: (key: string) => void;
+  setOcrMethod: (method: string) => void;
 
   loadGroups: () => Promise<void>;
   loadScreenshots: () => Promise<void>;
@@ -170,6 +173,7 @@ export function createPreprocessingStore(service: IPreprocessingService) {
   llmEndpoint: "http://10.23.7.55:1234/v1",
   llmModel: "openai/gpt-oss-20b",
   llmApiKey: "",
+  ocrMethod: "line_based",
   selectedScreenshotId: null,
   eventLog: null,
   isLoading: false,
@@ -212,6 +216,7 @@ export function createPreprocessingStore(service: IPreprocessingService) {
   setLlmEndpoint: (endpoint) => set({ llmEndpoint: endpoint }),
   setLlmModel: (model) => set({ llmModel: model }),
   setLlmApiKey: (key) => set({ llmApiKey: key }),
+  setOcrMethod: (method) => set({ ocrMethod: method }),
 
   loadGroups: async () => {
     try {
@@ -306,7 +311,7 @@ export function createPreprocessingStore(service: IPreprocessingService) {
   },
 
   runStage: async (stage, screenshotIds) => {
-    const { selectedGroupId, phiPreset, redactionMethod, llmEnabled, llmEndpoint, llmModel, llmApiKey } = get();
+    const { selectedGroupId, phiPreset, redactionMethod, llmEnabled, llmEndpoint, llmModel, llmApiKey, ocrMethod } = get();
     if (!selectedGroupId && !screenshotIds) return;
 
     // Capture how many are already completed before this batch starts
@@ -325,6 +330,9 @@ export function createPreprocessingStore(service: IPreprocessingService) {
         options.llm_endpoint = llmEndpoint;
         options.llm_model = llmModel;
         if (llmApiKey) options.llm_api_key = llmApiKey;
+      }
+      if (stage === "ocr") {
+        options.ocr_method = ocrMethod;
       }
       if (config.isLocalMode) {
         // WASM mode: report per-screenshot progress via callback

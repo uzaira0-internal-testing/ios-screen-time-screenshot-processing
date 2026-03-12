@@ -45,6 +45,7 @@ from screenshot_processor.web.database import (
     NextScreenshotResponse,
     PHIDetectionStageRequest,
     PHIRedactionStageRequest,
+    OCRStageRequest,
     PHIRegionRect,
     PHIRegionsResponse,
     PreprocessingDetailsResponse,
@@ -1828,7 +1829,7 @@ async def preprocess_screenshots_batch(
 # ============================================================================
 
 
-_STAGE_ORDER = ["device_detection", "cropping", "phi_detection", "phi_redaction"]
+_STAGE_ORDER = ["device_detection", "cropping", "phi_detection", "phi_redaction", "ocr"]
 
 
 async def _get_eligible_screenshot_ids(
@@ -2055,6 +2056,43 @@ async def run_phi_redaction_stage(
         screenshot_ids=ids,
         stage="phi_redaction",
         message=f"PHI redaction queued for {len(ids)} screenshots",
+    )
+
+
+@router.post("/preprocess-stage/ocr", response_model=StagePreprocessResponse)
+async def run_ocr_stage(
+    request: OCRStageRequest,
+    repo: ScreenshotRepo,
+    current_user: CurrentUser,
+):
+    """Queue batch OCR processing (grid detection + title/total + hourly extraction)."""
+    ids = await _get_eligible_screenshot_ids(repo, "ocr", request.group_id, request.screenshot_ids)
+    if not ids:
+        return StagePreprocessResponse(
+            queued_count=0,
+            screenshot_ids=[],
+            stage="ocr",
+            message="No eligible screenshots for OCR processing",
+        )
+
+    from celery import group as celery_group
+
+    from screenshot_processor.web.tasks import ocr_stage_task
+
+    task_group = celery_group(
+        ocr_stage_task.s(sid, ocr_method=request.ocr_method, max_shift=request.max_shift) for sid in ids
+    )
+    task_group.apply_async()
+
+    logger.info(
+        "OCR processing queued",
+        extra={"count": len(ids), "method": request.ocr_method, "username": current_user.username},
+    )
+    return StagePreprocessResponse(
+        queued_count=len(ids),
+        screenshot_ids=ids,
+        stage="ocr",
+        message=f"OCR processing queued for {len(ids)} screenshots",
     )
 
 

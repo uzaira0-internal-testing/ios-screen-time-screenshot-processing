@@ -52,7 +52,8 @@ export function bootstrapWasmServices(_config: AppConfig): ServiceContainer {
 
   container.registerSingleton(TOKENS.PREPROCESSING_PIPELINE_SERVICE, () => {
     const storage = container.resolve<IndexedDBStorageService>(TOKENS.STORAGE_SERVICE);
-    return new WASMPreprocessingService(storage);
+    const processing = container.resolve<WASMProcessingService>(TOKENS.PROCESSING_SERVICE);
+    return new WASMPreprocessingService(storage, processing);
   });
 
   // WASM mode: local processing via Tesseract.js + IndexedDB.

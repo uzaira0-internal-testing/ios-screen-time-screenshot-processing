@@ -631,6 +631,16 @@ class PHIRedactionStageRequest(StagePreprocessRequest):
     phi_redaction_method: str = Field(default="redbox")
 
 
+class OCRStageRequest(StagePreprocessRequest):
+    """OCR batch processing stage with method selection."""
+
+    ocr_method: str = Field(
+        default="line_based",
+        description="Grid detection method: 'line_based' (pixel analysis) or 'ocr_anchored' (text anchor detection)",
+    )
+    max_shift: int = Field(default=5, description="Max boundary shift for grid optimization")
+
+
 class StagePreprocessResponse(BaseModel):
     """Response from a stage preprocessing request."""
 
@@ -692,6 +702,7 @@ class PreprocessingSummary(BaseModel):
     cropping: PreprocessingStageSummary
     phi_detection: PreprocessingStageSummary
     phi_redaction: PreprocessingStageSummary
+    ocr: PreprocessingStageSummary
 
 
 # =============================================================================

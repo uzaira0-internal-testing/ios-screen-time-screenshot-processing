@@ -34,6 +34,7 @@ import { cropScreenshot } from "./cropping";
 import { detectPHI, terminateNERWorker, terminateTesseractWorker } from "./phiDetection";
 import { redactImage } from "./phiRedaction";
 import type { PHIRegion } from "@/core/interfaces/IPreprocessingService";
+import type { IProcessingService } from "@/core/interfaces/IProcessingService";
 import { createObjectURL as cachedCreateObjectURL } from "../storage/opfsBlobStorage";
 
 const STAGES: PreprocessingStage[] = [
@@ -41,6 +42,7 @@ const STAGES: PreprocessingStage[] = [
   "cropping",
   "phi_detection",
   "phi_redaction",
+  "ocr",
 ];
 
 // ---------------------------------------------------------------------------
@@ -127,8 +129,10 @@ function normalizeEvents(events: PreprocessingEvent[]): PreprocessingEvent[] {
 
 export class WASMPreprocessingService implements IPreprocessingService {
   private storage: IndexedDBStorageService;
-  constructor(storage: IndexedDBStorageService) {
+  private processing: IProcessingService;
+  constructor(storage: IndexedDBStorageService, processing: IProcessingService) {
     this.storage = storage;
+    this.processing = processing;
   }
 
   async getGroups(): Promise<Group[]> {
@@ -166,6 +170,7 @@ export class WASMPreprocessingService implements IPreprocessingService {
       cropping: { completed: 0, pending: 0, invalidated: 0, running: 0, failed: 0, exceptions: 0 },
       phi_detection: { completed: 0, pending: 0, invalidated: 0, running: 0, failed: 0, exceptions: 0 },
       phi_redaction: { completed: 0, pending: 0, invalidated: 0, running: 0, failed: 0, exceptions: 0 },
+      ocr: { completed: 0, pending: 0, invalidated: 0, running: 0, failed: 0, exceptions: 0 },
     };
 
     for (const s of screenshots) {
@@ -421,6 +426,83 @@ export class WASMPreprocessingService implements IPreprocessingService {
         await this.storage.updateScreenshot(id, {
           processing_metadata: setPreprocessing(screenshot, updated),
         });
+        break;
+      }
+
+      case "ocr": {
+        if (!blob) throw new Error("No image blob for OCR processing");
+
+        const ocrMethod = (options.ocr_method ?? "line_based") as "ocr_anchored" | "line_based";
+
+        // Initialize the processing service if needed
+        if (!this.processing.isInitialized()) {
+          await this.processing.initialize();
+        }
+
+        // Determine image type from screenshot metadata
+        const metadata = screenshot as unknown as Record<string, unknown>;
+        const imageType = (metadata.image_type as "battery" | "screen_time") ?? "screen_time";
+
+        let ocrResult: {
+          hourlyData: unknown;
+          title: string | null;
+          total: string | null;
+          gridCoordinates?: unknown;
+          gridDetectionFailed?: boolean;
+          gridDetectionError?: string;
+        };
+
+        try {
+          ocrResult = await this.processing.processImage(blob, {
+            imageType,
+            maxShift: 5,
+          });
+        } catch (err) {
+          // processImage may throw on grid detection failure — try with the other method
+          const fallbackMethod = ocrMethod === "line_based" ? "ocr_anchored" : "line_based";
+          try {
+            const grid = await this.processing.detectGrid(blob, imageType, fallbackMethod);
+            if (grid) {
+              ocrResult = await this.processing.processImage(blob, { imageType, gridCoordinates: grid, maxShift: 5 });
+            } else {
+              throw err; // fallback also failed
+            }
+          } catch {
+            // Both methods failed — record the failure
+            const ppOcr = getPreprocessing(screenshot);
+            const updated = addEvent(ppOcr, stage, "completed", {
+              processing_status: "failed",
+              processing_method: ocrMethod,
+              extracted_title: null,
+              extracted_total: null,
+              grid_detection_confidence: 0,
+              has_blocking_issues: true,
+              issues: [err instanceof Error ? err.message : String(err)],
+            });
+            await this.storage.updateScreenshot(id, {
+              processing_metadata: setPreprocessing(screenshot, updated),
+            });
+            break;
+          }
+        }
+
+        const ppOcr = getPreprocessing(screenshot);
+        const updated = addEvent(ppOcr, stage, "completed", {
+          processing_status: ocrResult.gridDetectionFailed ? "failed" : "completed",
+          processing_method: ocrMethod,
+          extracted_title: ocrResult.title,
+          extracted_total: ocrResult.total,
+          grid_detection_confidence: ocrResult.gridDetectionFailed ? 0 : 1,
+          has_blocking_issues: ocrResult.gridDetectionFailed ?? false,
+          issues: ocrResult.gridDetectionError ? [ocrResult.gridDetectionError] : [],
+        });
+
+        // Also update the screenshot's extracted data for the annotation view
+        await this.storage.updateScreenshot(id, {
+          processing_metadata: setPreprocessing(screenshot, updated),
+          extracted_title: ocrResult.title,
+          extracted_total: ocrResult.total,
+        } as Partial<Screenshot>);
         break;
       }
     }

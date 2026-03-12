@@ -566,6 +566,7 @@ export const api = {
         llm_endpoint?: string;
         llm_model?: string;
         llm_api_key?: string;
+        ocr_method?: string;
       },
     ) {
       const stageUrlMap: Record<string, string> = {
@@ -573,6 +574,7 @@ export const api = {
         cropping: "/api/v1/screenshots/preprocess-stage/cropping",
         phi_detection: "/api/v1/screenshots/preprocess-stage/phi-detection",
         phi_redaction: "/api/v1/screenshots/preprocess-stage/phi-redaction",
+        ocr: "/api/v1/screenshots/preprocess-stage/ocr",
       };
       const url = stageUrlMap[stage];
       if (!url) throw new Error(`Unknown stage: ${stage}`);
@@ -590,6 +592,9 @@ export const api = {
       }
       if (stage === "phi_redaction") {
         body.phi_redaction_method = options.phi_redaction_method ?? "redbox";
+      }
+      if (stage === "ocr") {
+        body.ocr_method = options.ocr_method ?? "line_based";
       }
 
       const response = await authFetch(url, {

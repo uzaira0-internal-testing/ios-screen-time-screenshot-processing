@@ -9,7 +9,7 @@ import type {
   PHIRegionRect,
 } from "@/types";
 
-export type PreprocessingStage = "device_detection" | "cropping" | "phi_detection" | "phi_redaction";
+export type PreprocessingStage = "device_detection" | "cropping" | "phi_detection" | "phi_redaction" | "ocr";
 
 /** A PHI region detected in an image, with bounding box and metadata. */
 export interface PHIRegion {
@@ -31,6 +31,7 @@ export interface RunStageOptions {
   llm_endpoint?: string;
   llm_model?: string;
   llm_api_key?: string;
+  ocr_method?: string;
   /** Called after each screenshot completes (WASM mode only). */
   onProgress?: (completed: number, total: number) => void;
   /** Signal to abort processing (WASM mode only). */

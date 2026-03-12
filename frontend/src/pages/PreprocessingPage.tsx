@@ -9,6 +9,7 @@ import { DeviceDetectionTab } from "@/components/preprocessing/DeviceDetectionTa
 import { CroppingTab } from "@/components/preprocessing/CroppingTab";
 import { PHIDetectionTab } from "@/components/preprocessing/PHIDetectionTab";
 import { PHIRedactionTab } from "@/components/preprocessing/PHIRedactionTab";
+import { OCRTab } from "@/components/preprocessing/OCRTab";
 import { EventLogPanel } from "@/components/preprocessing/EventLogPanel";
 import { PreprocessingQueueView } from "@/components/preprocessing/PreprocessingQueueView";
 import { usePreprocessingPipelineService } from "@/core";
@@ -201,6 +202,8 @@ export const PreprocessingPage = () => {
   const setLlmModel = usePreprocessingStore((s) => s.setLlmModel);
   const llmApiKey = usePreprocessingStore((s) => s.llmApiKey);
   const setLlmApiKey = usePreprocessingStore((s) => s.setLlmApiKey);
+  const ocrMethod = usePreprocessingStore((s) => s.ocrMethod);
+  const setOcrMethod = usePreprocessingStore((s) => s.setOcrMethod);
   const stopPolling = usePreprocessingStore((s) => s.stopPolling);
   const setHighlightedScreenshotId = usePreprocessingStore((s) => s.setHighlightedScreenshotId);
   const setReturnUrl = usePreprocessingStore((s) => s.setReturnUrl);
@@ -213,7 +216,7 @@ export const PreprocessingPage = () => {
     return () => stopPolling();
   }, [loadGroups, stopPolling]);
 
-  const VALID_STAGES = ["device_detection", "cropping", "phi_detection", "phi_redaction"];
+  const VALID_STAGES = ["device_detection", "cropping", "phi_detection", "phi_redaction", "ocr"];
 
   // Restore state from URL params on mount
   useEffect(() => {
@@ -323,7 +326,7 @@ export const PreprocessingPage = () => {
           <PreprocessingWizard />
 
           {/* Options - show preset/method controls for PHI stages */}
-          {(activeStage === "phi_detection" || activeStage === "phi_redaction") && (
+          {(activeStage === "phi_detection" || activeStage === "phi_redaction" || activeStage === "ocr") && (
             <div className="mt-3 flex flex-wrap items-center gap-4 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
               {activeStage === "phi_detection" && (
                 <>
@@ -382,6 +385,38 @@ export const PreprocessingPage = () => {
                   </select>
                 </div>
               )}
+              {activeStage === "ocr" && (
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Method:</span>
+                  <label className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="ocrMethod"
+                      value="line_based"
+                      checked={ocrMethod === "line_based"}
+                      onChange={() => setOcrMethod("line_based")}
+                      className="text-primary-600"
+                    />
+                    Line-Based
+                  </label>
+                  <label className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="ocrMethod"
+                      value="ocr_anchored"
+                      checked={ocrMethod === "ocr_anchored"}
+                      onChange={() => setOcrMethod("ocr_anchored")}
+                      className="text-primary-600"
+                    />
+                    OCR-Anchored
+                  </label>
+                  <span className="text-xs text-slate-400">
+                    {ocrMethod === "line_based"
+                      ? "Detects grid lines via pixel analysis (no OCR dependency)"
+                      : "Finds \"12AM\" and \"60\" text anchors via OCR"}
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
@@ -404,6 +439,7 @@ export const PreprocessingPage = () => {
                 <div className={activeStage === "cropping" ? "" : "hidden"}><CroppingTab /></div>
                 <div className={activeStage === "phi_detection" ? "" : "hidden"}><PHIDetectionTab /></div>
                 <div className={activeStage === "phi_redaction" ? "" : "hidden"}><PHIRedactionTab /></div>
+                <div className={activeStage === "ocr" ? "" : "hidden"}><OCRTab /></div>
               </>
             )}
           </div>

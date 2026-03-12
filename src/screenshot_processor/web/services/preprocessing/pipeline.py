@@ -277,7 +277,7 @@ def preprocess_screenshot_sync(
 # Event log management — composable per-stage pipeline
 # =============================================================================
 
-STAGE_ORDER = ["device_detection", "cropping", "phi_detection", "phi_redaction"]
+STAGE_ORDER = ["device_detection", "cropping", "phi_detection", "phi_redaction", "ocr"]
 
 # Stages that produce an output file (others are metadata-only)
 STAGE_FILE_SUFFIX = {

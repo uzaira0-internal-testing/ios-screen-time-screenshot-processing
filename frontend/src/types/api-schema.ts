@@ -711,6 +711,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/screenshots/preprocess-stage/ocr": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Ocr Stage
+         * @description Queue batch OCR processing (grid detection + title/total + hourly extraction).
+         */
+        post: operations["run_ocr_stage_api_v1_screenshots_preprocess_stage_ocr_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/screenshots/{screenshot_id}/invalidate-from-stage": {
         parameters: {
             query?: never;
@@ -2136,6 +2156,39 @@ export interface components {
             /** Message */
             message?: string | null;
         };
+        /**
+         * OCRStageRequest
+         * @description OCR batch processing stage with method selection.
+         */
+        OCRStageRequest: {
+            /**
+             * Screenshot Ids
+             * @description Specific screenshot IDs. If None, all eligible in group.
+             */
+            screenshot_ids?: number[] | null;
+            /**
+             * Group Id
+             * @description Required if screenshot_ids is None.
+             */
+            group_id?: string | null;
+            /**
+             * Stage
+             * @description Stage name (used by reset endpoint).
+             */
+            stage?: string | null;
+            /**
+             * Ocr Method
+             * @description Grid detection method: 'line_based' (pixel analysis) or 'ocr_anchored' (text anchor detection)
+             * @default line_based
+             */
+            ocr_method: string;
+            /**
+             * Max Shift
+             * @description Max boundary shift for grid optimization
+             * @default 5
+             */
+            max_shift: number;
+        };
         /** OrphanedEntriesResponse */
         OrphanedEntriesResponse: {
             /** Orphaned Annotations */
@@ -2486,6 +2539,7 @@ export interface components {
             cropping: components["schemas"]["PreprocessingStageSummary"];
             phi_detection: components["schemas"]["PreprocessingStageSummary"];
             phi_redaction: components["schemas"]["PreprocessingStageSummary"];
+            ocr: components["schemas"]["PreprocessingStageSummary"];
         };
         /**
          * ProcessingIssue
@@ -4586,6 +4640,42 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PHIRedactionStageRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StagePreprocessResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_ocr_stage_api_v1_screenshots_preprocess_stage_ocr_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OCRStageRequest"];
             };
         };
         responses: {
