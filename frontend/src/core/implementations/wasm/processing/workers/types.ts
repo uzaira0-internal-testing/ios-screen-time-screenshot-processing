@@ -98,6 +98,7 @@ export interface ProcessImageResponsePayload {
   gridCoordinates?: GridCoordinates;
   gridDetectionFailed?: boolean;
   gridDetectionError?: string;
+  alignmentScore?: number | null;
 }
 
 export interface ProgressPayload {

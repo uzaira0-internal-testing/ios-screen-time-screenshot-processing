@@ -338,6 +338,7 @@ export class WASMScreenshotService implements IScreenshotService {
         grid_upper_left_y: result.gridCoordinates?.upper_left?.y ?? null,
         grid_lower_right_x: result.gridCoordinates?.lower_right?.x ?? null,
         grid_lower_right_y: result.gridCoordinates?.lower_right?.y ?? null,
+        alignment_score: result.alignmentScore ?? null,
         processing_status: processingStatus,
         processed_at: new Date().toISOString(),
       });
@@ -541,6 +542,7 @@ export class WASMScreenshotService implements IScreenshotService {
           grid_lower_right_y:
             result.gridCoordinates?.lower_right?.y ??
             screenshot.grid_lower_right_y ?? null,
+          alignment_score: result.alignmentScore ?? null,
           processing_status: processingStatus,
           processed_at: new Date().toISOString(),
         };

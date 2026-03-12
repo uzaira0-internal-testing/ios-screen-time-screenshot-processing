@@ -305,3 +305,136 @@ function getMostCommonPixelValue(src: CanvasMat): number[] | null {
   const result = sorted[sorted.length - 2];
   return result ? result.pixel : null;
 }
+
+/**
+ * Compute alignment score between visual bar graph and computed hourly values.
+ *
+ * Port of Python's compute_bar_alignment_score() from bar_extraction.py.
+ * Uses HSV-based blue bar detection to measure visual bars, then compares
+ * with computed values using normalized MAE + shift penalty.
+ *
+ * @param roi - The cropped graph region (CanvasMat, RGB format)
+ * @param hourlyValues - Computed bar values for each hour (object with 24 keys)
+ * @returns Score from 0.0 to 1.0 where 1.0 = perfect alignment
+ */
+export function computeBarAlignmentScore(
+  roi: CanvasMat,
+  hourlyValues: HourlyData,
+): number {
+  try {
+    const numSlices = 24;
+    const roiHeight = roi.height;
+    const roiWidth = roi.width;
+
+    if (roiWidth === 0 || roiHeight === 0) return 0.0;
+
+    // Ensure exactly 24 values
+    const values: number[] = [];
+    for (let i = 0; i < 24; i++) {
+      values.push(hourlyValues[i] ?? 0);
+    }
+
+    const roiData = roi.imageData.data;
+
+    // Extract bar heights from image using HSV-based blue bar detection
+    const extractedHeights: number[] = [];
+    const sliceWidth = Math.floor(roiWidth / numSlices);
+
+    for (let i = 0; i < numSlices; i++) {
+      const midStart = i * sliceWidth + Math.floor(sliceWidth / 4);
+      const midEnd = Math.min(i * sliceWidth + Math.floor(3 * sliceWidth / 4), roiWidth);
+
+      let barHeight = 0;
+      // Scan top to bottom, find first row with blue pixel
+      for (let y = 0; y < roiHeight; y++) {
+        let hasBlue = false;
+        for (let x = midStart; x < midEnd; x++) {
+          const idx = (y * roiWidth + x) * 4;
+          const r = roiData[idx]!;
+          const g = roiData[idx + 1]!;
+          const b = roiData[idx + 2]!;
+
+          // Convert RGB to HSV
+          const rn = r / 255, gn = g / 255, bn = b / 255;
+          const max = Math.max(rn, gn, bn);
+          const min = Math.min(rn, gn, bn);
+          const delta = max - min;
+
+          let h = 0;
+          if (delta > 0) {
+            if (max === rn) h = 60 * (((gn - bn) / delta) % 6);
+            else if (max === gn) h = 60 * ((bn - rn) / delta + 2);
+            else h = 60 * ((rn - gn) / delta + 4);
+            if (h < 0) h += 360;
+          }
+          const s = max > 0 ? (delta / max) * 255 : 0;
+          const v = max * 255;
+
+          // OpenCV HSV: hue 0-180 (half-degree), so divide by 2
+          const hOcv = h / 2;
+
+          // Blue bars: hue 90-130, saturation > 50, value > 100
+          if (hOcv >= 90 && hOcv <= 130 && s > 50 && v > 100) {
+            hasBlue = true;
+            break;
+          }
+        }
+        if (hasBlue) {
+          barHeight = roiHeight - y;
+          break;
+        }
+      }
+
+      extractedHeights.push((barHeight / roiHeight) * 60);
+    }
+
+    // Compare extracted vs computed
+    let extractedSum = 0, computedSum = 0;
+    for (let i = 0; i < 24; i++) {
+      extractedSum += extractedHeights[i]!;
+      computedSum += values[i]!;
+    }
+
+    if (extractedSum === 0 && computedSum === 0) return 1.0;
+    if (extractedSum === 0 || computedSum === 0) {
+      return Math.max(extractedSum, computedSum) > 30 ? 0.1 : 0.3;
+    }
+
+    // Normalize and compute MAE
+    let extractedMax = 0, computedMax = 0;
+    for (let i = 0; i < 24; i++) {
+      if (extractedHeights[i]! > extractedMax) extractedMax = extractedHeights[i]!;
+      if (values[i]! > computedMax) computedMax = values[i]!;
+    }
+
+    let maeSum = 0;
+    const extractedNorm: number[] = [];
+    const computedNorm: number[] = [];
+    for (let i = 0; i < 24; i++) {
+      const en = extractedHeights[i]! / (extractedMax + 1e-10);
+      const cn = values[i]! / (computedMax + 1e-10);
+      extractedNorm.push(en);
+      computedNorm.push(cn);
+      maeSum += Math.abs(en - cn);
+    }
+    let score = 1.0 - maeSum / 24;
+
+    // Shift detection penalty
+    let extractedFirst = -1, computedFirst = -1;
+    for (let i = 0; i < 24; i++) {
+      if (extractedFirst < 0 && extractedNorm[i]! > 0.1) extractedFirst = i;
+      if (computedFirst < 0 && computedNorm[i]! > 0.1) computedFirst = i;
+    }
+    if (extractedFirst >= 0 && computedFirst >= 0) {
+      const startDiff = Math.abs(extractedFirst - computedFirst);
+      if (startDiff >= 2) {
+        const shiftPenalty = Math.min(startDiff * 0.15, 0.5);
+        score = Math.max(0.0, score - shiftPenalty);
+      }
+    }
+
+    return score;
+  } catch {
+    return 0.5;
+  }
+}

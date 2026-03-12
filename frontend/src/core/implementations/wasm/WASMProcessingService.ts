@@ -210,6 +210,7 @@ export class WASMProcessingService implements IProcessingService {
     gridCoordinates?: GridCoordinates;
     gridDetectionFailed?: boolean;
     gridDetectionError?: string;
+    alignmentScore?: number | null;
   }> {
     console.log(
       "[WASMProcessingService.processImage] Starting, initialized:",

@@ -455,6 +455,7 @@ export class WASMPreprocessingService implements IPreprocessingService {
           gridCoordinates?: unknown;
           gridDetectionFailed?: boolean;
           gridDetectionError?: string;
+          alignmentScore?: number | null;
         };
 
         // Detect grid using the user's chosen method first, then fall back to the other.
@@ -543,6 +544,7 @@ export class WASMPreprocessingService implements IPreprocessingService {
           grid_upper_left_y: gridCoords?.upper_left?.y ?? null,
           grid_lower_right_x: gridCoords?.lower_right?.x ?? null,
           grid_lower_right_y: gridCoords?.lower_right?.y ?? null,
+          alignment_score: ocrResult.alignmentScore ?? null,
           processing_status: ocrResult.gridDetectionFailed ? "failed" : "completed",
           processed_at: new Date().toISOString(),
         } as Partial<Screenshot>);

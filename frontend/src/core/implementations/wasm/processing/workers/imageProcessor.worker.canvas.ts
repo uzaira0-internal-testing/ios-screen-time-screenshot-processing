@@ -22,7 +22,8 @@ import type {
 
 import { imageDataToMat, convertDarkMode } from "../imageUtils.canvas";
 import { findScreenshotTitle, findScreenshotTotalUsage, recognizeFullImage } from "../ocr.canvas";
-import { extractHourlyData } from "../barExtraction.canvas";
+import { extractHourlyData, computeBarAlignmentScore } from "../barExtraction.canvas";
+import { extractROI } from "../canvasImageUtils";
 import { detectGrid } from "../gridDetection.canvas";
 import { detectGridLineBased } from "../lineBasedDetection.canvas";
 import { optimizeBoundaries } from "../boundaryOptimizer.canvas";
@@ -300,8 +301,18 @@ async function handleProcessImage(
     );
   }
 
+  // Compute bar alignment score (HSV-based, matches server's compute_bar_alignment_score)
+  const roiRect = {
+    x: gridCoordinates.upper_left.x,
+    y: gridCoordinates.upper_left.y,
+    width: gridCoordinates.lower_right.x - gridCoordinates.upper_left.x,
+    height: gridCoordinates.lower_right.y - gridCoordinates.upper_left.y,
+  };
+  const roi = extractROI(darkModeConverted, roiRect);
+  const alignmentScore = computeBarAlignmentScore(roi, hourlyData);
+
   const t9 = performance.now();
-  console.log(`[BENCH] Hourly data extraction: ${(t9 - t8).toFixed(0)}ms`);
+  console.log(`[BENCH] Hourly data extraction + alignment: ${(t9 - t8).toFixed(0)}ms`);
   console.log(`[BENCH] TOTAL processImage: ${(t9 - t0).toFixed(0)}ms`);
 
   postProgress("complete", 100, "Processing complete");
@@ -314,6 +325,7 @@ async function handleProcessImage(
       title,
       total: correctedTotal,
       gridCoordinates,
+      alignmentScore,
     },
   };
 

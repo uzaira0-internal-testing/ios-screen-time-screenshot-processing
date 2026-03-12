@@ -31,6 +31,7 @@ export interface IProcessingService {
     gridCoordinates?: GridCoordinates;
     gridDetectionFailed?: boolean;
     gridDetectionError?: string;
+    alignmentScore?: number | null;
   }>;
 
   extractTitle(imageData: ImageData | Blob): Promise<string | null>;
