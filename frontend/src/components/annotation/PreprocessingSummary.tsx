@@ -1,5 +1,3 @@
-import { Link } from "react-router";
-
 interface PreprocessingData {
   device_detection?: {
     device_category?: string;
@@ -20,16 +18,14 @@ interface PreprocessingData {
 
 interface PreprocessingSummaryProps {
   processingMetadata?: Record<string, unknown> | null | undefined;
-  screenshotId?: number;
-}
-
-function preprocessingLink(screenshotId: number, stage: string) {
-  return `/preprocessing?screenshot_id=${screenshotId}&stage=${stage}&returnUrl=${encodeURIComponent(`/annotate/${screenshotId}`)}`;
+  onEditPHI?: () => void;
+  onEditCrop?: () => void;
 }
 
 export const PreprocessingSummary = ({
   processingMetadata,
-  screenshotId,
+  onEditPHI,
+  onEditCrop,
 }: PreprocessingSummaryProps) => {
   const preprocessing = processingMetadata?.preprocessing as PreprocessingData | undefined;
   if (!preprocessing) return null;
@@ -58,18 +54,28 @@ export const PreprocessingSummary = ({
           </span>
         )}
         {cr?.was_cropped && (
-          <span
-            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
-            title="iPad sidebar was cropped"
-          >
-            Cropped
-          </span>
+          onEditCrop ? (
+            <button
+              onClick={onEditCrop}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 hover:ring-2 hover:ring-purple-300 hover:ring-offset-1 transition-all cursor-pointer"
+              title="iPad sidebar was cropped — click to adjust"
+            >
+              Cropped <span className="opacity-60">&#9998;</span>
+            </button>
+          ) : (
+            <span
+              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+              title="iPad sidebar was cropped"
+            >
+              Cropped
+            </span>
+          )
         )}
         {pd && (
-          screenshotId ? (
-            <Link
-              to={preprocessingLink(screenshotId, pd.phi_detected ? "phi_redaction" : "phi_detection")}
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium hover:ring-2 hover:ring-offset-1 transition-all ${
+          onEditPHI ? (
+            <button
+              onClick={onEditPHI}
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium hover:ring-2 hover:ring-offset-1 transition-all cursor-pointer ${
                 pd.phi_detected
                   ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 hover:ring-red-300"
                   : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 hover:ring-green-300"
@@ -81,8 +87,8 @@ export const PreprocessingSummary = ({
               }
             >
               {pd.phi_detected ? `PHI: ${pd.regions_count}` : "No PHI"}
-              <span className="opacity-60">&#8594;</span>
-            </Link>
+              <span className="opacity-60">&#9998;</span>
+            </button>
           ) : (
             <span
               className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
@@ -101,14 +107,14 @@ export const PreprocessingSummary = ({
           )
         )}
         {pr?.redacted && (
-          screenshotId ? (
-            <Link
-              to={preprocessingLink(screenshotId, "phi_redaction")}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 hover:ring-2 hover:ring-orange-300 hover:ring-offset-1 transition-all"
+          onEditPHI ? (
+            <button
+              onClick={onEditPHI}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 hover:ring-2 hover:ring-orange-300 hover:ring-offset-1 transition-all cursor-pointer"
               title={`${pr.regions_redacted} region(s) redacted via ${pr.method} — click to edit`}
             >
-              Redacted <span className="opacity-60">&#8594;</span>
-            </Link>
+              Redacted <span className="opacity-60">&#9998;</span>
+            </button>
           ) : (
             <span
               className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"

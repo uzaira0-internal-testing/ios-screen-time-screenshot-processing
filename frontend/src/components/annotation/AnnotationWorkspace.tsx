@@ -21,6 +21,8 @@ import type { ProcessingStatus } from "@/types";
 import type { ProcessingStatus as FilterProcessingStatus } from "@/constants/processingStatus";
 import { PreprocessingSummary } from "./PreprocessingSummary";
 import { useScreenshotImage } from "@/hooks/useScreenshotImage";
+import { PHIRegionEditor } from "@/components/preprocessing/PHIRegionEditor";
+import { CropAdjustModal } from "@/components/preprocessing/CropAdjustModal";
 import toast from "react-hot-toast";
 
 type ProcessingMethod = "ocr_anchored" | "line_based";
@@ -81,6 +83,8 @@ export const AnnotationWorkspace = ({
   const [isRecalculatingOcr, setIsRecalculatingOcr] = useState(false);
   const [reprocessingMethod, setReprocessingMethod] =
     useState<ProcessingMethod | null>(null);
+  const [phiEditorOpen, setPHIEditorOpen] = useState(false);
+  const [cropEditorOpen, setCropEditorOpen] = useState(false);
 
   // Check if THIS USER has verified the screenshot (read-only mode for them)
   // Use username-based check as it's more reliable than userId which can get stale
@@ -456,7 +460,11 @@ export const AnnotationWorkspace = ({
             <AlignmentWarning alignmentScore={screenshot.alignment_score} />
 
             {/* Preprocessing Summary */}
-            <PreprocessingSummary processingMetadata={screenshot.processing_metadata} screenshotId={screenshot.id} />
+            <PreprocessingSummary
+              processingMetadata={screenshot.processing_metadata}
+              onEditPHI={() => setPHIEditorOpen(true)}
+              onEditCrop={() => setCropEditorOpen(true)}
+            />
 
             {/* Totals Display */}
             <TotalsDisplay
@@ -732,6 +740,37 @@ export const AnnotationWorkspace = ({
           </div>
         </div>
       </div>
+      {/* PHI Region Editor Modal */}
+      {screenshot && (
+        <PHIRegionEditor
+          key={`phi-${screenshot.id}`}
+          screenshotId={screenshot.id}
+          isOpen={phiEditorOpen}
+          onClose={() => setPHIEditorOpen(false)}
+          onRegionsSaved={() => {
+            setPHIEditorOpen(false);
+            loadById(screenshot.id);
+          }}
+          onRedactionApplied={() => {
+            setPHIEditorOpen(false);
+            loadById(screenshot.id);
+          }}
+        />
+      )}
+
+      {/* Crop Adjust Modal */}
+      {screenshot && (
+        <CropAdjustModal
+          key={`crop-${screenshot.id}`}
+          screenshotId={screenshot.id}
+          isOpen={cropEditorOpen}
+          onClose={() => setCropEditorOpen(false)}
+          onCropApplied={() => {
+            setCropEditorOpen(false);
+            loadById(screenshot.id);
+          }}
+        />
+      )}
     </div>
   );
 };
