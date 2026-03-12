@@ -621,7 +621,8 @@ class PHIDetectionStageRequest(StagePreprocessRequest):
 
     phi_pipeline_preset: str = Field(default="screen_time")
     llm_endpoint: str | None = Field(default=None, description="LLM API endpoint for assisted detection")
-    llm_model: str | None = Field(default=None, description="LLM model name (e.g. gpt-oss-20b)")
+    llm_model: str | None = Field(default=None, description="LLM model name (e.g. openai/gpt-oss-20b)")
+    llm_api_key: str | None = Field(default=None, description="API key for the LLM endpoint")
 
 
 class PHIRedactionStageRequest(StagePreprocessRequest):

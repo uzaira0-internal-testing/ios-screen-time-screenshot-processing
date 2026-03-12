@@ -358,7 +358,11 @@ export class WASMPreprocessingService implements IPreprocessingService {
       case "phi_detection": {
         if (!blob) throw new Error("No image blob for PHI detection");
 
-        const phiResult = await detectPHI(blob);
+        const phiResult = await detectPHI(blob, {
+          llmEndpoint: options.llm_endpoint,
+          llmModel: options.llm_model,
+          llmApiKey: options.llm_api_key,
+        });
 
         const pp = getPreprocessing(screenshot);
         const updated = addEvent(pp, stage, "completed", {

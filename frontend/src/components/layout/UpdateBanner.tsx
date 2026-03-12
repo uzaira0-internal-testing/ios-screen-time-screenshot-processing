@@ -10,16 +10,18 @@ type BannerState =
   | { status: "downloading"; percent: number | null; downloaded: number; total: number }
   | { status: "ready"; info: UpdateInfo }
   | { status: "error"; message: string; retryAction?: "check" | "download"; info?: UpdateInfo | undefined }
-  | { status: "dismissed" };
+  | { status: "dismissed"; version: string };
 
-/** Check interval: 30 minutes */
-const CHECK_INTERVAL_MS = 30 * 60 * 1000;
+/** Check interval: 15 minutes */
+const CHECK_INTERVAL_MS = 15 * 60 * 1000;
 /** Initial delay before first check */
 const INITIAL_DELAY_MS = 3000;
 /** Max retries for failed checks */
 const MAX_RETRIES = 3;
 /** Delay between retries (doubles each time) */
 const RETRY_BASE_MS = 5000;
+/** Minimum time between visibility-triggered checks */
+const VISIBILITY_COOLDOWN_MS = 60 * 1000;
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -32,17 +34,34 @@ export const UpdateBanner = () => {
   const [showNotes, setShowNotes] = useState(false);
   const retryCount = useRef(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastCheckRef = useRef(0);
+  const checkInFlightRef = useRef(false);
+  // Ref mirror of state.status so event handlers can read it without stale closures
+  const stateRef = useRef<BannerState["status"]>("idle");
 
   const doCheck = useCallback(async () => {
+    // Prevent concurrent checks (visibility + focus can fire together)
+    if (checkInFlightRef.current) return;
+    // Don't interrupt active download or ready states
+    if (stateRef.current === "downloading" || stateRef.current === "ready") return;
+
+    checkInFlightRef.current = true;
+    lastCheckRef.current = Date.now();
     console.log("[UpdateBanner] Checking for updates...");
-    setState((prev) => (prev.status === "idle" || prev.status === "dismissed" ? { status: "checking" } : prev));
+    setState({ status: "checking" });
     try {
       const { checkForUpdate } = await import("../../lib/updater");
       const info = await checkForUpdate();
       console.log("[UpdateBanner] Check result:", info);
       retryCount.current = 0;
       if (info) {
-        setState({ status: "available", info });
+        // Show the banner — even if previously dismissed, a NEW version should appear
+        setState((prev) => {
+          if (prev.status === "dismissed" && prev.version === info.version) {
+            return prev;
+          }
+          return { status: "available", info };
+        });
       } else {
         setState({ status: "idle" });
       }
@@ -56,32 +75,45 @@ export const UpdateBanner = () => {
         const delay = RETRY_BASE_MS * Math.pow(2, retryCount.current - 1);
         console.log(`[UpdateBanner] Retrying in ${delay}ms (attempt ${retryCount.current}/${MAX_RETRIES})`);
         setTimeout(doCheck, delay);
+        checkInFlightRef.current = false;
         return;
       }
 
       setState({ status: "error", message, retryAction: "check" });
+    } finally {
+      checkInFlightRef.current = false;
     }
   }, []);
 
-  // Initial check + periodic re-check
+  // Keep stateRef in sync
+  useEffect(() => {
+    stateRef.current = state.status;
+  }, [state.status]);
+
+  // Initial check + periodic re-check + visibility/focus re-check
   useEffect(() => {
     if (!config.isTauri) return;
 
     const initialTimer = setTimeout(doCheck, INITIAL_DELAY_MS);
 
-    intervalRef.current = setInterval(() => {
-      // Only re-check if idle or dismissed — don't interrupt active download/ready states
-      setState((prev) => {
-        if (prev.status === "idle" || prev.status === "dismissed") {
-          doCheck();
-        }
-        return prev;
-      });
-    }, CHECK_INTERVAL_MS);
+    // Periodic re-check
+    intervalRef.current = setInterval(doCheck, CHECK_INTERVAL_MS);
+
+    // Re-check when the app comes back to foreground or gains focus.
+    // Both events can fire on the same user action — the in-flight guard deduplicates.
+    const handleAppResume = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastCheckRef.current < VISIBILITY_COOLDOWN_MS) return;
+      doCheck();
+    };
+    document.addEventListener("visibilitychange", handleAppResume);
+    window.addEventListener("focus", handleAppResume);
 
     return () => {
       clearTimeout(initialTimer);
       if (intervalRef.current) clearInterval(intervalRef.current);
+      document.removeEventListener("visibilitychange", handleAppResume);
+      window.removeEventListener("focus", handleAppResume);
     };
   }, [doCheck]);
 
@@ -141,7 +173,12 @@ export const UpdateBanner = () => {
     }
   };
 
-  const dismiss = () => setState({ status: "dismissed" });
+  const dismiss = () => {
+    const version = state.status === "available" ? state.info.version
+      : state.status === "error" && state.info ? state.info.version
+      : "unknown";
+    setState({ status: "dismissed", version });
+  };
 
   // Show nothing for idle, checking, dismissed, or non-Tauri
   if (!config.isTauri || state.status === "idle" || state.status === "checking" || state.status === "dismissed") {

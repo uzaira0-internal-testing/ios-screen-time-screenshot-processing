@@ -490,7 +490,7 @@ def cropping_task(self, screenshot_id: int) -> dict:
     time_limit=PREPROCESSING_HARD_LIMIT,
 )
 def phi_detection_task(
-    self, screenshot_id: int, preset: str = "screen_time", llm_endpoint: str | None = None, llm_model: str | None = None
+    self, screenshot_id: int, preset: str = "screen_time", llm_endpoint: str | None = None, llm_model: str | None = None, llm_api_key: str | None = None
 ) -> dict:
     """Run PHI detection stage only."""
     from pathlib import Path
@@ -525,7 +525,7 @@ def phi_detection_task(
         input_file = get_current_input_file(screenshot, "phi_detection")
         image_bytes = Path(input_file).read_bytes()
 
-        detection = detect_phi(image_bytes, preset=preset, llm_endpoint=llm_endpoint, llm_model=llm_model)
+        detection = detect_phi(image_bytes, preset=preset, llm_endpoint=llm_endpoint, llm_model=llm_model, llm_api_key=llm_api_key)
 
         result_data = {
             "phi_detected": detection.phi_detected,

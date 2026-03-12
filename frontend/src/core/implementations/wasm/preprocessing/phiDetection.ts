@@ -314,7 +314,13 @@ function isAllowListed(text: string): boolean {
 // Main detection function
 // ---------------------------------------------------------------------------
 
-export async function detectPHI(imageBlob: Blob): Promise<PHIDetectionResult> {
+export interface DetectPHIOptions {
+  llmEndpoint?: string | undefined;
+  llmModel?: string | undefined;
+  llmApiKey?: string | undefined;
+}
+
+export async function detectPHI(imageBlob: Blob, options?: DetectPHIOptions): Promise<PHIDetectionResult> {
   // Step 1: OCR with bounding boxes
   const { words, fullText, confidence } = await ocrWithBboxes(imageBlob);
 
@@ -322,11 +328,16 @@ export async function detectPHI(imageBlob: Blob): Promise<PHIDetectionResult> {
     return { regions: [], ocrText: "", ocrConfidence: 0, nerStatus: "skipped" };
   }
 
-  // Step 2 & 3: Run NER and regex in parallel
-  const [nerResult, regexMatches] = await Promise.all([
+  // Step 2 & 3: Run NER, regex, and optionally LLM in parallel
+  const tasks: [Promise<NERResult>, Promise<RegexMatch[]>, Promise<LLMEntity[]>] = [
     runNER(fullText),
     Promise.resolve(findRegexMatches(fullText)),
-  ]);
+    options?.llmEndpoint && options?.llmModel
+      ? runLLMDetection(fullText, options.llmEndpoint, options.llmModel, options.llmApiKey)
+      : Promise.resolve([]),
+  ];
+
+  const [nerResult, regexMatches, llmEntities] = await Promise.all(tasks);
 
   const nerEntities = nerResult.entities;
 
@@ -334,17 +345,11 @@ export async function detectPHI(imageBlob: Blob): Promise<PHIDetectionResult> {
 
   // Step 4: Process NER results
   for (const entity of nerEntities) {
-    // Skip excluded entity types
     if (EXCLUDED_ENTITY_TYPES.has(entity.entity_group)) continue;
-
-    // Skip allow-listed terms
     if (isAllowListed(entity.word)) continue;
 
-    // Map to image coordinates
     const bbox = offsetToRegion(entity.start, entity.end, words);
     if (!bbox) continue;
-
-    // Skip tiny detections
     if (bbox.w * bbox.h < MIN_BBOX_AREA) continue;
 
     regions.push({
@@ -358,25 +363,13 @@ export async function detectPHI(imageBlob: Blob): Promise<PHIDetectionResult> {
 
   // Step 5: Process regex matches
   for (const match of regexMatches) {
-    // Skip allow-listed terms
     if (isAllowListed(match.text)) continue;
 
-    // Map to image coordinates
     const bbox = offsetToRegion(match.start, match.end, words);
     if (!bbox) continue;
-
-    // Skip tiny detections
     if (bbox.w * bbox.h < MIN_BBOX_AREA) continue;
 
-    // Avoid duplicates: check if NER already detected this region
-    const isDuplicate = regions.some(
-      (r) =>
-        Math.abs(r.x - bbox.x) < 5 &&
-        Math.abs(r.y - bbox.y) < 5 &&
-        Math.abs(r.w - bbox.w) < 10 &&
-        Math.abs(r.h - bbox.h) < 10,
-    );
-    if (isDuplicate) continue;
+    if (isDuplicateRegion(regions, bbox)) continue;
 
     regions.push({
       ...bbox,
@@ -387,12 +380,140 @@ export async function detectPHI(imageBlob: Blob): Promise<PHIDetectionResult> {
     });
   }
 
+  // Step 6: Process LLM results
+  for (const entity of llmEntities) {
+    if (isAllowListed(entity.text)) continue;
+
+    const bbox = offsetToRegion(entity.start, entity.end, words);
+    if (!bbox) continue;
+    if (bbox.w * bbox.h < MIN_BBOX_AREA) continue;
+
+    if (isDuplicateRegion(regions, bbox)) continue;
+
+    regions.push({
+      ...bbox,
+      label: entity.label,
+      source: `llm:${options?.llmModel ?? "unknown"}`,
+      confidence: entity.confidence,
+      text: entity.text,
+    });
+  }
+
   return {
     regions,
     ocrText: fullText,
     ocrConfidence: confidence,
     nerStatus: nerResult.status,
   };
+}
+
+function isDuplicateRegion(
+  existing: PHIRegion[],
+  bbox: { x: number; y: number; w: number; h: number },
+): boolean {
+  return existing.some(
+    (r) =>
+      Math.abs(r.x - bbox.x) < 5 &&
+      Math.abs(r.y - bbox.y) < 5 &&
+      Math.abs(r.w - bbox.w) < 10 &&
+      Math.abs(r.h - bbox.h) < 10,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// LLM-assisted detection — calls an OpenAI-compatible chat/completions endpoint
+// ---------------------------------------------------------------------------
+
+interface LLMEntity {
+  label: string;
+  text: string;
+  start: number;
+  end: number;
+  confidence: number;
+}
+
+const LLM_SYSTEM_PROMPT = `You are a PHI (Protected Health Information) detector for iOS Screen Time screenshots.
+Given OCR-extracted text, identify ALL personally identifiable information.
+
+Return ONLY a JSON array of objects with these fields:
+- "label": entity type (PERSON, PHONE, EMAIL, SSN, MRN, ADDRESS, DATE_OF_BIRTH, MEDICAL_RECORD, DEVICE_ID)
+- "text": the exact text matched (must appear verbatim in the input)
+- "confidence": 0.0-1.0
+
+Example: [{"label":"PERSON","text":"John Smith","confidence":0.95}]
+
+If no PHI is found, return an empty array: []
+Do NOT include app names, UI labels, or time strings. Only real PHI.`;
+
+async function runLLMDetection(
+  fullText: string,
+  endpoint: string,
+  model: string,
+  apiKey?: string,
+): Promise<LLMEntity[]> {
+  try {
+    const url = `${endpoint.replace(/\/+$/, "")}/chat/completions`;
+    console.log(`[phiDetection] Querying LLM at ${url} with model ${model}`);
+
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (apiKey) {
+      headers["Authorization"] = `Bearer ${apiKey}`;
+    }
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: LLM_SYSTEM_PROMPT },
+          { role: "user", content: `Analyze this OCR text for PHI:\n\n${fullText}` },
+        ],
+        temperature: 0.1,
+        max_tokens: 2048,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error(`[phiDetection] LLM request failed: ${response.status} ${response.statusText}`);
+      return [];
+    }
+
+    const data = await response.json();
+    const content = data?.choices?.[0]?.message?.content ?? "";
+
+    // Parse JSON from response (may be wrapped in ```json ... ```)
+    const jsonMatch = content.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      console.warn("[phiDetection] LLM returned no JSON array:", content.slice(0, 200));
+      return [];
+    }
+
+    const parsed: Array<{ label: string; text: string; confidence: number }> = JSON.parse(jsonMatch[0]);
+    if (!Array.isArray(parsed)) return [];
+
+    // Map LLM entities back to text offsets
+    const entities: LLMEntity[] = [];
+    const textLower = fullText.toLowerCase();
+    for (const item of parsed) {
+      if (!item.text || !item.label) continue;
+      const idx = textLower.indexOf(item.text.toLowerCase());
+      if (idx === -1) continue;
+      entities.push({
+        label: item.label,
+        text: item.text,
+        start: idx,
+        end: idx + item.text.length,
+        confidence: item.confidence ?? 0.8,
+      });
+    }
+
+    console.log(`[phiDetection] LLM found ${entities.length} entities`);
+    return entities;
+  } catch (err) {
+    console.error("[phiDetection] LLM detection failed:", err);
+    return [];
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -2179,9 +2179,14 @@ export interface components {
             llm_endpoint?: string | null;
             /**
              * Llm Model
-             * @description LLM model name (e.g. gpt-oss-20b)
+             * @description LLM model name (e.g. openai/gpt-oss-20b)
              */
             llm_model?: string | null;
+            /**
+             * Llm Api Key
+             * @description API key for the LLM endpoint
+             */
+            llm_api_key?: string | null;
         };
         /**
          * PHIRedactionStageRequest
@@ -3561,7 +3566,10 @@ export interface operations {
     list_groups_api_v1_screenshots_groups_get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -3576,12 +3584,24 @@ export interface operations {
                     "application/json": components["schemas"]["GroupRead"][];
                 };
             };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
     };
     get_group_api_v1_screenshots_groups__group_id__get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
             path: {
                 group_id: string;
             };
@@ -4092,7 +4112,10 @@ export interface operations {
     get_screenshot_image_api_v1_screenshots__screenshot_id__image_get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
             path: {
                 screenshot_id: number;
             };
@@ -4697,7 +4720,10 @@ export interface operations {
     get_original_image_api_v1_screenshots__screenshot_id__original_image_get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
             path: {
                 screenshot_id: number;
             };
@@ -4731,7 +4757,10 @@ export interface operations {
                 /** @description Stage whose output to serve (e.g. 'cropping') */
                 stage: string;
             };
-            header?: never;
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
             path: {
                 screenshot_id: number;
             };

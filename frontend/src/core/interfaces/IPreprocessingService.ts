@@ -30,6 +30,7 @@ export interface RunStageOptions {
   phi_redaction_method?: string;
   llm_endpoint?: string;
   llm_model?: string;
+  llm_api_key?: string;
   /** Called after each screenshot completes (WASM mode only). */
   onProgress?: (completed: number, total: number) => void;
   /** Signal to abort processing (WASM mode only). */

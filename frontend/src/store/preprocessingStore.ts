@@ -63,6 +63,7 @@ interface PreprocessingState {
   llmEnabled: boolean;
   llmEndpoint: string;
   llmModel: string;
+  llmApiKey: string;
 
   // Event log detail
   selectedScreenshotId: number | null;
@@ -106,6 +107,7 @@ interface PreprocessingState {
   setLlmEnabled: (enabled: boolean) => void;
   setLlmEndpoint: (endpoint: string) => void;
   setLlmModel: (model: string) => void;
+  setLlmApiKey: (key: string) => void;
 
   loadGroups: () => Promise<void>;
   loadScreenshots: () => Promise<void>;
@@ -166,7 +168,8 @@ export function createPreprocessingStore(service: IPreprocessingService) {
   redactionMethod: "redbox",
   llmEnabled: false,
   llmEndpoint: "http://10.23.7.55:1234/v1",
-  llmModel: "gpt-oss-20b",
+  llmModel: "openai/gpt-oss-20b",
+  llmApiKey: "",
   selectedScreenshotId: null,
   eventLog: null,
   isLoading: false,
@@ -208,6 +211,7 @@ export function createPreprocessingStore(service: IPreprocessingService) {
   setLlmEnabled: (enabled) => set({ llmEnabled: enabled }),
   setLlmEndpoint: (endpoint) => set({ llmEndpoint: endpoint }),
   setLlmModel: (model) => set({ llmModel: model }),
+  setLlmApiKey: (key) => set({ llmApiKey: key }),
 
   loadGroups: async () => {
     try {
@@ -302,7 +306,7 @@ export function createPreprocessingStore(service: IPreprocessingService) {
   },
 
   runStage: async (stage, screenshotIds) => {
-    const { selectedGroupId, phiPreset, redactionMethod, llmEnabled, llmEndpoint, llmModel } = get();
+    const { selectedGroupId, phiPreset, redactionMethod, llmEnabled, llmEndpoint, llmModel, llmApiKey } = get();
     if (!selectedGroupId && !screenshotIds) return;
 
     // Capture how many are already completed before this batch starts
@@ -320,6 +324,7 @@ export function createPreprocessingStore(service: IPreprocessingService) {
       if (llmEnabled && stage === "phi_detection") {
         options.llm_endpoint = llmEndpoint;
         options.llm_model = llmModel;
+        if (llmApiKey) options.llm_api_key = llmApiKey;
       }
       if (config.isLocalMode) {
         // WASM mode: report per-screenshot progress via callback

@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState, useRef } from "react";
 import { useSearchParams, Link } from "react-router";
 import { Layout } from "@/components/layout/Layout";
 import { usePreprocessingStore } from "@/hooks/usePreprocessingWithDI";
@@ -12,6 +12,170 @@ import { PHIRedactionTab } from "@/components/preprocessing/PHIRedactionTab";
 import { EventLogPanel } from "@/components/preprocessing/EventLogPanel";
 import { PreprocessingQueueView } from "@/components/preprocessing/PreprocessingQueueView";
 import { usePreprocessingPipelineService } from "@/core";
+
+// ---------------------------------------------------------------------------
+// LLM Controls — endpoint, model dropdown + manual entry, API key, status
+// ---------------------------------------------------------------------------
+
+type ConnectionStatus = "idle" | "checking" | "connected" | "error";
+
+interface LLMModel {
+  id: string;
+  owned_by?: string;
+}
+
+function LLMControls({
+  endpoint,
+  setEndpoint,
+  model,
+  setModel,
+  apiKey,
+  setApiKey,
+}: {
+  endpoint: string;
+  setEndpoint: (v: string) => void;
+  model: string;
+  setModel: (v: string) => void;
+  apiKey: string;
+  setApiKey: (v: string) => void;
+}) {
+  const [status, setStatus] = useState<ConnectionStatus>("idle");
+  const [models, setModels] = useState<LLMModel[]>([]);
+  const [manualEntry, setManualEntry] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Fetch models when endpoint or apiKey changes
+  const fetchModels = useCallback(async () => {
+    if (!endpoint.trim()) {
+      setStatus("idle");
+      setModels([]);
+      return;
+    }
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setStatus("checking");
+
+    try {
+      const base = endpoint.replace(/\/+$/, "");
+      const headers: Record<string, string> = {};
+      if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+
+      const res = await fetch(`${base}/models`, {
+        headers,
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        setStatus("error");
+        setModels([]);
+        return;
+      }
+
+      const data = await res.json();
+      const fetched: LLMModel[] = (data?.data ?? []).map(
+        (m: { id: string; owned_by?: string }) => ({
+          id: m.id,
+          owned_by: m.owned_by,
+        }),
+      );
+
+      setModels(fetched);
+      setStatus("connected");
+
+      // Auto-select first model if current model is empty or not in list
+      if (fetched.length > 0 && !fetched.some((m) => m.id === model)) {
+        setModel(fetched[0]!.id);
+      }
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      setStatus("error");
+      setModels([]);
+    }
+  }, [endpoint, apiKey, model, setModel]);
+
+  // Debounce endpoint/apiKey changes
+  useEffect(() => {
+    const timer = setTimeout(fetchModels, 600);
+    return () => {
+      clearTimeout(timer);
+      abortRef.current?.abort();
+    };
+  }, [fetchModels]);
+
+  const statusDot =
+    status === "connected"
+      ? "bg-green-500"
+      : status === "error"
+        ? "bg-red-500"
+        : status === "checking"
+          ? "bg-yellow-400 animate-pulse"
+          : "bg-slate-400";
+
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <label className="text-sm text-slate-600 dark:text-slate-300">Endpoint:</label>
+        <div className="relative">
+          <input
+            type="text"
+            value={endpoint}
+            onChange={(e) => setEndpoint(e.target.value)}
+            placeholder="http://localhost:1234/v1"
+            className="text-sm border border-slate-300 dark:border-slate-600 rounded-md px-2 py-1 w-56 pr-7 dark:bg-slate-700 dark:text-slate-100"
+          />
+          <span
+            className={`absolute right-2 top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full ${statusDot}`}
+            title={status === "connected" ? `Connected (${models.length} model${models.length !== 1 ? "s" : ""})` : status === "error" ? "Connection failed" : status === "checking" ? "Checking..." : "Not connected"}
+          />
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <label className="text-sm text-slate-600 dark:text-slate-300">API Key:</label>
+        <input
+          type="password"
+          value={apiKey}
+          onChange={(e) => setApiKey(e.target.value)}
+          placeholder="Optional"
+          className="text-sm border border-slate-300 dark:border-slate-600 rounded-md px-2 py-1 w-36 dark:bg-slate-700 dark:text-slate-100"
+        />
+      </div>
+      <div className="flex items-center gap-2">
+        <label className="text-sm text-slate-600 dark:text-slate-300">Model:</label>
+        {!manualEntry && models.length > 0 ? (
+          <select
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            className="text-sm border border-slate-300 dark:border-slate-600 rounded-md px-2 py-1 w-48 dark:bg-slate-700 dark:text-slate-100"
+          >
+            {models.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.id}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            type="text"
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            placeholder="e.g. openai/gpt-4o"
+            className="text-sm border border-slate-300 dark:border-slate-600 rounded-md px-2 py-1 w-48 dark:bg-slate-700 dark:text-slate-100"
+          />
+        )}
+        <button
+          type="button"
+          onClick={() => setManualEntry(!manualEntry)}
+          className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 underline"
+          title={manualEntry ? "Switch to dropdown" : "Enter model manually"}
+        >
+          {manualEntry ? "dropdown" : "manual"}
+        </button>
+      </div>
+    </>
+  );
+}
 
 export const PreprocessingPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -35,6 +199,8 @@ export const PreprocessingPage = () => {
   const setLlmEndpoint = usePreprocessingStore((s) => s.setLlmEndpoint);
   const llmModel = usePreprocessingStore((s) => s.llmModel);
   const setLlmModel = usePreprocessingStore((s) => s.setLlmModel);
+  const llmApiKey = usePreprocessingStore((s) => s.llmApiKey);
+  const setLlmApiKey = usePreprocessingStore((s) => s.setLlmApiKey);
   const stopPolling = usePreprocessingStore((s) => s.stopPolling);
   const setHighlightedScreenshotId = usePreprocessingStore((s) => s.setHighlightedScreenshotId);
   const setReturnUrl = usePreprocessingStore((s) => s.setReturnUrl);
@@ -189,27 +355,14 @@ export const PreprocessingPage = () => {
                     </label>
                   </div>
                   {llmEnabled && (
-                    <>
-                      <div className="flex items-center gap-2">
-                        <label className="text-sm text-slate-600 dark:text-slate-300">Endpoint:</label>
-                        <input
-                          type="text"
-                          value={llmEndpoint}
-                          onChange={(e) => setLlmEndpoint(e.target.value)}
-                          className="text-sm border border-slate-300 dark:border-slate-600 rounded-md px-2 py-1 w-56 dark:bg-slate-700 dark:text-slate-100"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <label className="text-sm text-slate-600 dark:text-slate-300">Model:</label>
-                        <input
-                          type="text"
-                          value={llmModel}
-                          onChange={(e) => setLlmModel(e.target.value)}
-                          className="text-sm border border-slate-300 dark:border-slate-600 rounded-md px-2 py-1 w-36 dark:bg-slate-700 dark:text-slate-100"
-                        />
-                      </div>
-                      <span className="text-xs text-slate-400">Runs LLM alongside Presidio for higher accuracy</span>
-                    </>
+                    <LLMControls
+                      endpoint={llmEndpoint}
+                      setEndpoint={setLlmEndpoint}
+                      model={llmModel}
+                      setModel={setLlmModel}
+                      apiKey={llmApiKey}
+                      setApiKey={setLlmApiKey}
+                    />
                   )}
                 </>
               )}

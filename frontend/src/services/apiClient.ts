@@ -565,6 +565,7 @@ export const api = {
         phi_redaction_method?: string;
         llm_endpoint?: string;
         llm_model?: string;
+        llm_api_key?: string;
       },
     ) {
       const stageUrlMap: Record<string, string> = {
@@ -585,6 +586,7 @@ export const api = {
         body.phi_pipeline_preset = options.phi_pipeline_preset ?? "hipaa_compliant";
         if (options.llm_endpoint) body.llm_endpoint = options.llm_endpoint;
         if (options.llm_model) body.llm_model = options.llm_model;
+        if (options.llm_api_key) body.llm_api_key = options.llm_api_key;
       }
       if (stage === "phi_redaction") {
         body.phi_redaction_method = options.phi_redaction_method ?? "redbox";
