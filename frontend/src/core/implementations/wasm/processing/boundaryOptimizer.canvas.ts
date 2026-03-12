@@ -74,14 +74,16 @@ const DIGIT_MAP: Record<string, string> = {
   O: "0", o: "0", Q: "0",
   l: "1", I: "1", "|": "1",
   Z: "2", z: "2",
+  A: "4",
   S: "5", s: "5",
-  G: "6",
+  G: "6", b: "6",
+  T: "7",
   B: "8",
-  g: "9",
+  g: "9", q: "9",
 };
 
 function normalizeOcrDigits(text: string): string {
-  return text.replace(/[OoQlI|ZzSsGB9g]/g, (ch) => DIGIT_MAP[ch] ?? ch);
+  return text.replace(/[OoQlI|ZzASsGbTBgq]/g, (ch) => DIGIT_MAP[ch] ?? ch);
 }
 
 export function parseOcrTotal(ocrTotal: string): number | null {
@@ -162,6 +164,8 @@ export interface OptimizationResult {
   bounds: GridCoordinates;
   barTotalMinutes: number;
   ocrTotalMinutes: number;
+  /** OCR total string after 7→1 correction (if improved match) */
+  correctedTotal: string;
   shiftX: number;
   shiftY: number;
   shiftWidth: number;
@@ -204,6 +208,7 @@ export function optimizeBoundaries(
       bounds: initialBounds,
       barTotalMinutes: barTotal,
       ocrTotalMinutes: 0,
+      correctedTotal: ocrTotal,
       shiftX: 0,
       shiftY: 0,
       shiftWidth: 0,
@@ -288,6 +293,7 @@ export function optimizeBoundaries(
               bounds: bestBounds,
               barTotalMinutes: bestBarTotal,
               ocrTotalMinutes: targetMinutes,
+              correctedTotal: ocrTotal,
               shiftX: bestShiftX,
               shiftY: bestShiftY,
               shiftWidth: bestShiftWidth,
@@ -304,14 +310,15 @@ export function optimizeBoundaries(
   // Extract full hourly data only for the final best result
   bestHourlyData = extractHourlyDataFromPreprocessed(scaled, bestBounds);
 
-  // Apply 7→1 OCR correction
-  const { correctedMinutes } = correctOcrTotalWithBarHint(ocrTotal, bestBarTotal);
+  // Apply 7→1 OCR correction — pick the total string closest to bar total
+  const { correctedTotal, correctedMinutes } = correctOcrTotalWithBarHint(ocrTotal, bestBarTotal);
   const finalDiff = Math.abs(bestBarTotal - correctedMinutes);
 
   return {
     bounds: bestBounds,
     barTotalMinutes: bestBarTotal,
     ocrTotalMinutes: correctedMinutes,
+    correctedTotal,
     shiftX: bestShiftX,
     shiftY: bestShiftY,
     shiftWidth: bestShiftWidth,

@@ -278,6 +278,7 @@ async function handleProcessImage(
 
   const maxShift = payload.maxShift ?? 0;
   let hourlyData;
+  let correctedTotal = total;
 
   if (maxShift > 0 && total) {
     const optResult = optimizeBoundaries(
@@ -289,6 +290,8 @@ async function handleProcessImage(
     );
     hourlyData = optResult.hourlyData;
     gridCoordinates = optResult.bounds;
+    // Use the 7→1 corrected total if it better matches the bar total
+    correctedTotal = optResult.correctedTotal;
   } else {
     hourlyData = extractHourlyData(
       darkModeConverted,
@@ -309,7 +312,7 @@ async function handleProcessImage(
     payload: {
       hourlyData,
       title,
-      total,
+      total: correctedTotal,
       gridCoordinates,
     },
   };

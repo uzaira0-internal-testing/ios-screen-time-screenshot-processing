@@ -53,18 +53,19 @@ export async function recognizeFullImage(
   gridUpperY?: number,
 ): Promise<FullImageOCR> {
   const _t0 = performance.now();
-  // Crop to just above the grid — all text anchors are in this header region
+  // Server's _full_image_ocr_data() runs pytesseract.image_to_data(img, config="--psm 3")
+  // on the FULL image with NO contrast. We match that: no contrast here — contrast is
+  // only applied in extractAllText() for the small title/total crop regions.
+  // We still crop to the header region since all text anchors (INFO, SCREEN, etc.)
+  // are above the bar chart.
   const cropHeight = gridUpperY
     ? Math.min(gridUpperY + 20, imageMat.height)
     : Math.ceil(imageMat.height * 0.45);
   const cropped = extractRegion(imageMat, { x: 0, y: 0, width: imageMat.width, height: cropHeight });
 
-  // Apply contrast to strip visual noise (same as server's preprocessing)
-  const contrasted = adjustContrastBrightness(cropped, 2.0, 0);
-
-  const imageData = matToImageData(contrasted);
+  const imageData = matToImageData(cropped);
   const _t1 = performance.now();
-  console.log(`[BENCH] recognizeFullImage prep (crop+contrast+toImageData): ${(_t1 - _t0).toFixed(0)}ms`);
+  console.log(`[BENCH] recognizeFullImage prep (crop+toImageData): ${(_t1 - _t0).toFixed(0)}ms`);
 
   const canvas = imageDataToCanvas(imageData);
   const _t2 = performance.now();
@@ -329,8 +330,26 @@ export async function findScreenshotTotalUsage(
   }
 
   // Server: regex fallback if no time pattern found
+  // Server does 3-tier fallback: left third → left half → full image
+  // We simulate this by filtering cached OCR words by x-position
   if (!total || !/\d+\s*[hms]/.test(total)) {
-    const regexTotal = findTotalUsageRegex(ocr.text);
+    const imgWidth = imageMat.width;
+    // Try left third first (avoids "Daily Average" on right side)
+    const leftThirdText = ocr.words
+      .filter(w => w.bbox && w.bbox.x1 <= imgWidth / 3)
+      .map(w => w.text).join(" ").replace(/Os/g, "0s");
+    let regexTotal = extractTimeFromText(normalizeOcrDigits(leftThirdText));
+    if (!regexTotal) {
+      // Try left half
+      const leftHalfText = ocr.words
+        .filter(w => w.bbox && w.bbox.x1 <= imgWidth / 2)
+        .map(w => w.text).join(" ").replace(/Os/g, "0s");
+      regexTotal = extractTimeFromText(normalizeOcrDigits(leftHalfText));
+    }
+    if (!regexTotal) {
+      // Full image fallback
+      regexTotal = findTotalUsageRegex(ocr.text);
+    }
     if (regexTotal) {
       return regexTotal;
     }
