@@ -156,7 +156,7 @@ export const HourlyUsageOverlay = ({
     <div className="w-full" ref={containerRef} data-testid="hourly-editor">
       {/* Graph Area with Overlay */}
       <div
-        className="relative bg-white dark:bg-slate-800 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700"
+        className="relative bg-white rounded-lg overflow-hidden border border-slate-200"
         style={{ height: graphHeight }}
       >
         {/* Background: Cropped screenshot */}
@@ -170,7 +170,7 @@ export const HourlyUsageOverlay = ({
         />
 
         {(!hasValidGrid || !canvasReady) && (
-          <div className="absolute inset-0 w-full h-full bg-slate-50 dark:bg-slate-700 flex items-center justify-center text-slate-400 text-sm">
+          <div className="absolute inset-0 w-full h-full bg-slate-50 flex items-center justify-center text-slate-400 text-sm">
             {hasValidGrid ? "Loading..." : "Select grid area to view overlay"}
           </div>
         )}
@@ -194,7 +194,7 @@ export const HourlyUsageOverlay = ({
                 {/* Bar - only render if value > 0 */}
                 {value > 0 ? (
                   <div
-                    className="w-4/5 bg-primary-500/70 transition-all duration-300 hover:bg-primary-500/80 rounded-t-md"
+                    className="w-4/5 bg-blue-500/70 transition-all duration-300 hover:bg-blue-500/80 rounded-t-md"
                     style={{
                       height: `${heightPercentage}%`,
                       minHeight: "2px",

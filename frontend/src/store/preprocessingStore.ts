@@ -91,6 +91,10 @@ interface PreprocessingState {
   uploadProgress: { completed: number; total: number } | null;
   uploadErrors: string[];
 
+  // Per-stage table sort
+  tableSortColumn: Record<string, string>;
+  tableSortDirection: Record<string, "asc" | "desc">;
+
   // Deep-link state
   highlightedScreenshotId: number | null;
   returnUrl: string | null;
@@ -104,6 +108,7 @@ interface PreprocessingState {
   setActiveStage: (stage: Stage) => void;
   setPageMode: (mode: PageMode) => void;
   setFilter: (filter: FilterMode) => void;
+  setTableSort: (stage: Stage, column: string, direction: "asc" | "desc") => void;
   setSelectedGroupId: (groupId: string) => void;
   setPhiPreset: (preset: string) => void;
   setRedactionMethod: (method: string) => void;
@@ -192,6 +197,10 @@ export function createPreprocessingStore(service: IPreprocessingService) {
   uploadProgress: null,
   uploadErrors: [],
 
+  // Per-stage table sort
+  tableSortColumn: {},
+  tableSortDirection: {},
+
   // Deep-link state
   highlightedScreenshotId: null,
   returnUrl: null,
@@ -204,6 +213,10 @@ export function createPreprocessingStore(service: IPreprocessingService) {
   setActiveStage: (stage) => set({ activeStage: stage }),
   setPageMode: (mode) => set({ pageMode: mode }),
   setFilter: (filter) => set({ filter }),
+  setTableSort: (stage, column, direction) => set((s) => ({
+    tableSortColumn: { ...s.tableSortColumn, [stage]: column },
+    tableSortDirection: { ...s.tableSortDirection, [stage]: direction },
+  })),
   setSelectedGroupId: (groupId) => {
     set({ selectedGroupId: groupId, screenshots: [], summary: null });
     // Auto-load when group changes — catch to prevent unhandled rejections

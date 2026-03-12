@@ -61,7 +61,7 @@ export const HourlyUsageEditor = ({
     <div className="w-full" data-testid="hourly-editor">
       {/* Bar Graph - EXACTLY 24 columns */}
       <div
-        className="relative bg-white dark:bg-slate-800 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700"
+        className="relative bg-white rounded-lg overflow-hidden border border-slate-200"
         style={{ height: graphHeight }}
       >
         <div
@@ -77,11 +77,11 @@ export const HourlyUsageEditor = ({
             return (
               <div
                 key={i}
-                className="flex flex-col h-full justify-end items-center border-r border-slate-200 dark:border-slate-700 last:border-r-0"
+                className="flex flex-col h-full justify-end items-center border-r border-slate-200 last:border-r-0"
               >
                 {/* Bar */}
                 <div
-                  className="w-4/5 bg-primary-500 border-t border-primary-600/30 transition-all duration-300 rounded-t-md"
+                  className="w-4/5 bg-blue-500 border-t border-blue-600/30 transition-all duration-300 rounded-t-md"
                   style={{
                     height: `${heightPercentage}%`,
                     minHeight: value > 0 ? "2px" : "0",

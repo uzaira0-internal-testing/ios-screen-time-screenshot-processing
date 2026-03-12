@@ -237,12 +237,6 @@ function SyncSection() {
   );
 }
 
-const MAX_SHIFT_OPTIONS = [
-  { value: 0, label: "Off" },
-  { value: 5, label: "Normal" },
-  { value: 10, label: "Aggressive" },
-] as const;
-
 const GRID_METHOD_OPTIONS = [
   { value: "line_based" as const, label: "Line-Based" },
   { value: "ocr_anchored" as const, label: "OCR-Anchored" },
@@ -320,25 +314,24 @@ function ProcessingSection() {
         {/* Boundary Optimizer */}
         <div className="py-3 border-b border-slate-200 dark:border-slate-700">
           <div className="font-medium text-slate-900 dark:text-slate-100 mb-1">
-            Boundary Optimizer
+            Boundary Optimizer (Max Shift)
           </div>
           <div className="text-sm text-slate-600 dark:text-slate-400 mb-3">
-            How aggressively to optimize grid alignment with OCR total
+            Maximum pixels to shift grid boundaries for alignment (0 = off)
           </div>
-          <div className="flex gap-2">
-            {MAX_SHIFT_OPTIONS.map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => setSetting("maxShift", value)}
-                className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors focus-ring ${
-                  maxShift === value
-                    ? "bg-primary-50 dark:bg-primary-900/30 border-primary-300 dark:border-primary-700 text-primary-700 dark:text-primary-400"
-                    : "bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="flex items-center gap-3">
+            <input
+              type="range"
+              min={0}
+              max={10}
+              step={1}
+              value={maxShift}
+              onChange={(e) => setSetting("maxShift", Number(e.target.value))}
+              className="w-48 accent-primary-600"
+            />
+            <span className="text-sm font-mono font-medium text-slate-700 dark:text-slate-300 w-6 text-center">
+              {maxShift}
+            </span>
           </div>
         </div>
 

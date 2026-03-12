@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { usePreprocessingStore, useScreenshotImageUrl } from "@/hooks/usePreprocessingWithDI";
 import type { Stage, StageStatus, PreprocessingEventData } from "@/store/preprocessingStore";
@@ -161,15 +161,15 @@ export const StageReviewTable = ({
   const setHighlightedScreenshotId = usePreprocessingStore((s) => s.setHighlightedScreenshotId);
   const enterQueue = usePreprocessingStore((s) => s.enterQueue);
 
-  const [sortColumn, setSortColumn] = useState<string>("id");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const sortColumn = usePreprocessingStore((s) => s.tableSortColumn[stage] ?? "id");
+  const sortDirection = usePreprocessingStore((s) => s.tableSortDirection[stage] ?? "asc") as SortDirection;
+  const setTableSort = usePreprocessingStore((s) => s.setTableSort);
 
   const handleSort = (column: string) => {
     if (sortColumn === column) {
-      setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+      setTableSort(stage, column, sortDirection === "asc" ? "desc" : "asc");
     } else {
-      setSortColumn(column);
-      setSortDirection("asc");
+      setTableSort(stage, column, "asc");
     }
   };
 
