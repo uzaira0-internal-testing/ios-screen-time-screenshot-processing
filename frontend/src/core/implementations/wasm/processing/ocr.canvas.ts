@@ -181,19 +181,19 @@ export async function findScreenshotTitle(
   }
 
   // Server: info_rect = [40, 300, 120, 2000] (left, top, width, height)
-  let infoRect: Rect = { x: 40, y: 300, width: 120, height: 2000 };
+  // BUT the fallback uses numpy slicing: img[info_rect[0]:info_rect[2], info_rect[1]:info_rect[3]]
+  // = img[40:120, 300:2000] = y: 40-120, x: 300-2000 (80px tall, 1700px wide horizontal strip)
+  let infoLeft = 40, infoTop = 300, infoWidth = 120, infoHeight = 2000;
   let foundInfo = false;
 
   // Server: iterate all words, find last "INFO" match
   if (ocr.words.length > 0) {
     for (const word of ocr.words) {
       if (word.text && word.text.toUpperCase().includes("INFO") && word.bbox) {
-        infoRect = {
-          x: word.bbox.x0,
-          y: word.bbox.y0,
-          width: word.bbox.x1 - word.bbox.x0,
-          height: word.bbox.y1 - word.bbox.y0,
-        };
+        infoLeft = word.bbox.x0;
+        infoTop = word.bbox.y0;
+        infoWidth = word.bbox.x1 - word.bbox.x0;
+        infoHeight = word.bbox.y1 - word.bbox.y0;
         foundInfo = true;
         // Server doesn't break — takes the last match
       }
@@ -205,10 +205,10 @@ export async function findScreenshotTitle(
 
   if (foundInfo) {
     // Server: app_height = info_rect[3] * 7
-    const appHeight = infoRect.height * 7;
-    const titleOriginY = infoRect.y + infoRect.height;
-    const xOrigin = infoRect.x + Math.floor(1.5 * infoRect.width);
-    const xWidth = xOrigin + Math.floor(infoRect.width * 12);
+    const appHeight = infoHeight * 7;
+    const titleOriginY = infoTop + infoHeight;
+    const xOrigin = infoLeft + Math.floor(1.5 * infoWidth);
+    const xWidth = xOrigin + Math.floor(infoWidth * 12);
 
     appExtractRect = {
       x: xOrigin,
@@ -220,8 +220,10 @@ export async function findScreenshotTitle(
     titleYPosition = titleOriginY + appHeight;
   } else {
     // Server fallback: img[info_rect[0]:info_rect[2], info_rect[1]:info_rect[3]]
-    // which is img[40:120, 300:2000]
-    appExtractRect = infoRect;
+    // With default [40, 300, 120, 2000]:
+    // img[40:120, 300:2000] = numpy [rows, cols] = y: 40-120, x: 300-2000
+    // = 80px tall horizontal strip near top, spanning most of the width
+    appExtractRect = { x: 300, y: 40, width: 1700, height: 80 };
   }
 
   // Server: app_find = extract_all_text(app_extract, ocr_config)
