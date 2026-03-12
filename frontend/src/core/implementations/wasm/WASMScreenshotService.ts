@@ -411,11 +411,9 @@ export class WASMScreenshotService implements IScreenshotService {
       return screenshot;
     }
 
-    // If already has title and total (for screen_time) or hourly data, no need to process
-    const needsProcessing =
-      screenshot.image_type === "screen_time"
-        ? !screenshot.extracted_title || !screenshot.extracted_total
-        : !screenshot.extracted_hourly_data;
+    // Skip re-processing if we already have hourly data (the expensive part).
+    // Title/total may be null if OCR missed them — that's OK, the user can see the data.
+    const needsProcessing = !screenshot.extracted_hourly_data;
 
     console.log(
       `[WASMScreenshotService.processIfNeeded] Screenshot ${screenshot.id}: type=${screenshot.image_type}, title=${screenshot.extracted_title}, total=${screenshot.extracted_total}, needsProcessing=${needsProcessing}`,
@@ -492,6 +490,27 @@ export class WASMScreenshotService implements IScreenshotService {
           console.log(
             `[WASMScreenshotService.processIfNeeded] Using existing grid from screenshot:`,
             gridCoordsToUse,
+          );
+        }
+      }
+
+      // Priority 3: Detect grid with both methods before calling processImage
+      // This prevents the worker from throwing "Failed to detect grid automatically"
+      if (!gridCoordsToUse) {
+        console.log(
+          `[WASMScreenshotService.processIfNeeded] No grid coords, trying line_based then ocr_anchored detection`,
+        );
+        gridCoordsToUse = await this.processingService.detectGrid(imageBlob, screenshot.image_type, "line_based")
+          ?? await this.processingService.detectGrid(imageBlob, screenshot.image_type, "ocr_anchored")
+          ?? undefined;
+        if (gridCoordsToUse) {
+          console.log(
+            `[WASMScreenshotService.processIfNeeded] Detected grid:`,
+            gridCoordsToUse,
+          );
+        } else {
+          console.warn(
+            `[WASMScreenshotService.processIfNeeded] Grid detection failed for screenshot ${screenshot.id}`,
           );
         }
       }
