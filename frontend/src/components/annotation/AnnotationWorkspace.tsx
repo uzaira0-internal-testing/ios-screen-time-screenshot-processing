@@ -456,7 +456,7 @@ export const AnnotationWorkspace = ({
             <AlignmentWarning alignmentScore={screenshot.alignment_score} />
 
             {/* Preprocessing Summary */}
-            <PreprocessingSummary processingMetadata={screenshot.processing_metadata} />
+            <PreprocessingSummary processingMetadata={screenshot.processing_metadata} screenshotId={screenshot.id} />
 
             {/* Totals Display */}
             <TotalsDisplay
