@@ -431,6 +431,7 @@ export class WASMPreprocessingService implements IPreprocessingService {
 
       case "ocr": {
         if (!blob) throw new Error("No image blob for OCR processing");
+        const _ocrT0 = performance.now();
 
         const ocrMethod = (options.ocr_method ?? "line_based") as "ocr_anchored" | "line_based";
 
@@ -451,10 +452,12 @@ export class WASMPreprocessingService implements IPreprocessingService {
         // Line-based detection doesn't need Tesseract, so we skip initialize() here —
         // it will be called lazily before processImage() which needs OCR for title/total.
         const fallbackMethod = ocrMethod === "line_based" ? "ocr_anchored" : "line_based";
+        const _gridT0 = performance.now();
         let grid = await this.processing.detectGrid(blob, imageType, ocrMethod);
         if (!grid) {
           grid = await this.processing.detectGrid(blob, imageType, fallbackMethod);
         }
+        console.log(`[BENCH] OCR stage - grid detection: ${(performance.now() - _gridT0).toFixed(0)}ms`);
 
         if (!grid) {
           // Both methods failed — record the failure
@@ -476,14 +479,19 @@ export class WASMPreprocessingService implements IPreprocessingService {
 
         try {
           // Initialize Tesseract now — processImage needs it for title/total OCR
+          const _initT0 = performance.now();
           if (!this.processing.isInitialized()) {
             await this.processing.initialize();
           }
+          console.log(`[BENCH] OCR stage - Tesseract init check: ${(performance.now() - _initT0).toFixed(0)}ms`);
+          const _procT0 = performance.now();
           ocrResult = await this.processing.processImage(blob, {
             imageType,
             gridCoordinates: grid,
             maxShift: 5,
           });
+          console.log(`[BENCH] OCR stage - processImage: ${(performance.now() - _procT0).toFixed(0)}ms`);
+          console.log(`[BENCH] OCR stage - TOTAL: ${(performance.now() - _ocrT0).toFixed(0)}ms`);
         } catch (err) {
           const ppOcr = getPreprocessing(screenshot);
           const updated = addEvent(ppOcr, stage, "completed", {

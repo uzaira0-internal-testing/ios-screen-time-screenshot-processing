@@ -224,17 +224,14 @@ export class WASMProcessingService implements IProcessingService {
       console.log("[WASMProcessingService.processImage] Initialize complete");
     }
 
-    console.log(
-      "[WASMProcessingService.processImage] Converting blob to ImageData",
-    );
+    const _blobT0 = performance.now();
     const imgData =
       imageData instanceof Blob
         ? await smartConvertBlobToImageData(imageData)
         : imageData;
+    console.log(`[BENCH] processImage blob→ImageData: ${(performance.now() - _blobT0).toFixed(0)}ms (${imgData.width}x${imgData.height})`);
 
-    console.log(
-      "[WASMProcessingService.processImage] Sending PROCESS_IMAGE message to worker",
-    );
+    const _workerT0 = performance.now();
     const result = await this.sendMessage<ProcessImageResponse["payload"]>(
       {
         type: "PROCESS_IMAGE",
@@ -247,11 +244,8 @@ export class WASMProcessingService implements IProcessingService {
       },
       onProgress,
     );
+    console.log(`[BENCH] processImage worker round-trip: ${(performance.now() - _workerT0).toFixed(0)}ms`);
 
-    console.log(
-      "[WASMProcessingService.processImage] Received result from worker:",
-      result,
-    );
     return result;
   }
 
@@ -300,13 +294,17 @@ export class WASMProcessingService implements IProcessingService {
     imageType: ImageType,
     method?: "ocr_anchored" | "line_based",
   ): Promise<GridCoordinates | null> {
+    const _dgT0 = performance.now();
     const imgData = await this.ensureReadyAndConvert(imageData);
+    console.log(`[BENCH] detectGrid blob→ImageData: ${(performance.now() - _dgT0).toFixed(0)}ms`);
+    const _dgT1 = performance.now();
     const result = await this.sendMessage<{
       gridCoordinates: GridCoordinates | null;
     }>({
       type: "DETECT_GRID",
       payload: { imageData: imgData, imageType, method },
     });
+    console.log(`[BENCH] detectGrid worker round-trip (${method}): ${(performance.now() - _dgT1).toFixed(0)}ms`);
     return result.gridCoordinates;
   }
 
