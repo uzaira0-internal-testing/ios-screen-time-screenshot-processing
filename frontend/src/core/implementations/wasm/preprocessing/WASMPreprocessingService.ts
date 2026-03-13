@@ -67,7 +67,16 @@ function getPreprocessing(screenshot: Screenshot): PreprocessingMeta {
 
 function setPreprocessing(screenshot: Screenshot, pp: PreprocessingMeta): Record<string, unknown> {
   const pm = { ...((screenshot.processing_metadata as Record<string, unknown>) ?? {}) };
-  pm.preprocessing = pp;
+  // Write top-level stage result keys to match server shape (PreprocessingDetailsResponse).
+  // This ensures components reading preprocessing.device_detection etc. work in both modes.
+  const ppOut: Record<string, unknown> = { ...pp };
+  for (const [stage, eid] of Object.entries(pp.current_events)) {
+    const event = pp.events.find((e) => e.event_id === eid);
+    if (event) {
+      ppOut[stage] = event.result;
+    }
+  }
+  pm.preprocessing = ppOut;
   return pm;
 }
 
