@@ -23,6 +23,8 @@ import { PreprocessingSummary } from "./PreprocessingSummary";
 import { useScreenshotImage } from "@/hooks/useScreenshotImage";
 import { PHIRegionEditor } from "@/components/preprocessing/PHIRegionEditor";
 import { CropAdjustModal } from "@/components/preprocessing/CropAdjustModal";
+import { getCropRectFromEvent } from "@/components/preprocessing/CroppingTab";
+import { getCurrentEvent } from "@/components/preprocessing/StageReviewTable";
 import toast from "react-hot-toast";
 
 type ProcessingMethod = "ocr_anchored" | "line_based";
@@ -769,6 +771,7 @@ export const AnnotationWorkspace = ({
             setCropEditorOpen(false);
             loadById(screenshot.id);
           }}
+          initialCrop={getCropRectFromEvent(getCurrentEvent(screenshot, "cropping"))}
         />
       )}
     </div>
