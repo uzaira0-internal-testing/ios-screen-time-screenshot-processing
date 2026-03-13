@@ -25,17 +25,23 @@ export const HourlyUsageOverlay = ({
   const [canvasReady, setCanvasReady] = useState(false);
   const containerWidthRef = useRef(800);
   const loadedImageRef = useRef<HTMLImageElement | null>(null);
+  const gridCoordsRef = useRef(gridCoords);
+  gridCoordsRef.current = gridCoords;
+  const rafRef = useRef<number | null>(null);
+  // Stable boolean — only changes when gridCoords validity changes, not on every reference change
+  const hasValidGrid = !!(gridCoords && gridCoords.upper_left.x !== 0);
 
-  // Redraw canvas from cached image (no reload, no flicker)
+  // Redraw canvas from cached image (stable — reads everything from refs)
   const redrawCanvas = useCallback(() => {
     const img = loadedImageRef.current;
     const canvas = canvasRef.current;
-    if (!img || !canvas || !gridCoords || gridCoords.upper_left.x === 0) return;
+    const gc = gridCoordsRef.current;
+    if (!img || !canvas || !gc || gc.upper_left.x === 0) return;
 
-    const cropX = gridCoords.upper_left.x;
-    const cropY = gridCoords.upper_left.y;
-    const cropWidth = gridCoords.lower_right.x - gridCoords.upper_left.x;
-    const cropHeight = gridCoords.lower_right.y - gridCoords.upper_left.y;
+    const cropX = gc.upper_left.x;
+    const cropY = gc.upper_left.y;
+    const cropWidth = gc.lower_right.x - gc.upper_left.x;
+    const cropHeight = gc.lower_right.y - gc.upper_left.y;
     if (cropWidth <= 0 || cropHeight <= 0) return;
 
     const graphHeight = 200;
@@ -47,28 +53,36 @@ export const HourlyUsageOverlay = ({
     if (ctx) {
       ctx.drawImage(img, cropX, cropY, cropWidth, cropHeight, 0, 0, targetWidth, graphHeight);
     }
-  }, [gridCoords]);
+  }, []);
 
-  // Handle resize — just redraw, don't reload image
+  // Handle resize — RAF-coalesced redraw, no image reload
   useEffect(() => {
     if (!containerRef.current) return;
 
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         containerWidthRef.current = entry.contentRect.width;
-        redrawCanvas();
       }
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+        redrawCanvas();
+      });
     });
 
     observer.observe(containerRef.current);
-    return () => observer.disconnect();
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      observer.disconnect();
+    };
   }, [redrawCanvas]);
 
-  // Load image only when imageUrl or gridCoords change
+  // Load image when imageUrl changes or grid becomes valid.
+  // hasValidGrid is a primitive boolean so it won't trigger on unstable object refs.
   useEffect(() => {
     let isMounted = true;
 
-    if (!gridCoords || gridCoords.upper_left.x === 0) {
+    if (!hasValidGrid) {
       setCanvasReady(false);
       return;
     }
@@ -92,8 +106,9 @@ export const HourlyUsageOverlay = ({
 
     return () => {
       isMounted = false;
+      loadedImageRef.current = null;
     };
-  }, [imageUrl, gridCoords, redrawCanvas]);
+  }, [imageUrl, hasValidGrid, redrawCanvas]);
 
   const handleChange = (hour: number, delta: number) => {
     const currentValue = data[hour] || 0;
@@ -142,7 +157,6 @@ export const HourlyUsageOverlay = ({
     );
   };
 
-  const hasValidGrid = gridCoords && gridCoords.upper_left.x !== 0;
   const graphHeight = 200;
 
   return (

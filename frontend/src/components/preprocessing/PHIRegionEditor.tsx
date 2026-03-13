@@ -69,6 +69,7 @@ export const PHIRegionEditor = ({
   const [isRedacting, setIsRedacting] = useState(false);
   const [redactionMethod, setRedactionMethod] = useState("redbox");
   const [imageError, setImageError] = useState(false);
+  const [regionsLoadError, setRegionsLoadError] = useState(false);
 
   // Close on Escape key (skip in inline mode — queue view handles keyboard)
   useEffect(() => {
@@ -113,42 +114,84 @@ export const PHIRegionEditor = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [inline]);
 
-  // Track which screenshot is loaded to avoid unnecessary reloads
+  // Track which screenshot is loaded to avoid unnecessary reloads and blob URL leaks
   const loadedScreenshotRef = useRef<number | null>(null);
+  const blobUrlRef = useRef<string | undefined>(undefined);
+
+  // Reset loaded ref when modal closes so next open re-fetches fresh data
+  // (e.g., after applying redaction the image changes)
+  useEffect(() => {
+    if (!isOpen && !inline) {
+      loadedScreenshotRef.current = null;
+    }
+  }, [isOpen, inline]);
 
   // Load image and regions on open (inline mode is always "open")
   useEffect(() => {
     if (!isOpen && !inline) return;
     let cancelled = false;
-    setImageError(false);
     setSelectedIndex(null);
 
-    // Only reset image if switching to a different screenshot
-    if (loadedScreenshotRef.current !== screenshotId) {
-      setImage(null);
-      setRegions([]);
-      loadedScreenshotRef.current = screenshotId;
+    // Skip fetches if already loaded for this screenshot (avoids redundant
+    // network requests in inline mode where isOpen doesn't toggle)
+    if (loadedScreenshotRef.current === screenshotId) return;
+
+    setImage(null);
+    setRegions([]);
+    setImageError(false);
+    setRegionsLoadError(false);
+    loadedScreenshotRef.current = screenshotId;
+
+    // Revoke previous blob URL if any
+    if (blobUrlRef.current?.startsWith("blob:")) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = undefined;
     }
 
     // Load the cropped image (not the redacted one)
     preprocessingService.getStageImageUrl(screenshotId, "cropping").then((imageUrl) => {
       if (cancelled) return;
+      blobUrlRef.current = imageUrl;
       const img = new Image();
       img.crossOrigin = "anonymous";
       img.src = imageUrl;
       img.onload = () => { if (!cancelled) setImage(img); };
-      img.onerror = () => { if (!cancelled) setImageError(true); };
-    }).catch(() => { if (!cancelled) setImageError(true); });
+      img.onerror = () => {
+        if (!cancelled) {
+          console.error(`[PHIRegionEditor] Failed to load image for screenshot ${screenshotId}`);
+          setImageError(true);
+        }
+      };
+    }).catch((err) => {
+      if (!cancelled) {
+        console.error(`[PHIRegionEditor] Failed to get image URL for screenshot ${screenshotId}:`, err);
+        setImageError(true);
+      }
+    });
 
     // Load existing regions
     preprocessingService.getPHIRegions(screenshotId).then((data: { regions: PHIRegion[] }) => {
       if (!cancelled) setRegions(data.regions || []);
-    }).catch(() => {
-      if (!cancelled) setRegions([]);
+    }).catch((err) => {
+      if (!cancelled) {
+        console.error(`[PHIRegionEditor] Failed to load PHI regions for screenshot ${screenshotId}:`, err);
+        setRegionsLoadError(true);
+      }
     });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen, inline, screenshotId, preprocessingService]);
+
+  // Cleanup blob URL on unmount
+  useEffect(() => {
+    return () => {
+      if (blobUrlRef.current?.startsWith("blob:")) {
+        URL.revokeObjectURL(blobUrlRef.current);
+      }
+    };
+  }, []);
 
   // Calculate scale
   useEffect(() => {
@@ -484,7 +527,12 @@ export const PHIRegionEditor = ({
               </button>
             </div>
           ))}
-          {regions.length === 0 && (
+          {regionsLoadError && (
+            <div className="text-center text-red-500 dark:text-red-400 py-4 text-sm font-medium bg-red-50 dark:bg-red-900/20 rounded border border-red-200 dark:border-red-800 mx-2">
+              Failed to load PHI regions — regions may exist but could not be fetched. Do not skip redaction.
+            </div>
+          )}
+          {regions.length === 0 && !regionsLoadError && (
             <div className="text-center text-slate-400 dark:text-slate-500 py-8 text-sm">
               No PHI regions. Use Draw tool to add regions.
             </div>
