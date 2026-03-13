@@ -34,19 +34,22 @@ jobs:
         with:
           node-version: 22
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.os == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
-      - name: Cache Cargo registry + build
-        uses: actions/cache@v4
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            frontend/src-tauri/target
-          key: ${{ matrix.os }}-cargo-${{ hashFiles('frontend/src-tauri/Cargo.lock') }}
-          restore-keys: ${{ matrix.os }}-cargo-
+          workspaces: frontend/src-tauri -> target
+          cache-on-failure: true
+
+      - name: sccache
+        uses: mozilla-actions/sccache-action@v0.0.7
 
       - name: Install Linux deps
         if: matrix.os == 'ubuntu-22.04'
@@ -56,11 +59,11 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: frontend
-        run: npm install --no-audit --no-fund
+        run: bun install --frozen-lockfile
 
       - name: Build frontend
         working-directory: frontend
-        run: npx vite build
+        run: bunx vite build
 
       - name: Validate updater config
         shell: bash
@@ -77,11 +80,13 @@ jobs:
 
       - name: Build Tauri
         working-directory: frontend
-        run: npx @tauri-apps/cli build ${{ matrix.os == 'macos-latest' && '--target universal-apple-darwin' || '' }}
+        run: bunx @tauri-apps/cli build ${{ matrix.os == 'macos-latest' && '--target universal-apple-darwin' || '' }}
         env:
           CI: true
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          RUSTC_WRAPPER: sccache
+          SCCACHE_GHA_ENABLED: "true"
 
       - name: Upload updater artifacts
         uses: actions/upload-artifact@v4
