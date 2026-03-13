@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import type { HourlyData, Consensus } from '@/types';
 import { calculateTotalMinutes } from '@/utils/formatters';
 import clsx from 'clsx';
@@ -11,17 +10,9 @@ interface DataGridProps {
 }
 
 export const DataGrid = ({ data, onChange, consensus, readOnly = false }: DataGridProps) => {
-  const [localData, setLocalData] = useState<HourlyData>(data);
-
-  useEffect(() => {
-    setLocalData(data);
-  }, [data]);
-
   const handleChange = (hour: number, value: string) => {
     const numValue = parseInt(value) || 0;
     if (numValue < 0 || numValue > 60) return;
-
-    setLocalData({ ...localData, [hour]: numValue });
     onChange(hour, numValue);
   };
 
@@ -31,7 +22,7 @@ export const DataGrid = ({ data, onChange, consensus, readOnly = false }: DataGr
     const disagreement = consensus.disagreements.find((d) => d.hour === hour);
     if (!disagreement) return 'none';
 
-    const currentValue = localData[hour] || 0;
+    const currentValue = data[hour] || 0;
     const consensusValue = disagreement.consensus_value;
     const diff = Math.abs(currentValue - consensusValue);
 
@@ -55,7 +46,7 @@ export const DataGrid = ({ data, onChange, consensus, readOnly = false }: DataGr
     );
   };
 
-  const total = calculateTotalMinutes(localData);
+  const total = calculateTotalMinutes(data);
 
   return (
     <div className="space-y-4">
@@ -70,7 +61,7 @@ export const DataGrid = ({ data, onChange, consensus, readOnly = false }: DataGr
               type="number"
               min="0"
               max="60"
-              value={localData[i] || 0}
+              value={data[i] || 0}
               onChange={(e) => handleChange(i, e.target.value)}
               disabled={readOnly}
               className={getCellClassName(i)}

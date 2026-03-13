@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import type { HourlyData, Consensus, GridCoordinates } from "@/types";
 import { loadImage } from "@/utils/imageUtils";
 import clsx from "clsx";
@@ -23,69 +23,63 @@ export const HourlyUsageOverlay = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [canvasReady, setCanvasReady] = useState(false);
-  const [containerWidth, setContainerWidth] = useState(800);
+  const containerWidthRef = useRef(800);
+  const loadedImageRef = useRef<HTMLImageElement | null>(null);
 
-  // Handle resize
+  // Redraw canvas from cached image (no reload, no flicker)
+  const redrawCanvas = useCallback(() => {
+    const img = loadedImageRef.current;
+    const canvas = canvasRef.current;
+    if (!img || !canvas || !gridCoords || gridCoords.upper_left.x === 0) return;
+
+    const cropX = gridCoords.upper_left.x;
+    const cropY = gridCoords.upper_left.y;
+    const cropWidth = gridCoords.lower_right.x - gridCoords.upper_left.x;
+    const cropHeight = gridCoords.lower_right.y - gridCoords.upper_left.y;
+    if (cropWidth <= 0 || cropHeight <= 0) return;
+
+    const graphHeight = 200;
+    const targetWidth = containerWidthRef.current;
+    canvas.width = targetWidth;
+    canvas.height = graphHeight;
+
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.drawImage(img, cropX, cropY, cropWidth, cropHeight, 0, 0, targetWidth, graphHeight);
+    }
+  }, [gridCoords]);
+
+  // Handle resize — just redraw, don't reload image
   useEffect(() => {
     if (!containerRef.current) return;
 
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        setContainerWidth(entry.contentRect.width);
+        containerWidthRef.current = entry.contentRect.width;
+        redrawCanvas();
       }
     });
 
     observer.observe(containerRef.current);
     return () => observer.disconnect();
-  }, []);
+  }, [redrawCanvas]);
 
+  // Load image only when imageUrl or gridCoords change
   useEffect(() => {
     let isMounted = true;
-    // Reset canvas ready state when dependencies change (intentional loading state pattern)
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setCanvasReady(false);
 
     if (!gridCoords || gridCoords.upper_left.x === 0) {
+      setCanvasReady(false);
       return;
     }
 
     const loadAndCropImage = async () => {
       try {
         const img = await loadImage(imageUrl);
-        const canvas = canvasRef.current;
-        if (!canvas || !isMounted) return;
-
-        const cropX = gridCoords.upper_left.x;
-        const cropY = gridCoords.upper_left.y;
-        const cropWidth = gridCoords.lower_right.x - gridCoords.upper_left.x;
-        const cropHeight = gridCoords.lower_right.y - gridCoords.upper_left.y;
-
-        if (cropWidth <= 0 || cropHeight <= 0) return;
-
-        // Fixed height for the graph - matching the aspect ratio
-        const graphHeight = 200;
-        const targetWidth = containerWidth;
-
-        canvas.width = targetWidth;
-        canvas.height = graphHeight;
-
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.drawImage(
-            img,
-            cropX,
-            cropY,
-            cropWidth,
-            cropHeight,
-            0,
-            0,
-            targetWidth,
-            graphHeight,
-          );
-        }
-        if (isMounted) {
-          setCanvasReady(true);
-        }
+        if (!isMounted) return;
+        loadedImageRef.current = img;
+        redrawCanvas();
+        setCanvasReady(true);
       } catch (err) {
         console.error("Failed to load cropped image:", err);
         if (isMounted) {
@@ -94,13 +88,12 @@ export const HourlyUsageOverlay = ({
       }
     };
 
-    const timeoutId = setTimeout(loadAndCropImage, 50);
+    loadAndCropImage();
 
     return () => {
       isMounted = false;
-      clearTimeout(timeoutId);
     };
-  }, [imageUrl, gridCoords, containerWidth]);
+  }, [imageUrl, gridCoords, redrawCanvas]);
 
   const handleChange = (hour: number, delta: number) => {
     const currentValue = data[hour] || 0;

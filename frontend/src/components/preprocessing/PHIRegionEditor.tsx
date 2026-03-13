@@ -113,14 +113,22 @@ export const PHIRegionEditor = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [inline]);
 
+  // Track which screenshot is loaded to avoid unnecessary reloads
+  const loadedScreenshotRef = useRef<number | null>(null);
+
   // Load image and regions on open (inline mode is always "open")
   useEffect(() => {
     if (!isOpen && !inline) return;
     let cancelled = false;
     setImageError(false);
-    setImage(null);
-    setRegions([]);
     setSelectedIndex(null);
+
+    // Only reset image if switching to a different screenshot
+    if (loadedScreenshotRef.current !== screenshotId) {
+      setImage(null);
+      setRegions([]);
+      loadedScreenshotRef.current = screenshotId;
+    }
 
     // Load the cropped image (not the redacted one)
     preprocessingService.getStageImageUrl(screenshotId, "cropping").then((imageUrl) => {
