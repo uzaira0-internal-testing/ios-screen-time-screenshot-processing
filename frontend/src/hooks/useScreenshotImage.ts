@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { useScreenshotService } from "@/core/hooks/useServices";
 
 /**
- * Hook to get the image URL for a screenshot, handling both server and WASM modes
+ * Hook to get the image URL for a screenshot, handling both server and WASM modes.
+ * Pass a refreshKey that changes when the image needs to be re-fetched
+ * (e.g., after crop or redaction modifies the underlying file).
  */
-export function useScreenshotImage(screenshotId: number): string | null {
+export function useScreenshotImage(screenshotId: number, refreshKey?: number): string | null {
   const screenshotService = useScreenshotService();
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
@@ -19,7 +21,12 @@ export function useScreenshotImage(screenshotId: number): string | null {
 
     const loadImage = async () => {
       try {
-        const resolvedUrl = await screenshotService.getImageUrl(screenshotId);
+        let resolvedUrl = await screenshotService.getImageUrl(screenshotId);
+        // Bust browser cache when image has been modified (crop/redaction)
+        if (refreshKey && !resolvedUrl.startsWith("blob:")) {
+          const separator = resolvedUrl.includes("?") ? "&" : "?";
+          resolvedUrl = `${resolvedUrl}${separator}_t=${refreshKey}`;
+        }
         if (!cancelled) {
           setImageUrl(resolvedUrl);
         }
@@ -42,7 +49,7 @@ export function useScreenshotImage(screenshotId: number): string | null {
     return () => {
       cancelled = true;
     };
-  }, [screenshotId, screenshotService]);
+  }, [screenshotId, screenshotService, refreshKey]);
 
   return imageUrl;
 }

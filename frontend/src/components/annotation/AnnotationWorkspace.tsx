@@ -78,7 +78,8 @@ export const AnnotationWorkspace = ({
     setMaxShift,
   } = useAnnotation(groupId, processingStatus);
 
-  const imageUrl = useScreenshotImage(screenshot?.id || 0);
+  const [imageRefreshKey, setImageRefreshKey] = useState(0);
+  const imageUrl = useScreenshotImage(screenshot?.id || 0, imageRefreshKey);
 
   const [notes, setNotes] = useState("");
   const [displayMode, setDisplayMode] = useState<GraphDisplayMode>("overlay");
@@ -756,6 +757,7 @@ export const AnnotationWorkspace = ({
           onRedactionApplied={() => {
             setPHIEditorOpen(false);
             loadById(screenshot.id);
+            setImageRefreshKey((k) => k + 1);
           }}
         />
       )}
@@ -770,6 +772,7 @@ export const AnnotationWorkspace = ({
           onCropApplied={() => {
             setCropEditorOpen(false);
             loadById(screenshot.id);
+            setImageRefreshKey((k) => k + 1);
           }}
           initialCrop={getCropRectFromEvent(getCurrentEvent(screenshot, "cropping"))}
         />
