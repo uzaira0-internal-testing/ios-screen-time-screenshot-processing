@@ -56,6 +56,11 @@ export const CropAdjustModal = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose, inline]);
 
+  // Keep a ref to initialCrop so the image-load effect doesn't re-trigger on
+  // every render when the parent computes a new (structurally equal) object.
+  const initialCropRef = useRef(initialCrop);
+  initialCropRef.current = initialCrop;
+
   // Load original image (inline mode is always "open")
   useEffect(() => {
     if (!isOpen && !inline) return;
@@ -68,8 +73,9 @@ export const CropAdjustModal = ({
     img.onload = () => {
       if (cancelled) return;
       setImage(img);
-      if (initialCrop) {
-        setCrop(initialCrop);
+      const ic = initialCropRef.current;
+      if (ic) {
+        setCrop(ic);
       } else {
         setCrop({ left: 0, top: 0, right: img.naturalWidth, bottom: img.naturalHeight });
       }
@@ -87,7 +93,7 @@ export const CropAdjustModal = ({
       cancelled = true;
       if (blobUrl?.startsWith("blob:")) URL.revokeObjectURL(blobUrl);
     };
-  }, [isOpen, inline, screenshotId, initialCrop, preprocessingService]);
+  }, [isOpen, inline, screenshotId, preprocessingService]);
 
   // Calculate scale to fit canvas — use most of the viewport
   useEffect(() => {
