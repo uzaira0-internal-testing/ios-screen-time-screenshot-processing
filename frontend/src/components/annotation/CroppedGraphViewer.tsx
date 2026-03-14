@@ -18,6 +18,10 @@ export const CroppedGraphViewer = ({
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    // Reset error when imageUrl changes so the component recovers after
+    // a transient failure (e.g., revoked blob URL replaced by a fresh one).
+    setError(false);
+
     if (!gridCoords || gridCoords.upper_left.x === 0 || !imageUrl) {
       return;
     }

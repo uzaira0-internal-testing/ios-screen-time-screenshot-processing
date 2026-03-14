@@ -115,6 +115,11 @@ export function useScreenshotImageUrl(
       return;
     }
 
+    // Clear stale URL immediately so components don't render with a revoked
+    // blob URL during the async gap (e.g., after crop/redaction calls
+    // storeImageBlob which revokes the old URL synchronously).
+    setUrl(null);
+
     let revoked = false;
     let objectUrl: string | null = null;
 
