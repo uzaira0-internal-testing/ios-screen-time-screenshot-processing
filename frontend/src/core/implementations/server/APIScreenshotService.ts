@@ -119,8 +119,10 @@ export class APIScreenshotService implements IScreenshotService {
     }) as Promise<ProcessingResult>;
   }
 
-  async skip(screenshotId: number): Promise<void> {
+  async skip(screenshotId: number, _reason?: string): Promise<void> {
     await api.screenshots.skip(screenshotId);
+    // Skip reason stored client-side only for now; server skip endpoint
+    // would need a backend change to accept a reason parameter.
   }
 
   async updateTitle(screenshotId: number, title: string): Promise<void> {

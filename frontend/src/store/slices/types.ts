@@ -30,7 +30,7 @@ export interface ScreenshotSlice {
   loadNextScreenshot: () => Promise<void>;
   loadScreenshot: (id: number) => Promise<void>;
   loadQueueStats: () => Promise<void>;
-  skipScreenshot: () => Promise<void>;
+  skipScreenshot: (reason?: string) => Promise<void>;
 }
 
 // ============================================================================

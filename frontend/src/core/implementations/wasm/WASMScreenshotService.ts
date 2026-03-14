@@ -365,6 +365,13 @@ export class WASMScreenshotService implements IScreenshotService {
         issues: issues,
         has_blocking_issues: gridFailed,
         is_daily_total: false,
+        alignment_score: result.alignmentScore ?? null,
+        processing_method: method,
+        grid_detection_confidence: null,
+        grid_upper_left_x: result.gridCoordinates?.upper_left?.x ?? null,
+        grid_upper_left_y: result.gridCoordinates?.upper_left?.y ?? null,
+        grid_lower_right_x: result.gridCoordinates?.lower_right?.x ?? null,
+        grid_lower_right_y: result.gridCoordinates?.lower_right?.y ?? null,
       };
     }
 
@@ -381,11 +388,17 @@ export class WASMScreenshotService implements IScreenshotService {
     };
   }
 
-  async skip(screenshotId: number): Promise<void> {
-    await this.storageService.updateScreenshot(screenshotId, {
+  async skip(screenshotId: number, reason?: string): Promise<void> {
+    const update: Record<string, unknown> = {
       annotation_status: "skipped",
       processing_status: "skipped",
-    });
+    };
+    if (reason) {
+      const screenshot = await this.getById(screenshotId);
+      const meta = (screenshot.processing_metadata ?? {}) as Record<string, unknown>;
+      update.processing_metadata = { ...meta, skip_reason: reason };
+    }
+    await this.storageService.updateScreenshot(screenshotId, update);
   }
 
   async updateTitle(screenshotId: number, title: string): Promise<void> {

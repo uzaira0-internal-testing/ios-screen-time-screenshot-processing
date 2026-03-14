@@ -207,13 +207,13 @@ export const useAnnotation = (groupId?: string, processingStatus?: ProcessingSta
     [saveAnnotation],
   );
 
-  const handleSkip = useCallback(async () => {
+  const handleSkip = useCallback(async (reason?: string) => {
     try {
       if (config.isDev) {
-        console.log("[useAnnotation.handleSkip] Starting skip...");
+        console.log("[useAnnotation.handleSkip] Starting skip...", reason ? `reason: ${reason}` : "");
       }
-      await skipScreenshot();
-      toast.success("Screenshot skipped");
+      await skipScreenshot(reason);
+      toast.success(reason ? `Skipped: ${reason}` : "Screenshot skipped");
       if (config.isDev) {
         console.log("[useAnnotation.handleSkip] Skip completed");
       }
@@ -224,7 +224,7 @@ export const useAnnotation = (groupId?: string, processingStatus?: ProcessingSta
       toastErrorWithRetry({
         message: errorMessage,
         // eslint-disable-next-line react-hooks/immutability
-        onRetry: handleSkip,
+        onRetry: () => handleSkip(reason),
         retryLabel: "Retry Skip",
       });
     }

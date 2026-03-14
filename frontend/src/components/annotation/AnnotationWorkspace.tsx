@@ -16,6 +16,7 @@ import { VerificationFilter } from "./VerificationFilter";
 import { ProcessingStatusFilter } from "./ProcessingStatusFilter";
 import { SaveStatusIndicator } from "./SaveStatusIndicator";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { TotalsDisplay } from "./TotalsDisplay";
 import { AlignmentWarning } from "./AlignmentWarning";
 import type { ProcessingStatus } from "@/types";
@@ -26,6 +27,8 @@ import { PHIRegionEditor } from "@/components/preprocessing/PHIRegionEditor";
 import { CropAdjustModal } from "@/components/preprocessing/CropAdjustModal";
 import { getCropRectFromEvent } from "@/components/preprocessing/CroppingTab";
 import { getCurrentEvent } from "@/components/preprocessing/StageReviewTable";
+import { useConsensusService } from "@/core/hooks/useServices";
+import type { Consensus } from "@/types";
 import toast from "react-hot-toast";
 
 type ProcessingMethod = "ocr_anchored" | "line_based";
@@ -89,6 +92,22 @@ export const AnnotationWorkspace = ({
     useState<ProcessingMethod | null>(null);
   const [phiEditorOpen, setPHIEditorOpen] = useState(false);
   const [cropEditorOpen, setCropEditorOpen] = useState(false);
+  const [skipMenuOpen, setSkipMenuOpen] = useState(false);
+  const [consensus, setConsensus] = useState<Consensus | null>(null);
+  const consensusService = useConsensusService();
+
+  // Load consensus data when screenshot has multiple verifiers
+  useEffect(() => {
+    if (!screenshot?.id || !screenshot.verified_by_usernames || screenshot.verified_by_usernames.length < 2) {
+      setConsensus(null);
+      return;
+    }
+    let cancelled = false;
+    consensusService.getForScreenshot(screenshot.id)
+      .then((data) => { if (!cancelled) setConsensus(data); })
+      .catch(() => { if (!cancelled) setConsensus(null); });
+    return () => { cancelled = true; };
+  }, [screenshot?.id, screenshot?.verified_by_usernames?.length, consensusService]);
 
   // Check if THIS USER has verified the screenshot (read-only mode for them)
   // Use username-based check as it's more reliable than userId which can get stale
@@ -262,6 +281,18 @@ export const AnnotationWorkspace = ({
       key: "v",
       handler: handleVerificationToggle,
     },
+    {
+      key: "p",
+      handler: () => {
+        if (!isVerifiedByMe) setPHIEditorOpen(true);
+      },
+    },
+    {
+      key: "c",
+      handler: () => {
+        if (!isVerifiedByMe) setCropEditorOpen(true);
+      },
+    },
   ]);
 
   if (noScreenshots) {
@@ -320,8 +351,20 @@ export const AnnotationWorkspace = ({
     );
   }
 
+  const progressPercent = totalInFilter > 0 ? ((currentIndex + 1) / totalInFilter) * 100 : 0;
+
   return (
-    <div className="flex gap-1 h-full" data-testid="annotation-workspace">
+    <div className="flex flex-col h-full" data-testid="annotation-workspace">
+      {/* Progress bar */}
+      {totalInFilter > 0 && (
+        <div className="h-1 w-full bg-slate-200 dark:bg-slate-700 flex-shrink-0" title={`${currentIndex + 1} of ${totalInFilter}`}>
+          <div
+            className="h-full bg-primary-500 transition-all duration-300"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+      )}
+      <div className="flex gap-1 flex-1 min-h-0">
       {/* Left Column - Grid Selector */}
       <div className="flex-1">
         <div className="bg-white dark:bg-slate-800 h-full p-1 flex items-center justify-center relative">
@@ -394,6 +437,16 @@ export const AnnotationWorkspace = ({
               </div>
             );
           })()}
+          {consensus && (
+            <div className="bg-primary-50 dark:bg-primary-900/20 border-b border-primary-200 dark:border-primary-800 px-4 py-1.5 text-xs flex items-center gap-3">
+              <span className="font-medium text-primary-700 dark:text-primary-400">
+                Consensus ({consensus.total_annotations} annotations, {consensus.agreement_percentage}% agreement)
+              </span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" /> Agree</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500" /> Minor diff</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /> Major diff</span>
+            </div>
+          )}
           <div className="flex-1 flex items-center justify-center p-4 min-h-0">
             <div className="w-full">
               {!imageUrl ? (
@@ -404,6 +457,7 @@ export const AnnotationWorkspace = ({
                   onChange={updateHour}
                   imageUrl={imageUrl}
                   gridCoords={annotation?.grid_coords || null}
+                  {...(consensus ? { consensus } : {})}
                   readOnly={isVerifiedByMe}
                 />
               ) : (
@@ -449,22 +503,24 @@ export const AnnotationWorkspace = ({
             </div>
 
             {/* Filters */}
-            <div className="border-b border-slate-100 dark:border-slate-700 pb-2 space-y-2">
-              <div>
-                <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Status</div>
-                <ProcessingStatusFilter
-                  value={(processingStatus as FilterProcessingStatus) || "all"}
-                  onChange={handleProcessingStatusChange}
-                />
+            <CollapsibleSection title="Filters" storageKey="annotation-filters">
+              <div className="space-y-2">
+                <div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Status</div>
+                  <ProcessingStatusFilter
+                    value={(processingStatus as FilterProcessingStatus) || "all"}
+                    onChange={handleProcessingStatusChange}
+                  />
+                </div>
+                <div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Verified</div>
+                  <VerificationFilter
+                    value={verificationFilter}
+                    onChange={setVerificationFilter}
+                  />
+                </div>
               </div>
-              <div>
-                <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Verified</div>
-                <VerificationFilter
-                  value={verificationFilter}
-                  onChange={setVerificationFilter}
-                />
-              </div>
-            </div>
+            </CollapsibleSection>
 
             {/* Alignment Score Warning */}
             <AlignmentWarning alignmentScore={screenshot.alignment_score} />
@@ -475,6 +531,34 @@ export const AnnotationWorkspace = ({
               onEditPHI={() => setPHIEditorOpen(true)}
               onEditCrop={() => setCropEditorOpen(true)}
             />
+
+            {/* Tools — always visible so users discover PHI redaction / crop adjustment */}
+            <CollapsibleSection title="Tools (P / C)" storageKey="annotation-tools">
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setPHIEditorOpen(true)}
+                  disabled={isVerifiedByMe}
+                  className="flex-1 px-2 py-1.5 text-xs font-medium border border-red-200 dark:border-red-800 rounded bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
+                  title="Review and redact personal health information (P)"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  Redact PHI
+                </button>
+                <button
+                  onClick={() => setCropEditorOpen(true)}
+                  disabled={isVerifiedByMe}
+                  className="flex-1 px-2 py-1.5 text-xs font-medium border border-purple-200 dark:border-purple-800 rounded bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
+                  title="Adjust the crop boundaries (C)"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Adjust Crop
+                </button>
+              </div>
+            </CollapsibleSection>
 
             {/* Totals Display */}
             <TotalsDisplay
@@ -489,8 +573,7 @@ export const AnnotationWorkspace = ({
             />
 
             {/* View Mode Toggle */}
-            <div className="border-b border-slate-100 dark:border-slate-700 pb-2">
-              <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">View</div>
+            <CollapsibleSection title="View Mode" storageKey="annotation-view-mode">
               <div className="flex gap-1">
                 <button
                   onClick={() => setDisplayMode("overlay")}
@@ -513,7 +596,7 @@ export const AnnotationWorkspace = ({
                   Separate
                 </button>
               </div>
-            </div>
+            </CollapsibleSection>
 
             {/* Potential Duplicate Warning */}
             {screenshot?.potential_duplicate_of && (
@@ -541,11 +624,8 @@ export const AnnotationWorkspace = ({
             )}
 
             {/* Reprocessing Buttons */}
-            <div
-              className={`border-b border-slate-100 dark:border-slate-700 pb-2 ${isVerifiedByMe ? "opacity-50" : ""}`}
-            >
-              <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Reprocess Grid</div>
-
+            <CollapsibleSection title="Reprocess Grid" storageKey="annotation-reprocess" defaultOpen={false}>
+              <div className={isVerifiedByMe ? "opacity-50" : ""}>
               {/* Grid Optimization Spinner - centered */}
               <div className="flex flex-col items-center mb-2">
                 <div
@@ -663,11 +743,11 @@ export const AnnotationWorkspace = ({
                     ? `Current: ${screenshot.processing_method === "ocr_anchored" ? "OCR" : screenshot.processing_method === "line_based" ? "Lines" : screenshot.processing_method}`
                     : "Click to detect grid"}
               </div>
-            </div>
+              </div>
+            </CollapsibleSection>
 
             {/* Notes */}
-            <div className="border-b border-slate-100 dark:border-slate-700 pb-2">
-              <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Notes</div>
+            <CollapsibleSection title="Notes" storageKey="annotation-notes" defaultOpen={false}>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
@@ -675,7 +755,7 @@ export const AnnotationWorkspace = ({
                 placeholder="Optional notes..."
                 rows={2}
               />
-            </div>
+            </CollapsibleSection>
 
             {/* Action Buttons */}
             <div className="pt-2 space-y-2">
@@ -719,15 +799,40 @@ export const AnnotationWorkspace = ({
                 </div>
               )}
 
-              {/* Skip Button */}
-              <button
-                onClick={skip}
-                disabled={isLoading}
-                className="w-full py-2 text-sm bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded hover:bg-slate-200 dark:hover:bg-slate-600 disabled:opacity-50"
-                title="Skip this screenshot"
-              >
-                Skip (Esc)
-              </button>
+              {/* Skip Button with reasons dropdown */}
+              <div className="relative">
+                <div className="flex">
+                  <button
+                    onClick={() => skip()}
+                    disabled={isLoading}
+                    className="flex-1 py-2 text-sm bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-l hover:bg-slate-200 dark:hover:bg-slate-600 disabled:opacity-50"
+                    title="Skip this screenshot"
+                  >
+                    Skip (Esc)
+                  </button>
+                  <button
+                    onClick={() => setSkipMenuOpen((o) => !o)}
+                    disabled={isLoading}
+                    className="px-2 py-2 text-sm bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-r border-l border-slate-200 dark:border-slate-600 hover:bg-slate-200 dark:hover:bg-slate-600 disabled:opacity-50"
+                    title="Skip with reason"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                  </button>
+                </div>
+                {skipMenuOpen && (
+                  <div className="absolute bottom-full left-0 right-0 mb-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded shadow-lg z-20">
+                    {["Duplicate", "Bad quality", "Wrong type", "Daily total", "Other"].map((reason) => (
+                      <button
+                        key={reason}
+                        onClick={() => { setSkipMenuOpen(false); skip(reason.toLowerCase().replace(/ /g, "_")); }}
+                        className="w-full text-left px-3 py-1.5 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 first:rounded-t last:rounded-b"
+                      >
+                        {reason}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               {/* Auto-save Status */}
               <SaveStatusIndicator
@@ -743,7 +848,8 @@ export const AnnotationWorkspace = ({
               <div className="text-xs text-slate-400 dark:text-slate-500 text-center space-y-1">
                 <div>
                   <strong>←/→</strong> navigate | <strong>V</strong> verify |{" "}
-                  <strong>Esc</strong> skip
+                  <strong>Esc</strong> skip | <strong>P</strong> PHI |{" "}
+                  <strong>C</strong> crop
                 </div>
                 <div>
                   <strong>WASD</strong> move grid | <strong>Shift+WASD</strong>{" "}
@@ -788,6 +894,7 @@ export const AnnotationWorkspace = ({
           initialCrop={getCropRectFromEvent(getCurrentEvent(screenshot, "cropping"))}
         />
       )}
+      </div>
     </div>
   );
 };

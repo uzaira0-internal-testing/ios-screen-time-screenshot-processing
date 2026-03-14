@@ -248,10 +248,10 @@ export const createScreenshotSlice = (
     }
   },
 
-  skipScreenshot: async () => {
+  skipScreenshot: async (reason?: string) => {
     const { currentScreenshot } = get();
     if (currentScreenshot) {
-      await screenshotService.skip(currentScreenshot.id);
+      await screenshotService.skip(currentScreenshot.id, reason);
     }
     // Use navigateNext to go to the next screenshot in the queue (like pressing "next")
     // instead of loadNextScreenshot which resets to the beginning

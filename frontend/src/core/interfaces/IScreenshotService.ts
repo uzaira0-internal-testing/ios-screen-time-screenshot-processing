@@ -65,7 +65,7 @@ export interface IScreenshotService {
     maxShift?: number,
   ): Promise<ProcessingResult>;
 
-  skip(screenshotId: number): Promise<void>;
+  skip(screenshotId: number, reason?: string): Promise<void>;
 
   updateTitle(screenshotId: number, title: string): Promise<void>;
 

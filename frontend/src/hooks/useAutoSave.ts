@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import toast from "react-hot-toast";
 
 interface UseAutoSaveOptions {
   screenshotId: number | undefined;
@@ -105,6 +106,7 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
       setSaveFailCount(0);
       setLastError(null);
       setHasUnsavedChanges(false);
+      toast("Saved", { duration: 1500, position: "bottom-center", style: { fontSize: "12px", padding: "4px 12px", background: "#334155", color: "#e2e8f0" } });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Save failed";
       console.error("[AutoSave] Failed:", message);
