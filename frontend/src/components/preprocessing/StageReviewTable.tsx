@@ -3,6 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { usePreprocessingStore, useScreenshotImageUrl } from "@/hooks/usePreprocessingWithDI";
 import type { Stage, StageStatus, PreprocessingEventData } from "@/store/preprocessingStore";
 import type { Screenshot } from "@/types";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 type SortDirection = "asc" | "desc";
 
@@ -109,7 +110,7 @@ const TableRow = memo(function TableRow({
               onError={(e) => { e.currentTarget.src = ""; }}
             />
           ) : (
-            <div className="w-10 h-14 rounded bg-slate-200 dark:bg-slate-600 animate-pulse" />
+            <Skeleton className="w-10 h-14" />
           )}
         </button>
       </td>

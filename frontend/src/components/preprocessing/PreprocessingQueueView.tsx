@@ -8,6 +8,7 @@ import { getCropRectFromEvent } from "./CroppingTab";
 import { getRecentCropConfigs, getRecentPHIConfigs } from "./recentConfigHelpers";
 import type { PreprocessingEventData } from "@/store/preprocessingStore";
 import type { Screenshot } from "@/types";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 export const PreprocessingQueueView = () => {
   const queueIndex = usePreprocessingStore((s) => s.queueIndex);
@@ -209,7 +210,7 @@ function DeviceInfoPanel({
             className="max-w-full object-contain rounded"
           />
         ) : (
-          <div className="w-48 h-64 rounded bg-slate-200 dark:bg-slate-600 animate-pulse" />
+          <Skeleton className="w-48 h-64" />
         )}
       </div>
 
@@ -329,7 +330,7 @@ function RedactionReviewPanel({
               className="max-w-full object-contain rounded"
             />
           ) : (
-            <div className="w-48 h-64 rounded bg-slate-200 dark:bg-slate-600 animate-pulse" />
+            <Skeleton className="w-48 h-64" />
           )}
         </div>
       </div>
@@ -432,7 +433,7 @@ function OCRReviewPanel({
             className="max-w-full object-contain rounded"
           />
         ) : (
-          <div className="w-48 h-64 rounded bg-slate-200 dark:bg-slate-600 animate-pulse" />
+          <Skeleton className="w-48 h-64" />
         )}
       </div>
 

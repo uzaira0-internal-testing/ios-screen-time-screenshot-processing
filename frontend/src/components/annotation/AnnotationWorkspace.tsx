@@ -15,6 +15,7 @@ import { ScreenshotSelector } from "./ScreenshotSelector";
 import { VerificationFilter } from "./VerificationFilter";
 import { ProcessingStatusFilter } from "./ProcessingStatusFilter";
 import { SaveStatusIndicator } from "./SaveStatusIndicator";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { TotalsDisplay } from "./TotalsDisplay";
 import { AlignmentWarning } from "./AlignmentWarning";
 import type { ProcessingStatus } from "@/types";
@@ -337,7 +338,7 @@ export const AnnotationWorkspace = ({
                 data-testid="grid-selector"
               />
             ) : (
-              <div className="w-full aspect-[9/16] max-h-[70vh] rounded bg-slate-200 dark:bg-slate-600 animate-pulse" />
+              <Skeleton className="w-full aspect-[9/16] max-h-[70vh]" />
             )}
           </div>
         </div>
@@ -396,7 +397,7 @@ export const AnnotationWorkspace = ({
           <div className="flex-1 flex items-center justify-center p-4 min-h-0">
             <div className="w-full">
               {!imageUrl ? (
-                <div className="w-full h-48 rounded bg-slate-200 dark:bg-slate-600 animate-pulse" />
+                <Skeleton className="w-full" height="12rem" />
               ) : displayMode === "overlay" ? (
                 <HourlyUsageOverlay
                   data={annotation?.hourly_values || {}}

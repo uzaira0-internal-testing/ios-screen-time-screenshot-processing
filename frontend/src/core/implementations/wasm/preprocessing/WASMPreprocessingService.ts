@@ -842,12 +842,13 @@ export class WASMPreprocessingService implements IPreprocessingService {
         // is bounded (see size cap below) or when cleanup() is called.
         const url = URL.createObjectURL(stageBlob);
         this.stageBlobUrls.set(key, url);
-        // Bound the map size to prevent unbounded growth
+        // Bound map size — just drop old entries without revoking, since
+        // components may still reference the URLs. The useScreenshotImageUrl
+        // hook revokes blob URLs on unmount/re-fetch via its cleanup function.
         if (this.stageBlobUrls.size > 100) {
-          const entries = [...this.stageBlobUrls.entries()];
-          for (let i = 0; i < 50; i++) {
-            URL.revokeObjectURL(entries[i]![1]);
-            this.stageBlobUrls.delete(entries[i]![0]);
+          const keysToDelete = [...this.stageBlobUrls.keys()].slice(0, 50);
+          for (const k of keysToDelete) {
+            this.stageBlobUrls.delete(k);
           }
         }
         return url;
