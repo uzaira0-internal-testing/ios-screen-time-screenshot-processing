@@ -13,6 +13,7 @@ import { OCRTab } from "@/components/preprocessing/OCRTab";
 import { EventLogPanel } from "@/components/preprocessing/EventLogPanel";
 import { PreprocessingQueueView } from "@/components/preprocessing/PreprocessingQueueView";
 import { usePreprocessingPipelineService } from "@/core";
+import { KeyboardShortcutsModal, useKeyboardShortcutsModal } from "@/components/preprocessing/KeyboardShortcutsModal";
 
 // ---------------------------------------------------------------------------
 // LLM Controls — endpoint, model dropdown + manual entry, API key, status
@@ -207,6 +208,7 @@ export const PreprocessingPage = () => {
   const setReturnUrl = usePreprocessingStore((s) => s.setReturnUrl);
   const returnUrl = usePreprocessingStore((s) => s.returnUrl);
   const queueMode = usePreprocessingStore((s) => s.queueMode);
+  const shortcutsModal = useKeyboardShortcutsModal();
 
   // Load groups on mount, cleanup polling on unmount
   useEffect(() => {
@@ -299,6 +301,13 @@ export const PreprocessingPage = () => {
           <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
             Preprocessing Pipeline
           </h1>
+          <button
+            onClick={shortcutsModal.toggle}
+            className="px-2 py-0.5 text-sm text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 border border-slate-300 dark:border-slate-600 rounded"
+            title="Keyboard shortcuts (?)"
+          >
+            ?
+          </button>
         </div>
         <div className="flex items-center gap-3">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Group:</label>
@@ -429,6 +438,7 @@ export const PreprocessingPage = () => {
           {eventLog && <EventLogPanel />}
         </>
       )}
+      <KeyboardShortcutsModal isOpen={shortcutsModal.isOpen} onClose={shortcutsModal.onClose} />
     </div>
     </Layout>
   );

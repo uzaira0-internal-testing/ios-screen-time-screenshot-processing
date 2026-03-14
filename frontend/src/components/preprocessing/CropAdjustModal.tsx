@@ -46,6 +46,27 @@ export const CropAdjustModal = ({
   const [isApplying, setIsApplying] = useState(false);
   const [imageError, setImageError] = useState(false);
 
+  // localStorage-backed recent crops (used when recentCrops prop is not provided, e.g. modal mode)
+  const [storedRecentCrops, setStoredRecentCrops] = useState<CropRect[]>(() => {
+    try {
+      const stored = localStorage.getItem("crop-recent-configs");
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  });
+
+  const trackCrop = (c: CropRect) => {
+    const key = `${c.left},${c.top},${c.right},${c.bottom}`;
+    setStoredRecentCrops((prev) => {
+      const deduped = prev.filter((r) => `${r.left},${r.top},${r.right},${r.bottom}` !== key);
+      const updated = [c, ...deduped].slice(0, 5);
+      try { localStorage.setItem("crop-recent-configs", JSON.stringify(updated)); } catch { /* ignore */ }
+      return updated;
+    });
+  };
+
+  // Merge prop-provided recent crops with localStorage-backed ones
+  const effectiveRecentCrops = recentCrops && recentCrops.length > 0 ? recentCrops : storedRecentCrops;
+
   // Close on Escape key (skip in inline mode — queue view handles keyboard)
   useEffect(() => {
     if (!isOpen || inline) return;
@@ -282,6 +303,7 @@ export const CropAdjustModal = ({
     setIsApplying(true);
     try {
       await preprocessingService.applyManualCrop(screenshotId, crop);
+      trackCrop(crop);
       toast.success("Manual crop applied");
       onCropApplied();
       onClose();
@@ -301,6 +323,7 @@ export const CropAdjustModal = ({
     setIsApplying(true);
     try {
       await preprocessingService.applyManualCrop(screenshotId, crop);
+      trackCrop(crop);
       toast.success("Manual crop applied");
       onCropApplied();
       onApplyAndNext?.();
@@ -347,12 +370,12 @@ export const CropAdjustModal = ({
 
         {/* Right: Preview + controls */}
         <div className="w-[420px] shrink-0 flex flex-col gap-4 overflow-auto">
-          {/* Recent crops (inline queue mode only) */}
-          {inline && recentCrops && recentCrops.length > 0 && (
+          {/* Recent crops */}
+          {effectiveRecentCrops.length > 0 && (
             <div>
               <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Recent Crops</div>
               <div className="flex flex-wrap gap-1.5">
-                {recentCrops.map((rc, i) => (
+                {effectiveRecentCrops.map((rc, i) => (
                   <button
                     key={i}
                     onClick={() => setCrop(rc)}
@@ -395,6 +418,15 @@ export const CropAdjustModal = ({
 
       {/* Footer */}
       <div className="flex items-center justify-end gap-3 px-6 py-3 border-t dark:border-slate-700 shrink-0">
+        {initialCropRef.current && (
+          <button
+            onClick={() => setCrop(initialCropRef.current!)}
+            className="px-4 py-2 text-sm text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700 focus-ring mr-auto"
+            title="Reset crop to the auto-detected values"
+          >
+            Reset to Auto
+          </button>
+        )}
         {!inline && (
           <button
             onClick={onClose}

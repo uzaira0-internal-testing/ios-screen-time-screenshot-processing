@@ -20,7 +20,7 @@ interface PHIRegionEditorProps {
   recentPHIConfigs?: RecentPHIConfig[];
 }
 
-type Tool = "draw" | "select" | "delete";
+type Tool = "draw" | "delete";
 
 const LABELS = [
   // Presidio entity types
@@ -61,15 +61,40 @@ export const PHIRegionEditor = ({
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [regions, setRegions] = useState<PHIRegion[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const [tool, setTool] = useState<Tool>("select");
-  const [scale, setScale] = useState(1);
+  const [tool, setTool] = useState<Tool>("draw");
+  const [baseScale, setBaseScale] = useState(1);
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
   const [drawCurrent, setDrawCurrent] = useState<{ x: number; y: number } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isRedacting, setIsRedacting] = useState(false);
-  const [redactionMethod, setRedactionMethod] = useState("redbox");
+  const [redactionMethod, setRedactionMethod] = useState(() => {
+    try { return localStorage.getItem("phi-recent-redaction-method") || "redbox"; } catch { return "redbox"; }
+  });
   const [imageError, setImageError] = useState(false);
   const [regionsLoadError, setRegionsLoadError] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const scale = baseScale * zoom;
+
+  // Recent labels tracked in localStorage
+  const [recentLabels, setRecentLabels] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem("phi-recent-labels");
+      return stored ? JSON.parse(stored) : ["PERSON"];
+    } catch { return ["PERSON"]; }
+  });
+  const lastUsedLabel = recentLabels[0] || "PERSON";
+
+  const trackLabel = (label: string) => {
+    setRecentLabels((prev) => {
+      const updated = [label, ...prev.filter((l) => l !== label)].slice(0, 3);
+      try { localStorage.setItem("phi-recent-labels", JSON.stringify(updated)); } catch { /* ignore */ }
+      return updated;
+    });
+  };
+
+  const trackRedactionMethod = (method: string) => {
+    try { localStorage.setItem("phi-recent-redaction-method", method); } catch { /* ignore */ }
+  };
 
   // Close on Escape key (skip in inline mode — queue view handles keyboard)
   useEffect(() => {
@@ -193,7 +218,7 @@ export const PHIRegionEditor = ({
     };
   }, []);
 
-  // Calculate scale
+  // Fit-to-container scale
   useEffect(() => {
     if (!image || !canvasRef.current) return;
     const container = canvasRef.current.parentElement;
@@ -201,7 +226,20 @@ export const PHIRegionEditor = ({
     const maxW = container.clientWidth - 10;
     const maxH = window.innerHeight - 200;
     const s = Math.min(maxW / image.naturalWidth, maxH / image.naturalHeight, 1);
-    setScale(s);
+    setBaseScale(s);
+  }, [image]);
+
+  // Mouse wheel zoom on canvas
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.1 : 0.1;
+      setZoom((z) => Math.min(4, Math.max(0.25, z + delta)));
+    };
+    canvas.addEventListener("wheel", handleWheel, { passive: false });
+    return () => canvas.removeEventListener("wheel", handleWheel);
   }, [image]);
 
   // Draw canvas
@@ -293,9 +331,6 @@ export const PHIRegionEditor = ({
     if (tool === "draw") {
       setDrawStart(pt);
       setDrawCurrent(pt);
-    } else if (tool === "select") {
-      const idx = findRegionAt(pt.x, pt.y);
-      setSelectedIndex(idx);
     } else if (tool === "delete") {
       const idx = findRegionAt(pt.x, pt.y);
       if (idx !== null) {
@@ -322,7 +357,7 @@ export const PHIRegionEditor = ({
         setRegions((prev) => {
           const updated = [
             ...prev,
-            { x, y, w, h, label: "OTHER", source: "manual", confidence: 1.0, text: "" },
+            { x, y, w, h, label: lastUsedLabel, source: "manual", confidence: 1.0, text: "" },
           ];
           setSelectedIndex(updated.length - 1);
           return updated;
@@ -334,14 +369,11 @@ export const PHIRegionEditor = ({
   };
 
   const getCursor = (): string => {
-    switch (tool) {
-      case "draw": return "crosshair";
-      case "delete": return "not-allowed";
-      default: return "default";
-    }
+    return tool === "draw" ? "crosshair" : "not-allowed";
   };
 
   const updateRegion = (index: number, updates: Partial<PHIRegion>) => {
+    if (updates.label) trackLabel(updates.label);
     setRegions((prev) => prev.map((r, i) => i === index ? { ...r, ...updates } : r));
   };
 
@@ -366,18 +398,27 @@ export const PHIRegionEditor = ({
 
   const handleRedact = async () => {
     const confirmed = window.confirm(
-      `Apply ${redactionMethod} redaction to ${regions.length} region(s)? This will create a new redacted image and mark the redaction stage as complete.`,
+      `Apply ${redactionMethod} redaction to ${regions.length} region(s)? This will save regions and create a new redacted image.`,
     );
     if (!confirmed) return;
 
     setIsRedacting(true);
     try {
-      await preprocessingService.applyRedaction(screenshotId, { regions, redaction_method: redactionMethod });
-      toast.success("Redaction applied");
+      // Save regions first, then apply redaction
+      await preprocessingService.savePHIRegions(screenshotId, { regions, preset: "manual" });
+      onRegionsSaved();
+      try {
+        await preprocessingService.applyRedaction(screenshotId, { regions, redaction_method: redactionMethod });
+      } catch (redactErr) {
+        toast.error(`Regions saved, but redaction failed: ${redactErr}`);
+        return;
+      }
+      trackRedactionMethod(redactionMethod);
+      toast.success("Regions saved & redaction applied");
       onRedactionApplied();
       onClose();
     } catch (err) {
-      toast.error(`Redaction failed: ${err}`);
+      toast.error(`Save failed: ${err}`);
     } finally {
       setIsRedacting(false);
     }
@@ -425,7 +466,7 @@ export const PHIRegionEditor = ({
           <canvas
             ref={canvasRef}
             role="img"
-            aria-label={`PHI region editor for screenshot ${screenshotId}. ${regions.length} regions marked. Use the toolbar to select Draw, Select, or Delete tools.`}
+            aria-label={`PHI region editor for screenshot ${screenshotId}. ${regions.length} regions marked. Use the toolbar to select Draw or Delete tools.`}
             style={{ cursor: getCursor() }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
@@ -444,11 +485,11 @@ export const PHIRegionEditor = ({
       <div className="w-80 border-l dark:border-slate-700 flex flex-col">
         {/* Toolbar */}
         <div className="flex items-center gap-1 p-3 border-b dark:border-slate-700">
-          {(["select", "draw", "delete"] as Tool[]).map((t) => (
+          {(["draw", "delete"] as Tool[]).map((t) => (
             <button
               key={t}
               onClick={() => setTool(t)}
-              aria-label={`${t === "select" ? "Select" : t === "draw" ? "Draw" : "Delete"} tool`}
+              aria-label={`${t === "draw" ? "Draw" : "Delete"} tool`}
               aria-pressed={tool === t}
               className={`px-3 py-1.5 text-xs rounded font-medium ${
                 tool === t
@@ -456,15 +497,60 @@ export const PHIRegionEditor = ({
                   : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 border border-transparent"
               }`}
             >
-              {t === "select" ? "Select" : t === "draw" ? "Draw" : "Delete"}
+              {t === "draw" ? "Draw" : "Delete"}
             </button>
           ))}
+          <div className="ml-auto flex items-center gap-1">
+            <button
+              onClick={() => setZoom((z) => Math.max(0.25, z - 0.25))}
+              className="px-2 py-1 text-xs rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600"
+              title="Zoom out"
+            >
+              −
+            </button>
+            <span className="text-xs text-slate-500 dark:text-slate-400 w-10 text-center">{Math.round(zoom * 100)}%</span>
+            <button
+              onClick={() => setZoom((z) => Math.min(4, z + 0.25))}
+              className="px-2 py-1 text-xs rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600"
+              title="Zoom in"
+            >
+              +
+            </button>
+            <button
+              onClick={() => setZoom(1)}
+              className="px-1.5 py-1 text-[10px] rounded bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600"
+              title="Reset zoom"
+            >
+              Fit
+            </button>
+          </div>
         </div>
 
         {/* Region list */}
         <div className="flex-1 overflow-y-auto p-3 space-y-1">
-          {/* Recent region configs (inline queue mode only) */}
-          {inline && recentPHIConfigs && recentPHIConfigs.length > 0 && (
+          {/* Recent labels (quick apply to new drawings) */}
+          {recentLabels.length > 1 && (
+            <div className="mb-2">
+              <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Next label:</div>
+              <div className="flex flex-wrap gap-1">
+                {recentLabels.map((label) => (
+                  <button
+                    key={label}
+                    onClick={() => trackLabel(label)}
+                    className={`px-2 py-0.5 text-[10px] rounded font-medium transition-colors ${
+                      label === lastUsedLabel
+                        ? "bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 border border-primary-300 dark:border-primary-700"
+                        : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 border border-transparent"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Recent region configs */}
+          {recentPHIConfigs && recentPHIConfigs.length > 0 && (
             <div className="mb-3">
               <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Recent Regions</div>
               <div className="flex flex-wrap gap-1.5">
@@ -545,7 +631,7 @@ export const PHIRegionEditor = ({
             <label className="text-xs text-slate-500 dark:text-slate-400">Method:</label>
             <select
               value={redactionMethod}
-              onChange={(e) => setRedactionMethod(e.target.value)}
+              onChange={(e) => { setRedactionMethod(e.target.value); trackRedactionMethod(e.target.value); }}
               className="text-xs border dark:border-slate-600 rounded px-2 py-1 flex-1 dark:bg-slate-700 dark:text-slate-200"
             >
               <option value="redbox">Red Box</option>

@@ -172,7 +172,7 @@ export function createPreprocessingStore(service: IPreprocessingService) {
   pageMode: "pipeline",
   isRunningStage: false,
   stageProgress: null,
-  filter: "all",
+  filter: (() => { try { return (localStorage.getItem("pp-filter") as FilterMode) || "completed"; } catch { return "completed" as FilterMode; } })(),
   phiPreset: "screen_time",
   redactionMethod: "redbox",
   llmEnabled: false,
@@ -197,9 +197,9 @@ export function createPreprocessingStore(service: IPreprocessingService) {
   uploadProgress: null,
   uploadErrors: [],
 
-  // Per-stage table sort
-  tableSortColumn: {},
-  tableSortDirection: {},
+  // Per-stage table sort (restored from localStorage)
+  tableSortColumn: (() => { try { const v = localStorage.getItem("pp-sort-col"); return v ? JSON.parse(v) : {}; } catch { return {}; } })(),
+  tableSortDirection: (() => { try { const v = localStorage.getItem("pp-sort-dir"); return v ? JSON.parse(v) : {}; } catch { return {}; } })(),
 
   // Deep-link state
   highlightedScreenshotId: null,
@@ -212,11 +212,13 @@ export function createPreprocessingStore(service: IPreprocessingService) {
 
   setActiveStage: (stage) => set({ activeStage: stage }),
   setPageMode: (mode) => set({ pageMode: mode }),
-  setFilter: (filter) => set({ filter }),
-  setTableSort: (stage, column, direction) => set((s) => ({
-    tableSortColumn: { ...s.tableSortColumn, [stage]: column },
-    tableSortDirection: { ...s.tableSortDirection, [stage]: direction },
-  })),
+  setFilter: (filter) => { try { localStorage.setItem("pp-filter", filter); } catch { /* ignore */ } set({ filter }); },
+  setTableSort: (stage, column, direction) => {
+    const newCol = { ...get().tableSortColumn, [stage]: column };
+    const newDir = { ...get().tableSortDirection, [stage]: direction };
+    try { localStorage.setItem("pp-sort-col", JSON.stringify(newCol)); localStorage.setItem("pp-sort-dir", JSON.stringify(newDir)); } catch { /* ignore */ }
+    set({ tableSortColumn: newCol, tableSortDirection: newDir });
+  },
   setSelectedGroupId: (groupId) => {
     set({ selectedGroupId: groupId, screenshots: [], summary: null });
     // Auto-load when group changes — catch to prevent unhandled rejections

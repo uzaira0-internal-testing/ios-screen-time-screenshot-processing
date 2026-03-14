@@ -1,4 +1,24 @@
+import { useState } from "react";
 import { usePreprocessingStore } from "@/hooks/usePreprocessingWithDI";
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }).catch(() => { /* clipboard denied or unavailable */ });
+  };
+  return (
+    <button
+      onClick={handleCopy}
+      className="px-1.5 py-0.5 text-[10px] rounded bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+      title="Copy to clipboard"
+    >
+      {copied ? "Copied" : "Copy"}
+    </button>
+  );
+}
 
 const STAGE_LABELS: Record<string, string> = {
   device_detection: "Device Detection",
@@ -117,13 +137,21 @@ export const EventLogPanel = () => {
                 {/* Result summary */}
                 <div className="mt-1 text-slate-600 dark:text-slate-400">
                   {isError ? (
-                    <span className="text-red-600">
-                      Error: {event.result.error as string}
-                    </span>
+                    <div className="flex items-start gap-1">
+                      <span className="text-red-600 flex-1">
+                        Error: {event.result.error as string}
+                      </span>
+                      <CopyButton text={event.result.error as string} />
+                    </div>
                   ) : (
-                    <pre className="whitespace-pre-wrap break-all text-[10px] bg-slate-50 dark:bg-slate-700/50 rounded p-1.5 max-h-24 overflow-y-auto">
-                      {JSON.stringify(event.result, null, 1)}
-                    </pre>
+                    <div className="relative group">
+                      <pre className="whitespace-pre-wrap break-all text-[10px] bg-slate-50 dark:bg-slate-700/50 rounded p-1.5 max-h-24 overflow-y-auto">
+                        {JSON.stringify(event.result, null, 1)}
+                      </pre>
+                      <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <CopyButton text={JSON.stringify(event.result, null, 2)} />
+                      </div>
+                    </div>
                   )}
                 </div>
                 {event.output_file && (
@@ -138,11 +166,29 @@ export const EventLogPanel = () => {
       </div>
 
       {/* Footer */}
-      {eventLog.base_file_path && (
-        <div className="px-4 py-2 border-t border-slate-100 dark:border-slate-700 text-xs text-slate-400">
-          Base: {eventLog.base_file_path.split("/").pop()}
-        </div>
-      )}
+      <div className="px-4 py-2 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
+        {eventLog.base_file_path ? (
+          <span className="text-xs text-slate-400 truncate mr-2">
+            Base: {eventLog.base_file_path.split("/").pop()}
+          </span>
+        ) : <span />}
+        <button
+          onClick={() => {
+            const json = JSON.stringify(eventLog, null, 2);
+            const blob = new Blob([json], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `event-log-${selectedScreenshotId}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+          className="text-xs text-slate-500 dark:text-slate-400 hover:text-primary-600 dark:hover:text-primary-400"
+          title="Download full event log as JSON"
+        >
+          Export JSON
+        </button>
+      </div>
     </div>
   );
 };
