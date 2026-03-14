@@ -48,9 +48,11 @@ export const PreprocessingQueueView = () => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [queuePrev, queueNext, exitQueue]);
 
+  const [imageRefreshKey, setImageRefreshKey] = useState(0);
   const handleRefresh = () => {
     loadScreenshots().catch(() => {});
     loadSummary().catch(() => {});
+    setImageRefreshKey((k) => k + 1);
   };
 
   // Hooks must be called unconditionally — compute all derived values here
@@ -89,7 +91,7 @@ export const PreprocessingQueueView = () => {
     return (
       <div className="flex flex-col h-[calc(100vh-8rem)]">
         <QueueNavigationBar currentScreenshot={currentScreenshot} />
-        <DeviceInfoPanel screenshot={currentScreenshot} event={event} />
+        <DeviceInfoPanel screenshot={currentScreenshot} event={event} refreshKey={imageRefreshKey} />
       </div>
     );
   }
@@ -155,6 +157,7 @@ export const PreprocessingQueueView = () => {
             redactEvent={redactEvent}
             phiEvent={phiEvent}
             onNext={queueNext}
+            refreshKey={imageRefreshKey}
           />
         </div>
       </div>
@@ -171,6 +174,7 @@ export const PreprocessingQueueView = () => {
             screenshot={currentScreenshot}
             event={event}
             onNext={queueNext}
+            refreshKey={imageRefreshKey}
           />
         </div>
       </div>
@@ -184,12 +188,14 @@ export const PreprocessingQueueView = () => {
 function DeviceInfoPanel({
   screenshot,
   event,
+  refreshKey,
 }: {
   screenshot: { id: number; participant_id?: string | null; device_type?: string | null };
   event: PreprocessingEventData | null;
+  refreshKey?: number;
 }) {
   const result = event?.result as Record<string, unknown> | undefined;
-  const imageUrl = useScreenshotImageUrl(screenshot.id);
+  const imageUrl = useScreenshotImageUrl(screenshot.id, "getImageUrl", undefined, refreshKey);
 
   return (
     <div className="flex-1 flex overflow-hidden bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 min-h-0">
@@ -262,11 +268,13 @@ function RedactionReviewPanel({
   redactEvent,
   phiEvent,
   onNext,
+  refreshKey,
 }: {
   screenshot: Screenshot;
   redactEvent: PreprocessingEventData | null;
   phiEvent: PreprocessingEventData | null;
   onNext: () => void;
+  refreshKey?: number;
 }) {
   const redactResult = redactEvent?.result as Record<string, unknown> | undefined;
   const phiResult = phiEvent?.result as Record<string, unknown> | undefined;
@@ -275,8 +283,8 @@ function RedactionReviewPanel({
   const regionsRedacted = (redactResult?.regions_redacted as number) ?? 0;
   const method = (redactResult?.method as string) ?? "unknown";
 
-  const afterUrl = useScreenshotImageUrl(screenshot.id);
-  const beforeUrl = useScreenshotImageUrl(screenshot.id, "getStageImageUrl", "cropping");
+  const afterUrl = useScreenshotImageUrl(screenshot.id, "getImageUrl", undefined, refreshKey);
+  const beforeUrl = useScreenshotImageUrl(screenshot.id, "getStageImageUrl", "cropping", refreshKey);
 
   const [view, setView] = useState<"after" | "before">("after");
   const activeUrl = view === "after" ? afterUrl : beforeUrl;
@@ -400,13 +408,15 @@ function OCRReviewPanel({
   screenshot,
   event,
   onNext,
+  refreshKey,
 }: {
   screenshot: Screenshot;
   event: PreprocessingEventData | null;
   onNext: () => void;
+  refreshKey?: number;
 }) {
   const result = event?.result as Record<string, unknown> | undefined;
-  const imageUrl = useScreenshotImageUrl(screenshot.id);
+  const imageUrl = useScreenshotImageUrl(screenshot.id, "getImageUrl", undefined, refreshKey);
   const status = result?.processing_status as string | undefined;
   const issues = (result?.issues as string[]) ?? [];
 

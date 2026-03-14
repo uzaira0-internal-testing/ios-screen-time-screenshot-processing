@@ -104,6 +104,7 @@ export function useScreenshotImageUrl(
   screenshotId: number | undefined,
   method: "getImageUrl" | "getStageImageUrl" | "getOriginalImageUrl" = "getImageUrl",
   stage?: string,
+  refreshKey?: number,
 ): string | null {
   const service = useContext(serviceContext);
   const [url, setUrl] = useState<string | null>(null);
@@ -151,7 +152,7 @@ export function useScreenshotImageUrl(
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [service, screenshotId, method, stage]);
+  }, [service, screenshotId, method, stage, refreshKey]);
 
   return url;
 }
