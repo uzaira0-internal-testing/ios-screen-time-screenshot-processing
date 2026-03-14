@@ -21,8 +21,6 @@ interface UseAutoSaveReturn {
   hasUnsavedChanges: boolean;
   /** Manually trigger a save (e.g., from a "Retry" button). */
   retrySave: () => void;
-  /** Mark the auto-save as having persisted (e.g., after grid coords are saved externally). */
-  markSaved: () => void;
 }
 
 export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
@@ -39,8 +37,9 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
   const prevHourlyDataRef = useRef<string>("");
   const prevTitleRef = useRef<string | null | undefined>(undefined);
   const prevScreenshotIdRef = useRef<number | null>(null);
-  // Guard against concurrent saves
+  // Guard against concurrent saves; pendingSaveRef triggers a re-save after completion
   const isSavingRef = useRef(false);
+  const pendingSaveRef = useRef(false);
   // Stable ref for notes so it doesn't trigger re-saves
   const notesRef = useRef(notes);
   notesRef.current = notes;
@@ -92,8 +91,13 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
   }, [lastSaved]);
 
   const doSave = useCallback(async () => {
-    if (isSavingRef.current) return;
+    if (isSavingRef.current) {
+      // Another save is in-flight — mark pending so it re-saves after completion
+      pendingSaveRef.current = true;
+      return;
+    }
     isSavingRef.current = true;
+    pendingSaveRef.current = false;
     setIsSaving(true);
     try {
       await onSaveRef.current(notesRef.current);
@@ -110,6 +114,11 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
     } finally {
       isSavingRef.current = false;
       setIsSaving(false);
+      // If data changed while we were saving, save again with latest state
+      if (pendingSaveRef.current) {
+        pendingSaveRef.current = false;
+        doSave();
+      }
     }
   }, []);
 
@@ -155,11 +164,6 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
     doSave();
   }, [doSave]);
 
-  const markSaved = useCallback(() => {
-    setLastSaved(new Date());
-    setHasUnsavedChanges(false);
-  }, []);
-
   return {
     isSaving,
     lastSaved,
@@ -168,6 +172,5 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
     lastError,
     hasUnsavedChanges,
     retrySave,
-    markSaved,
   };
 }

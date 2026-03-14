@@ -158,8 +158,11 @@ export const useAnnotation = (groupId?: string, processingStatus?: ProcessingSta
   const recalculateOcrTotal = store((s) => s.recalculateOcrTotal);
   const setMaxShift = store((s) => s.setMaxShift);
 
+  const isSubmittingRef = useRef(false);
   const handleSubmit = useCallback(
     async (notes?: string) => {
+      if (isSubmittingRef.current) return;
+      isSubmittingRef.current = true;
       try {
         if (config.isDev) {
           console.log("[useAnnotation.handleSubmit] Starting submission...");
@@ -169,6 +172,7 @@ export const useAnnotation = (groupId?: string, processingStatus?: ProcessingSta
         if (config.isDev) {
           console.log("[useAnnotation.handleSubmit] Loading next screenshot...");
         }
+        await loadQueueStats();
         await loadNextScreenshot();
         if (config.isDev) {
           console.log("[useAnnotation.handleSubmit] Next screenshot loaded");
@@ -183,9 +187,11 @@ export const useAnnotation = (groupId?: string, processingStatus?: ProcessingSta
           onRetry: () => handleSubmit(notes),
           retryLabel: "Retry",
         });
+      } finally {
+        isSubmittingRef.current = false;
       }
     },
-    [saveAnnotation, loadNextScreenshot],
+    [saveAnnotation, loadNextScreenshot, loadQueueStats],
   );
 
   // Save without navigating (for auto-save)
@@ -226,16 +232,10 @@ export const useAnnotation = (groupId?: string, processingStatus?: ProcessingSta
 
   const handleSetGrid = useCallback(
     (coords: GridCoordinates) => {
+      // setGridCoordinates also persists to IndexedDB via updateGridCoords (in annotationSlice)
       setGridCoordinates(coords);
-      // Auto-persist grid to screenshot so loadById() restores it after crop/redaction
-      const screenshot = store.getState().currentScreenshot;
-      if (screenshot) {
-        screenshotService.updateGridCoords(screenshot.id, coords).catch((err) => {
-          console.error("[useAnnotation] Failed to persist grid coords:", err);
-        });
-      }
     },
-    [setGridCoordinates, store, screenshotService],
+    [setGridCoordinates],
   );
 
   const handleReprocessWithGrid = useCallback(
