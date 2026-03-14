@@ -227,8 +227,15 @@ export const useAnnotation = (groupId?: string, processingStatus?: ProcessingSta
   const handleSetGrid = useCallback(
     (coords: GridCoordinates) => {
       setGridCoordinates(coords);
+      // Auto-persist grid to screenshot so loadById() restores it after crop/redaction
+      const screenshot = store.getState().currentScreenshot;
+      if (screenshot) {
+        screenshotService.updateGridCoords(screenshot.id, coords).catch((err) => {
+          console.error("[useAnnotation] Failed to persist grid coords:", err);
+        });
+      }
     },
-    [setGridCoordinates],
+    [setGridCoordinates, store, screenshotService],
   );
 
   const handleReprocessWithGrid = useCallback(

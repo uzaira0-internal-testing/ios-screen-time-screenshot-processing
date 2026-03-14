@@ -99,6 +99,9 @@ interface PreprocessingState {
   highlightedScreenshotId: number | null;
   returnUrl: string | null;
 
+  // Image version counter — incremented on screenshot reload to bust stale blob URLs
+  imageVersion: number;
+
   // Queue review mode
   queueMode: boolean;
   queueIndex: number;
@@ -205,6 +208,9 @@ export function createPreprocessingStore(service: IPreprocessingService) {
   highlightedScreenshotId: null,
   returnUrl: null,
 
+  // Image version counter
+  imageVersion: 0,
+
   // Queue review mode
   queueMode: false,
   queueIndex: 0,
@@ -283,7 +289,7 @@ export function createPreprocessingStore(service: IPreprocessingService) {
             stageStatusJson(item) !== prevCache[i]
           );
         if (changed) {
-          set({ screenshots: next });
+          set({ screenshots: next, imageVersion: get().imageVersion + 1 });
         }
       }
     } catch (err) {

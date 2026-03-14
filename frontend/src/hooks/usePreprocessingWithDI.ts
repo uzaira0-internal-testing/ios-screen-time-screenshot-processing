@@ -131,10 +131,9 @@ export function useScreenshotImageUrl(
         if (!revoked) {
           objectUrl = result;
           setUrl(result);
-        } else if (result.startsWith("blob:") && method === "getOriginalImageUrl") {
-          // Only revoke getOriginalImageUrl — it always creates uncached blob URLs.
-          // getImageUrl uses an LRU cache; getStageImageUrl may fall through to the
-          // LRU cache. Revoking cached URLs would corrupt the cache for other consumers.
+        } else if (result.startsWith("blob:") && method !== "getImageUrl") {
+          // Revoke uncached blob URLs (getOriginalImageUrl and getStageImageUrl).
+          // Only getImageUrl uses the shared LRU cache and should NOT be revoked here.
           URL.revokeObjectURL(result);
         }
       } catch (err) {
@@ -145,10 +144,10 @@ export function useScreenshotImageUrl(
 
     return () => {
       revoked = true;
-      // Only revoke getOriginalImageUrl blob URLs — they're always uncached.
-      // getImageUrl uses an LRU cache; getStageImageUrl may fall through to the
-      // cached path. Revoking cached URLs would corrupt the cache for other consumers.
-      if (objectUrl?.startsWith("blob:") && method === "getOriginalImageUrl") {
+      // Revoke blob URLs from getOriginalImageUrl (always uncached) and
+      // getStageImageUrl (uncached per-call URLs). Only getImageUrl uses
+      // the shared LRU cache and should NOT be revoked here.
+      if (objectUrl?.startsWith("blob:") && method !== "getImageUrl") {
         URL.revokeObjectURL(objectUrl);
       }
     };

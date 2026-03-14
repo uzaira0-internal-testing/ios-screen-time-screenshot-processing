@@ -29,6 +29,13 @@ export const createAnnotationSlice = (
         grid_coords: coords,
       },
     }));
+    // Persist grid coords to storage so they survive reload/navigation
+    const { currentScreenshot } = get();
+    if (currentScreenshot) {
+      screenshotService.updateGridCoords(currentScreenshot.id, coords).catch((err) => {
+        console.error("[setGridCoordinates] Failed to persist:", err);
+      });
+    }
   },
 
   setHourlyValues: (data: HourlyData) => {
@@ -75,7 +82,10 @@ export const createAnnotationSlice = (
       throw new Error("Missing required data");
     }
 
-    set({ isLoading: true, error: null });
+    // Note: intentionally NOT setting isLoading here — saveAnnotation is called
+    // by both manual submit and auto-save. Setting isLoading would briefly disable
+    // UI buttons during every auto-save tick, which is disruptive. The manual submit
+    // flow (handleSubmit) manages its own loading state via the button.
     try {
       // Convert UIAnnotation to AnnotationCreate format for the API
       await annotationService.create({
@@ -102,12 +112,9 @@ export const createAnnotationSlice = (
           currentAnnotation.hourly_values,
         );
       }
-
-      set({ isLoading: false });
-      await get().loadQueueStats();
     } catch (error: unknown) {
       const message = extractErrorMessage(error, "Failed to save annotation");
-      set({ error: message, isLoading: false });
+      set({ error: message });
       throw error;
     }
   },

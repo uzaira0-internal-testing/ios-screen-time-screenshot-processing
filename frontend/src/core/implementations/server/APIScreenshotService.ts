@@ -183,6 +183,10 @@ export class APIScreenshotService implements IScreenshotService {
     return result;
   }
 
+  async updateGridCoords(_screenshotId: number, _coords: GridCoordinates | null): Promise<void> {
+    // Server mode: grid coords are persisted via annotation submission
+  }
+
   async exportCSV(): Promise<string> {
     const csvUrl = api.export.getCSVUrl();
     const response = await fetch(csvUrl, { headers: getAuthHeaders() });

@@ -14,7 +14,7 @@ let opfsRoot: FileSystemDirectoryHandle | null = null;
 let opfsAvailable: boolean | null = null;
 
 // LRU cache for object URLs with automatic eviction
-const MAX_CACHE_SIZE = 50;
+const MAX_CACHE_SIZE = 200;
 const urlCache = new Map<number, string>();
 const cacheAccessOrder: number[] = [];
 // In-flight requests to prevent duplicate blob URL creation for the same ID

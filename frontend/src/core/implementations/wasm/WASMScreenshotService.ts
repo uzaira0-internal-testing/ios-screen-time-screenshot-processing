@@ -846,6 +846,24 @@ export class WASMScreenshotService implements IScreenshotService {
     return this.storageService.deleteScreenshotsByGroup(groupId);
   }
 
+  async updateGridCoords(screenshotId: number, coords: GridCoordinates | null): Promise<void> {
+    if (coords) {
+      await this.storageService.updateScreenshot(screenshotId, {
+        grid_upper_left_x: coords.upper_left.x,
+        grid_upper_left_y: coords.upper_left.y,
+        grid_lower_right_x: coords.lower_right.x,
+        grid_lower_right_y: coords.lower_right.y,
+      });
+    } else {
+      await this.storageService.updateScreenshot(screenshotId, {
+        grid_upper_left_x: null,
+        grid_upper_left_y: null,
+        grid_lower_right_x: null,
+        grid_lower_right_y: null,
+      });
+    }
+  }
+
   async exportCSV(): Promise<string> {
     const allScreenshots = await db.screenshots.toArray();
     const allAnnotations = await db.annotations.toArray();

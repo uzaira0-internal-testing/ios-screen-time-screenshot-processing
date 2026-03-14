@@ -140,4 +140,13 @@ export interface IScreenshotService {
    * WASM: generates CSV from local IndexedDB data
    */
   exportCSV(): Promise<string>;
+
+  /**
+   * Persist grid coordinates to storage (IndexedDB in WASM, no-op in server mode).
+   * Used to auto-save grid selection so it survives reload/navigation/crop.
+   */
+  updateGridCoords(
+    screenshotId: number,
+    coords: GridCoordinates | null,
+  ): Promise<void>;
 }

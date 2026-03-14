@@ -113,7 +113,7 @@ export const AnnotationWorkspace = ({
       annotation.grid_coords.lower_right.x === 0
     );
 
-  const { isSaving, lastSaved, timeSinceLastSave } = useAutoSave({
+  const { isSaving, lastSaved, timeSinceLastSave, saveFailCount, lastError, hasUnsavedChanges, retrySave } = useAutoSave({
     screenshotId: screenshot?.id,
     hourlyData: annotation?.hourly_values,
     extractedTitle: screenshot?.extracted_title,
@@ -733,6 +733,10 @@ export const AnnotationWorkspace = ({
                 isSaving={isSaving}
                 lastSaved={lastSaved}
                 timeSinceLastSave={timeSinceLastSave}
+                saveFailCount={saveFailCount}
+                lastError={lastError}
+                hasUnsavedChanges={hasUnsavedChanges}
+                onRetry={retrySave}
               />
 
               <div className="text-xs text-slate-400 dark:text-slate-500 text-center space-y-1">

@@ -67,6 +67,7 @@ interface RowProps {
   onEnterQueue: (screenshotId: number) => void;
   onLoadLog: (id: number) => void;
   renderResultColumns: (screenshot: Screenshot, event: PreprocessingEventData | null) => React.ReactNode;
+  imageVersion: number;
 }
 
 const TableRow = memo(function TableRow({
@@ -79,9 +80,10 @@ const TableRow = memo(function TableRow({
   onEnterQueue,
   onLoadLog,
   renderResultColumns,
+  imageVersion,
 }: RowProps) {
   const badge = STATUS_BADGES[status] ?? STATUS_BADGES.pending;
-  const imageUrl = useScreenshotImageUrl(screenshot.id);
+  const imageUrl = useScreenshotImageUrl(screenshot.id, "getImageUrl", undefined, imageVersion);
   return (
     <tr
       ref={isHighlighted ? highlightedRef : undefined}
@@ -160,6 +162,7 @@ export const StageReviewTable = ({
   const highlightedScreenshotId = usePreprocessingStore((s) => s.highlightedScreenshotId);
   const setHighlightedScreenshotId = usePreprocessingStore((s) => s.setHighlightedScreenshotId);
   const enterQueue = usePreprocessingStore((s) => s.enterQueue);
+  const imageVersion = usePreprocessingStore((s) => s.imageVersion);
 
   const sortColumn = usePreprocessingStore((s) => s.tableSortColumn[stage] ?? "id");
   const sortDirection = usePreprocessingStore((s) => s.tableSortDirection[stage] ?? "asc") as SortDirection;
@@ -327,6 +330,7 @@ export const StageReviewTable = ({
                     onEnterQueue={handleEnterQueue}
                     onLoadLog={loadEventLog}
                     renderResultColumns={renderResultColumns}
+                    imageVersion={imageVersion}
                   />
                 );
               })}

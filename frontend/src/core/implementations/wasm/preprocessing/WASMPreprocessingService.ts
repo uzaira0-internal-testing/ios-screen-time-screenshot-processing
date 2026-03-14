@@ -709,9 +709,32 @@ export class WASMPreprocessingService implements IPreprocessingService {
     await this.storage.saveImageBlob(screenshotId, croppedBlob);
     await this.storage.saveStageBlob(screenshotId, "cropping", croppedBlob);
 
-    // Update cropping event
+    // Update cropping event and migrate grid coordinates in a single write
     const screenshot = await this.storage.getScreenshot(screenshotId);
     if (screenshot) {
+      // Migrate grid coordinates from original image space to cropped image space
+      const gridUpdate: Record<string, number | null> = {};
+      if (screenshot.grid_upper_left_x != null && screenshot.grid_lower_right_x != null) {
+        const newULX = (screenshot.grid_upper_left_x ?? 0) - crop.left;
+        const newULY = (screenshot.grid_upper_left_y ?? 0) - crop.top;
+        const newLRX = (screenshot.grid_lower_right_x ?? 0) - crop.left;
+        const newLRY = (screenshot.grid_lower_right_y ?? 0) - crop.top;
+
+        // Check if grid is still within the cropped region
+        if (newLRX > 0 && newLRY > 0 && newULX < cropWidth && newULY < cropHeight) {
+          gridUpdate.grid_upper_left_x = Math.max(0, newULX);
+          gridUpdate.grid_upper_left_y = Math.max(0, newULY);
+          gridUpdate.grid_lower_right_x = Math.min(cropWidth, newLRX);
+          gridUpdate.grid_lower_right_y = Math.min(cropHeight, newLRY);
+        } else {
+          // Grid falls entirely outside cropped region — reset
+          gridUpdate.grid_upper_left_x = null;
+          gridUpdate.grid_upper_left_y = null;
+          gridUpdate.grid_lower_right_x = null;
+          gridUpdate.grid_lower_right_y = null;
+        }
+      }
+
       const pp = getPreprocessing(screenshot);
       const updated = addEvent(pp, "cropping", "completed", {
         was_cropped: true,
@@ -723,6 +746,7 @@ export class WASMPreprocessingService implements IPreprocessingService {
       });
       await this.storage.updateScreenshot(screenshotId, {
         processing_metadata: setPreprocessing(screenshot, updated),
+        ...gridUpdate,
       });
     }
   }
@@ -813,11 +837,19 @@ export class WASMPreprocessingService implements IPreprocessingService {
       const stageBlob = await this.storage.getStageBlob(screenshotId, stage);
       if (stageBlob) {
         const key = `${screenshotId}:${stage}`;
-        // Revoke previous URL for this screenshot+stage to prevent leaks
-        const prev = this.stageBlobUrls.get(key);
-        if (prev) URL.revokeObjectURL(prev);
+        // Don't revoke the previous URL — another component may still be displaying it.
+        // Just overwrite the map entry. The old URL will be cleaned up when the map
+        // is bounded (see size cap below) or when cleanup() is called.
         const url = URL.createObjectURL(stageBlob);
         this.stageBlobUrls.set(key, url);
+        // Bound the map size to prevent unbounded growth
+        if (this.stageBlobUrls.size > 100) {
+          const entries = [...this.stageBlobUrls.entries()];
+          for (let i = 0; i < 50; i++) {
+            URL.revokeObjectURL(entries[i]![1]);
+            this.stageBlobUrls.delete(entries[i]![0]);
+          }
+        }
         return url;
       }
     }
