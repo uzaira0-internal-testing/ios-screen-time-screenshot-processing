@@ -18,7 +18,7 @@ export const CroppedGraphViewer = ({
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    if (!gridCoords || gridCoords.upper_left.x === 0) {
+    if (!gridCoords || gridCoords.upper_left.x === 0 || !imageUrl) {
       return;
     }
 

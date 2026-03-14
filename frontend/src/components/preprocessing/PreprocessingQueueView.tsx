@@ -279,6 +279,7 @@ function RedactionReviewPanel({
   const beforeUrl = useScreenshotImageUrl(screenshot.id, "getStageImageUrl", "cropping");
 
   const [view, setView] = useState<"after" | "before">("after");
+  const activeUrl = view === "after" ? afterUrl : beforeUrl;
 
   return (
     <div className="flex-1 flex overflow-hidden bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 min-h-0">
@@ -312,9 +313,9 @@ function RedactionReviewPanel({
         )}
 
         <div className="flex-1 min-h-0 overflow-hidden flex items-center justify-center p-4">
-          {(view === "after" ? afterUrl : beforeUrl) ? (
+          {activeUrl ? (
             <img
-              src={(view === "after" ? afterUrl : beforeUrl)!}
+              src={activeUrl}
               alt={`Screenshot ${screenshot.id} — ${view === "after" ? "redacted" : "original"}`}
               style={{ maxHeight: "calc(100vh - 15rem)" }}
               className="max-w-full object-contain rounded"

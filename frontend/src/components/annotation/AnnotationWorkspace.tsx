@@ -325,16 +325,20 @@ export const AnnotationWorkspace = ({
       <div className="flex-1">
         <div className="bg-white dark:bg-slate-800 h-full p-1 flex items-center justify-center relative">
           <div className="w-full max-w-xl">
-            <GridSelector
-              imageUrl={imageUrl || ""}
-              onGridSelect={handleGridSelect}
-              initialCoords={annotation?.grid_coords}
-              disabled={isVerifiedByMe}
-              imageType={screenshot.image_type}
-              extractedTitle={screenshot.extracted_title}
-              onTitleChange={setTitle}
-              data-testid="grid-selector"
-            />
+            {imageUrl ? (
+              <GridSelector
+                imageUrl={imageUrl}
+                onGridSelect={handleGridSelect}
+                initialCoords={annotation?.grid_coords}
+                disabled={isVerifiedByMe}
+                imageType={screenshot.image_type}
+                extractedTitle={screenshot.extracted_title}
+                onTitleChange={setTitle}
+                data-testid="grid-selector"
+              />
+            ) : (
+              <div className="w-full aspect-[9/16] max-h-[70vh] rounded bg-slate-200 dark:bg-slate-600 animate-pulse" />
+            )}
           </div>
         </div>
       </div>
@@ -391,18 +395,20 @@ export const AnnotationWorkspace = ({
           })()}
           <div className="flex-1 flex items-center justify-center p-4 min-h-0">
             <div className="w-full">
-              {displayMode === "overlay" ? (
+              {!imageUrl ? (
+                <div className="w-full h-48 rounded bg-slate-200 dark:bg-slate-600 animate-pulse" />
+              ) : displayMode === "overlay" ? (
                 <HourlyUsageOverlay
                   data={annotation?.hourly_values || {}}
                   onChange={updateHour}
-                  imageUrl={imageUrl || ""}
+                  imageUrl={imageUrl}
                   gridCoords={annotation?.grid_coords || null}
                   readOnly={isVerifiedByMe}
                 />
               ) : (
                 <>
                   <CroppedGraphViewer
-                    imageUrl={imageUrl || ""}
+                    imageUrl={imageUrl}
                     gridCoords={annotation?.grid_coords || null}
                     targetWidth={800}
                   />

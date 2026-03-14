@@ -104,11 +104,15 @@ export const CropAdjustModal = ({
     img.onerror = () => { if (!cancelled) setImageError(true); };
     preprocessingService.getOriginalImageUrl(screenshotId).then((url) => {
       if (cancelled) {
-        if (url.startsWith("blob:")) URL.revokeObjectURL(url);
+        if (url?.startsWith("blob:")) URL.revokeObjectURL(url);
         return;
       }
       blobUrl = url;
-      img.src = url;
+      if (url) {
+        img.src = url;
+      } else {
+        setImageError(true);
+      }
     }).catch(() => { if (!cancelled) setImageError(true); });
     return () => {
       cancelled = true;

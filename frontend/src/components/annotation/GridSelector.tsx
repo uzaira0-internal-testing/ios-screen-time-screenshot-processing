@@ -178,6 +178,7 @@ export const GridSelector = ({
   );
 
   useEffect(() => {
+    if (!imageUrl) return;
     const loadAndDrawImage = async () => {
       try {
         const img = await loadImage(imageUrl);

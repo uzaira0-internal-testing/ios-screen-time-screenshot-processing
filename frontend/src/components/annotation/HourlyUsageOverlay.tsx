@@ -82,7 +82,7 @@ export const HourlyUsageOverlay = ({
   useEffect(() => {
     let isMounted = true;
 
-    if (!hasValidGrid) {
+    if (!hasValidGrid || !imageUrl) {
       setCanvasReady(false);
       return;
     }
