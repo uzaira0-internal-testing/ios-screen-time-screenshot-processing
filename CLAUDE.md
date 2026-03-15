@@ -469,6 +469,19 @@ This project has Claude Code automations configured in `.claude/`, `.mcp.json`, 
 |-------|------------|---------|
 | `/generate-api-types` | User-only | Regenerate frontend TypeScript types from backend OpenAPI spec. Run after any Pydantic schema or API route changes. |
 | `/backup-restore` | User-only | Database backup and restore operations. Lists, creates, and restores PostgreSQL backups. |
+| `/setup-dual-mode` | User-only | Scaffold DI container, interfaces, mode detection, bootstrap, and React hooks for dual-mode architecture. |
+| `/setup-tauri` | User-only | Add Tauri v2 to an existing React frontend with plugins, capabilities, CSP, and build config. |
+| `/setup-auto-updates` | User-only | Set up Tauri auto-updates with code signing, GitHub Actions CI/CD, and UpdateBanner component. |
+| `/setup-testing-pipeline` | User-only | Set up comprehensive testing pipeline with Essential + Recommended tier tests. |
+| `/setup-wasm-worker` | User-only | Create typed Web Worker (JS/TS or Rust→WASM) with message protocol and service wrapper. |
+| `/setup-offline-storage` | User-only | Set up Dexie schema, OPFS blob storage, and IStorageService for offline-first apps. |
+| `/testing-encyclopedia` | User-only | Universal testing catalog — adapts to any stack with tailored recommendations and CI workflows. |
+
+### Reference Guides
+
+| Guide | Location | Description |
+|-------|----------|-------------|
+| **Tauri/WASM Transition** | `docs/guides/tauri-wasm-transition/` | 8-chapter guide for transitioning React/TS apps to offline+online Tauri v2 desktop apps with auto-updates, CI/CD, and comprehensive testing. |
 
 ### Subagents (`.claude/agents/`)
 
