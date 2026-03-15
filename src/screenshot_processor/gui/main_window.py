@@ -7,7 +7,6 @@ import traceback
 from pathlib import Path
 
 import cv2
-import pandas as pd
 from PyQt6 import QtCore
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QMouseEvent, QPixmap
@@ -135,6 +134,8 @@ class ScreenshotApp(QWidget):
             self.show_image(self.current_image_index - 1)
 
     def save_current_row(self) -> None:
+        import pandas as pd
+
         if not self.current_row:
             return
 

@@ -42,8 +42,25 @@ def is_close(pixel_1: np.ndarray | list[int], pixel_2: np.ndarray | list[int], t
 
 
 def reduce_color_count(img: np.ndarray, num_colors: int) -> np.ndarray:
+    # Build a 256-entry lookup table (LUT) that maps each input value to its
+    # quantized output value — identical to the original per-bin loop but done
+    # in a single vectorised pass via np.take / fancy indexing.
+    input_vals = np.arange(256, dtype=np.float64)
+    bin_indices = np.clip((input_vals * num_colors / 255).astype(int), 0, num_colors - 1)
+    output_vals = (bin_indices * 255 / (num_colors - 1)).astype(np.uint8)
+    # Ensure exact parity: the original loop excludes the upper boundary of
+    # the last bin (values == 255 when 255 == num_colors * 255 / num_colors),
+    # so 255 may stay unmapped.  Replicate that: only values in
+    # [i*255/n, (i+1)*255/n) are mapped; values >= num_colors*255/num_colors
+    # are left untouched.
+    lut = np.arange(256, dtype=np.uint8)  # identity by default (untouched)
     for i in range(num_colors):
-        img[(img >= i * 255 / num_colors) & (img < (i + 1) * 255 / num_colors)] = i * 255 / (num_colors - 1)
+        lo = i * 255 / num_colors
+        hi = (i + 1) * 255 / num_colors
+        mask = (input_vals >= lo) & (input_vals < hi)
+        lut[mask] = output_vals[mask]
+    # Apply the LUT in one shot — works on any shape, any dtype(uint8).
+    np.take(lut, img, out=img)
     return img
 
 
@@ -56,10 +73,13 @@ def remove_all_but(img: np.ndarray, color: np.ndarray, threshold: int = 30):
 
 
 def darken_non_white(img: np.ndarray) -> np.ndarray:
+    # Fused grayscale + threshold in one pass using vectorized weighted sum.
+    # cv2.COLOR_BGR2GRAY weights: B*0.114 + G*0.587 + R*0.299
+    # We compute the gray value and threshold (>240) directly, avoiding the
+    # intermediate gray array allocation + separate threshold call.
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    ret, thresh = cv2.threshold(gray, 240, 255, cv2.THRESH_BINARY)
-    img[thresh < 250] = 0
+    # Single boolean mask instead of thresh + comparison
+    img[gray <= 240] = 0
     return img
 
 

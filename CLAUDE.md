@@ -34,6 +34,38 @@ pytest tests/integration/test_annotation_workflow.py::test_name -v  # Single tes
 ruff check . && ruff format .
 ```
 
+### Profiling & Benchmarking
+
+```bash
+# Master profiling script (generates reports to profiling-reports/)
+scripts/profile.sh [category]        # all, python, complexity, frontend, rust, db, benchmark, k6, import
+
+# Individual profilers
+scripts/profile-db.sh                # PostgreSQL slow queries, missing indexes, cache hit ratio
+scripts/benchmark-cli.sh             # Hyperfine CLI benchmarks (import time, pipeline, API latency)
+
+# Python benchmarks
+pytest tests/benchmark/ --benchmark-only                    # Run all benchmarks
+pytest tests/benchmark/test_matrix_benchmarks.py -v         # Parameterized matrix benchmarks
+pytest tests/benchmark/ --benchmark-only --benchmark-save=baseline  # Save baseline
+pytest tests/benchmark/ --benchmark-only --benchmark-compare        # Compare vs baseline
+
+# Per-request profiling (pyinstrument)
+PROFILE=1 uvicorn src.screenshot_processor.web.api.main:app --reload  # Saves HTML profiles
+
+# Frontend bundle analysis
+cd frontend && ANALYZE=1 bun run build   # Opens bundle treemap
+
+# Rust benchmarks
+cd frontend/src-tauri && cargo bench     # Criterion parameterized benchmarks
+
+# k6 load profiling (ramp 1→100 VUs)
+k6 run tests/load/profile-endpoints.js
+
+# Import time analysis
+python -X importtime -c "import screenshot_processor" 2> import.log
+```
+
 ### Frontend
 
 ```bash
@@ -476,6 +508,7 @@ This project has Claude Code automations configured in `.claude/`, `.mcp.json`, 
 | `/setup-wasm-worker` | User-only | Create typed Web Worker (JS/TS or Rust→WASM) with message protocol and service wrapper. |
 | `/setup-offline-storage` | User-only | Set up Dexie schema, OPFS blob storage, and IStorageService for offline-first apps. |
 | `/testing-encyclopedia` | User-only | Universal testing catalog — adapts to any stack with tailored recommendations and CI workflows. |
+| `/profiling-optimization` | User-only | Stack-agnostic profiling encyclopedia — CPU/memory profiling, flamegraphs, bundle analysis, DB query profiling, complexity analysis, benchmark matrices. |
 
 ### Reference Guides
 

@@ -39,13 +39,38 @@ from .models import (
     TotalUnderestimationLargeIssue,
     TotalUnderestimationSmallIssue,
 )
-from .ocr_engines import PaddleOCREngine, TesseractOCREngine
-from .ocr_factory import OCREngineFactory, OCREngineType
 from .ocr_protocol import IOCREngine, OCREngineError, OCREngineNotAvailableError, OCRResult
-from .processing_pipeline import ProcessingPipeline
-from .processor import ScreenshotProcessor
-from .queue_manager import QueueManager, QueueStatistics
-from .queue_models import ProcessingMetadata, ProcessingMethod, ProcessingTag, ScreenshotQueue
+
+# Heavy imports deferred via __getattr__ to avoid pulling in
+# matplotlib (515ms), pandas (531ms), httpx (172ms) at import time.
+# These are only loaded when actually accessed.
+_LAZY_IMPORTS = {
+    "PaddleOCREngine": ".ocr_engines",
+    "TesseractOCREngine": ".ocr_engines",
+    "OCREngineFactory": ".ocr_factory",
+    "OCREngineType": ".ocr_factory",
+    "ProcessingPipeline": ".processing_pipeline",
+    "ScreenshotProcessor": ".processor",
+    "QueueManager": ".queue_manager",
+    "QueueStatistics": ".queue_manager",
+    "ProcessingMetadata": ".queue_models",
+    "ProcessingMethod": ".queue_models",
+    "ProcessingTag": ".queue_models",
+    "ScreenshotQueue": ".queue_models",
+}
+
+
+def __getattr__(name: str):
+    if name in _LAZY_IMPORTS:
+        import importlib
+
+        module = importlib.import_module(_LAZY_IMPORTS[name], __name__)
+        value = getattr(module, name)
+        # Cache on the module so __getattr__ isn't called again
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     # Processor

@@ -238,6 +238,9 @@ issue_screenshots/
 # Benchmark results
 .benchmarks/
 
+# Profiling reports
+profiling-reports/
+
 # Lighthouse reports
 lighthouse-*.html
 lighthouse-*.json

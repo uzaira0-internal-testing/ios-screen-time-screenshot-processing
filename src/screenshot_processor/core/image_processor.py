@@ -16,7 +16,6 @@ from collections.abc import Callable
 from pathlib import Path
 
 import cv2
-import matplotlib.pyplot as plt
 import numpy as np
 
 from .bar_extraction import slice_image
@@ -318,6 +317,8 @@ def _save_processed_image(
 
 def _save_debug_graph(filename: str | Path, row: list, roi_height: int) -> str:
     """Save bar graph visualization for debugging."""
+    import matplotlib.pyplot as plt
+
     debug_folder = "debug"
     Path(debug_folder).mkdir(parents=True, exist_ok=True)
 

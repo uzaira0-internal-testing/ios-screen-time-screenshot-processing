@@ -15,7 +15,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
 from screenshot_processor.core.image_utils import convert_dark_mode
-from screenshot_processor.core.ocr import find_screenshot_total_usage
 from screenshot_processor.web.database.models import Screenshot
 from screenshot_processor.web.repositories import NavigationResult, ScreenshotRepository
 
@@ -28,6 +27,8 @@ def _sync_extract_ocr_total(file_path: str) -> str | None:
     if img is None:
         return None
     img = convert_dark_mode(img)
+    from screenshot_processor.core.ocr import find_screenshot_total_usage
+
     total, _ = find_screenshot_total_usage(img)
     return total.strip() if total and total.strip() else None
 
@@ -108,6 +109,8 @@ class ScreenshotService:
                 return False, None, "Could not read image file"
 
             img = convert_dark_mode(img)
+            from screenshot_processor.core.ocr import find_screenshot_total_usage
+
             total, _ = find_screenshot_total_usage(img)
 
             if total and total.strip():

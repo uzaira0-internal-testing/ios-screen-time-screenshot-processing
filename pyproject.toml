@@ -81,6 +81,12 @@ dev = [
     "vulture>=2.0",
     "radon>=6.0",
     "pytest-benchmark>=4.0",
+    "py-spy>=0.3.0",
+    "scalene>=1.5.0",
+    "memray>=1.0",
+    "pytest-memray>=1.0",
+    "pyinstrument>=4.0",
+    "wily>=1.0",
 ]
 
 [project.scripts]

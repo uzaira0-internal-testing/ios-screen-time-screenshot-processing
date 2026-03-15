@@ -14,7 +14,6 @@ import cv2
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from screenshot_processor.core.image_utils import convert_dark_mode
-from screenshot_processor.core.ocr import find_screenshot_total_usage
 from screenshot_processor.web.repositories.admin_repository import AdminRepository
 
 logger = logging.getLogger(__name__)
@@ -149,6 +148,8 @@ class AdminService:
     ) -> RecalculateOcrResult:
         """Recalculate OCR totals for screenshots missing extracted_total."""
         screenshots = await self.repo.get_screenshots_missing_ocr_total(group_id=group_id, limit=limit)
+
+        from screenshot_processor.core.ocr import find_screenshot_total_usage
 
         total_missing = len(screenshots)
         processed = 0

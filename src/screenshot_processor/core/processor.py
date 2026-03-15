@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import cv2
-import pandas as pd
 
 from .callbacks import CancellationCheck, IssueCallback, LogCallback, ProgressCallback
 from .config import ProcessorConfig
@@ -486,6 +485,8 @@ class ScreenshotProcessor:
         return total_minutes
 
     def _save_results_to_csv(self, results: FolderProcessingResults, folder_path: Path) -> None:
+        import pandas as pd
+
         successful_results = [r for r in results.results if r.success and r.row_data is not None]
 
         if not successful_results:

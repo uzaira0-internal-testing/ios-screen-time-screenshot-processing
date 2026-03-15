@@ -67,8 +67,17 @@ def small_image():
 
 @pytest.fixture
 def roi_image():
-    """Image sized like a typical bar graph ROI."""
-    return np.random.randint(0, 255, (200, 600, 3), dtype=np.uint8)
+    """Image sized like a typical bar graph ROI (white bg + colored bars)."""
+    h, w = 200, 600
+    roi = np.full((h, w, 3), 255, dtype=np.uint8)
+    slice_width = w // 24
+    for hour in range(24):
+        bar_height = int(h * (hour % 12 + 1) / 13)
+        x_start = hour * slice_width + 2
+        x_end = (hour + 1) * slice_width - 2
+        if x_end > x_start:
+            roi[h - bar_height : h, x_start:x_end] = [50, 100, 200]
+    return roi
 
 
 class TestBarExtractionBenchmarks:
@@ -76,8 +85,10 @@ class TestBarExtractionBenchmarks:
 
     def test_slice_image_speed(self, benchmark, roi_image):
         """slice_image should process a ROI in <50ms."""
-        result = benchmark(slice_image, roi_image)
-        assert len(result) == 25
+        h, w = roi_image.shape[:2]
+        result = benchmark(slice_image, roi_image, roi_x=0, roi_y=0, roi_width=w, roi_height=h)
+        row, _img, _scale = result
+        assert len(row) == 25
 
     def test_alignment_score_speed(self, benchmark):
         """compute_bar_alignment_score should be <1ms."""
@@ -331,6 +342,7 @@ class TestSchemaBenchmarks:
                 current_annotation_count=0,
                 has_consensus=None,
                 uploaded_at=datetime(2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc),
+                uploaded_by_id=1,
                 processing_status="completed",
                 extracted_title="Safari",
                 extracted_total="45m",

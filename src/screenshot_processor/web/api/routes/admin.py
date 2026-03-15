@@ -6,8 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
 
 from screenshot_processor.core.image_utils import convert_dark_mode
-from screenshot_processor.core.ocr import find_screenshot_total_usage
 from screenshot_processor.web.api.dependencies import CurrentUser
+from screenshot_processor.web.cache import invalidate_stats_and_groups
 from screenshot_processor.web.database import (
     DeleteGroupResponse,
     ResetTestDataResponse,
@@ -146,6 +146,7 @@ async def reset_test_data(request: Request, repo: AdminRepo, admin: User = Admin
     """
     try:
         await repo.reset_test_data()
+        invalidate_stats_and_groups()
 
         logger.info("Admin reset test data", extra={"audit": True, "admin_username": admin.username})
 
@@ -197,6 +198,7 @@ async def delete_group(
 
         # Cascade delete all DB rows
         counts = await repo.delete_group_cascade(group_id, screenshot_ids)
+        invalidate_stats_and_groups()
 
         logger.info(
             "Admin deleted group",
@@ -289,6 +291,8 @@ async def recalculate_ocr_totals(
                 img = convert_dark_mode(img)
 
                 # Extract the total using OCR
+                from screenshot_processor.core.ocr import find_screenshot_total_usage
+
                 total, _ = find_screenshot_total_usage(img)
 
                 if total and total.strip():

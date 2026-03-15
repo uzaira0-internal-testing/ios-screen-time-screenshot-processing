@@ -5,6 +5,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Query, status
 
 from screenshot_processor.web.api.dependencies import CurrentUser, DatabaseSession
+from screenshot_processor.web.cache import invalidate_stats_and_groups
 from screenshot_processor.web.database import (
     Annotation,
     AnnotationCreate,
@@ -162,6 +163,7 @@ async def create_or_update_annotation(
 
             await db.commit()
             await db.refresh(existing)
+            invalidate_stats_and_groups()
 
             # Re-analyze consensus if needed
             if screenshot.current_annotation_count >= 2:
@@ -212,6 +214,7 @@ async def create_or_update_annotation(
             # Single atomic commit for annotation + audit log
             await db.commit()
             await db.refresh(new_annotation)
+            invalidate_stats_and_groups()
 
             logger.info(
                 "Annotation created",
@@ -309,6 +312,7 @@ async def update_annotation(
 
         await db.commit()
         await db.refresh(annotation)
+        invalidate_stats_and_groups()
 
         logger.info(
             "User updated annotation", extra={"username": current_user.username, "annotation_id": annotation_id}
@@ -380,6 +384,7 @@ async def delete_annotation(
             screenshot.annotation_status = AnnotationStatus.PENDING
 
         await db.commit()
+        invalidate_stats_and_groups()
 
         logger.info(
             "User deleted annotation",

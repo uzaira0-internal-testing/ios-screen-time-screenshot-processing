@@ -18,8 +18,8 @@ from sqlalchemy import String, cast
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from screenshot_processor.core.image_utils import convert_dark_mode
-from screenshot_processor.core.ocr import find_screenshot_total_usage
 from screenshot_processor.web.api.dependencies import CurrentUser, DatabaseSession
+from screenshot_processor.web.cache import GROUPS_KEY, STATS_KEY, invalidate_stats_and_groups, stats_cache
 from screenshot_processor.web.config import get_settings
 from screenshot_processor.web.database import (
     AnnotationStatus,
@@ -121,8 +121,17 @@ async def enrich_screenshots_with_usernames(
 
 @router.get("/groups", response_model=list[GroupRead], tags=["Groups"])
 async def list_groups(repo: ScreenshotRepo, _user: CurrentUser):
-    """List all groups with screenshot counts by processing_status."""
-    return await repo.list_groups()
+    """List all groups with screenshot counts by processing_status.
+
+    Results are cached in-memory with a configurable TTL (default 10s).
+    """
+    cached = stats_cache.get(GROUPS_KEY)
+    if cached is not None:
+        return cached
+
+    groups = await repo.list_groups()
+    stats_cache.set(GROUPS_KEY, groups)
+    return groups
 
 
 @router.get("/groups/{group_id}", response_model=GroupRead, tags=["Groups"])
@@ -184,12 +193,21 @@ async def get_disputed_screenshots(current_user: CurrentUser, db: DatabaseSessio
 
 @router.get("/stats", response_model=StatsResponse)
 async def get_screenshot_stats(repo: ScreenshotRepo, current_user: CurrentUser):
-    """Get screenshot statistics using consolidated queries."""
+    """Get screenshot statistics using consolidated queries.
+
+    Results are cached in-memory with a configurable TTL (default 10s,
+    set via STATS_CACHE_TTL_SECONDS env var) to avoid 6+ COUNT queries
+    on every page load.
+    """
+    cached = stats_cache.get(STATS_KEY)
+    if cached is not None:
+        return cached
+
     stats = await repo.get_stats()
 
     avg_annotations = stats.total_annotations / stats.total if stats.total > 0 else 0.0
 
-    return StatsResponse(
+    response = StatsResponse(
         total_screenshots=stats.total,
         pending_screenshots=stats.pending_annotation,
         completed_screenshots=stats.completed_annotation,
@@ -203,6 +221,8 @@ async def get_screenshot_stats(repo: ScreenshotRepo, current_user: CurrentUser):
         failed=stats.failed,
         skipped=stats.skipped,
     )
+    stats_cache.set(STATS_KEY, response)
+    return response
 
 
 @router.get("/list", response_model=PaginatedResponse[ScreenshotRead])
@@ -359,6 +379,7 @@ async def skip_screenshot(screenshot_id: int, db: DatabaseSession, repo: Screens
     screenshot.processing_status = ProcessingStatus.SKIPPED
     await db.commit()
     await db.refresh(screenshot)
+    invalidate_stats_and_groups()
 
     logger.info(
         "Screenshot skipped",
@@ -399,6 +420,7 @@ async def unskip_screenshot(screenshot_id: int, db: DatabaseSession, repo: Scree
     screenshot.processing_status = ProcessingStatus.COMPLETED
     await db.commit()
     await db.refresh(screenshot)
+    invalidate_stats_and_groups()
     logger.info(
         "Screenshot unskipped",
         extra={
@@ -722,6 +744,8 @@ async def recalculate_ocr_total(
         img = convert_dark_mode(img)
 
         # Extract the total using OCR
+        from screenshot_processor.core.ocr import find_screenshot_total_usage
+
         total, _ = find_screenshot_total_usage(img)
 
         if total and total.strip():
@@ -803,6 +827,7 @@ async def reprocess_screenshot_endpoint(
         current_user_id=current_user.id,
         max_shift=reprocess_request.max_shift,
     )
+    invalidate_stats_and_groups()
 
     # Handle case where processing_result is None (shouldn't happen, but be defensive)
     if processing_result is None:
@@ -1189,6 +1214,7 @@ async def _process_single_upload(
             logger.info("Duplicate upload: cleared all data, reprocessing", extra={"screenshot_id": screenshot_id})
 
         await db.commit()
+        invalidate_stats_and_groups()
     except Exception as e:
         await db.rollback()
         # Clean up saved file
@@ -1615,6 +1641,7 @@ async def upload_screenshots_batch(
                 )
 
             await db.commit()
+            invalidate_stats_and_groups()
 
         except Exception as e:
             await db.rollback()
@@ -2316,6 +2343,8 @@ async def upload_browser(
             failed += 1
 
     await db.commit()
+    if successful > 0:
+        invalidate_stats_and_groups()
 
     return BrowserUploadResponse(
         total=len(files),

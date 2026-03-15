@@ -83,6 +83,12 @@ class Settings(AuthSettingsMixin, BaseSettings):
         description="Rate limit for reprocessing endpoints",
     )
 
+    # Cache
+    STATS_CACHE_TTL_SECONDS: float = Field(
+        default=10.0,
+        description="TTL in seconds for in-memory stats/groups cache. Set to 0 to disable.",
+    )
+
     # Processing options
     USE_FRACTIONAL_HOURLY_VALUES: bool = Field(
         default=False,

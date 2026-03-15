@@ -53,6 +53,31 @@ logger.info("Error handlers configured")
 setup_rate_limiting(app, default_limits=[settings.RATE_LIMIT_DEFAULT])
 logger.info("Rate limiting configured", default_limits=[settings.RATE_LIMIT_DEFAULT])
 
+# Add GZip compression for JSON/text responses > 500 bytes.
+# Skips already-compressed formats (PNG/JPEG images) to avoid wasting CPU.
+from starlette.middleware.gzip import GZipMiddleware
+
+
+class SelectiveGZipMiddleware(GZipMiddleware):
+    """GZip that skips binary/image content types."""
+
+    _SKIP_TYPES = frozenset({"image/png", "image/jpeg", "image/webp", "image/heic", "application/octet-stream"})
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and any(scope["path"].endswith(suffix) for suffix in ("/image", "/original-image", "/stage-image")):
+            # Bypass gzip for image endpoints
+            await self.app(scope, receive, send)
+        else:
+            await super().__call__(scope, receive, send)
+
+
+app.add_middleware(SelectiveGZipMiddleware, minimum_size=500)
+
+# Add Server-Timing header + slow request logging middleware
+from .middleware import ServerTimingMiddleware
+
+app.add_middleware(ServerTimingMiddleware)
+
 # Add request logging middleware
 app.add_middleware(RequestLoggingMiddleware)
 

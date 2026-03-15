@@ -18,8 +18,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from ...core.interfaces import GridBounds, GridDetectionMethod
-from ...core.screenshot_processing import ScreenshotProcessingService
 from ..config import get_settings
+
+# Lazy sentinel — actual import in process_screenshot_file() to avoid pulling in
+# pytesseract/pandas/matplotlib at module load time. Module-level attribute
+# needed for unittest.mock.patch() to work.
+ScreenshotProcessingService = None
 
 if TYPE_CHECKING:
     from ..database.models import Screenshot
@@ -58,6 +62,10 @@ def process_screenshot_file(
     Returns:
         dict with processing results
     """
+    global ScreenshotProcessingService
+    if ScreenshotProcessingService is None:
+        from ...core.screenshot_processing import ScreenshotProcessingService
+
     settings = get_settings()
     service = ScreenshotProcessingService(use_fractional=settings.USE_FRACTIONAL_HOURLY_VALUES)
 
