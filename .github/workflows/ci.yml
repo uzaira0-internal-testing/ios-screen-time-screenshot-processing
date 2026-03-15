@@ -1,8 +1,13 @@
 name: CI
 
-# This workflow runs ONLY checks that benefit from the CI environment.
-# All testing runs locally via scripts/test-all.sh and pre-push hooks.
-# CI is for: lint (fast gate), contract drift, security scanning, container scanning.
+# CI exists ONLY for checks that cannot run locally or that gate deployments.
+# All testing, linting, and type checking runs locally via scripts/test-all.sh.
+#
+# What's here:
+#   - Nothing. The tauri-build.yml handles releases.
+#
+# If you need CI for multi-OS matrix builds or cloud-only services, add jobs here.
+# Otherwise, run scripts/test-all.sh locally before pushing.
 
 on:
   push:
@@ -15,96 +20,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Fast gate — catches obvious issues before anything else runs
-  lint:
-    name: Lint & Typecheck
+  # Placeholder — all real checks run locally via scripts/test-all.sh
+  # The tauri-build.yml workflow handles release builds on tag push.
+  check:
+    name: Verify
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Backend lint
-        run: |
-          pip install ruff
-          ruff check src/
-          ruff format --check src/
-
-      - name: Frontend checks
-        working-directory: frontend
-        run: |
-          bun install --frozen-lockfile
-          bun run typecheck
-          bun run lint
-
-  # Detect when frontend types drift from backend schemas
-  contract-drift:
-    name: API Contract Drift
-    runs-on: ubuntu-latest
-    continue-on-error: true  # Monorepo deps may not be available
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Install deps
-        run: |
-          pip install -e ".[web,dev]" || true
-          cd frontend && bun install --frozen-lockfile
-
-      - name: Check for drift
-        working-directory: frontend
-        run: |
-          bun run generate:api-types 2>/dev/null || exit 0
-          git diff --exit-code src/types/api-schema.ts
-
-  # Scan for vulnerabilities in dependencies and secrets
-  security:
-    name: Security Scan
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: pip-audit
-        run: |
-          pip install pip-audit
-          pip install -e ".[web]" 2>/dev/null || true
-          pip-audit || true
-
-      - name: Gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Trivy filesystem scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: fs
-          scan-ref: .
-          severity: CRITICAL,HIGH
-          exit-code: 0
+      - run: echo "All testing runs locally. See scripts/test-all.sh"

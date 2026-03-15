@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Local test runner — runs everything that CI does NOT need to run.
+# Local test runner — runs EVERYTHING. CI is only for Tauri release builds.
 # Usage:
 #   ./scripts/test-all.sh          # Run all tests
 #   ./scripts/test-all.sh quick    # Lint + typecheck + unit tests only (~30s)
-#   ./scripts/test-all.sh full     # All tests including integration + property
+#   ./scripts/test-all.sh full     # All tests including integration + security
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -87,6 +87,21 @@ if command -v gitleaks &>/dev/null || [ -f ~/.local/bin/gitleaks ]; then
   run "Secret scan (gitleaks)" "$GITLEAKS" detect --source . --no-git -c .gitleaks.toml
 else
   skip "Secret scan" "gitleaks not installed"
+fi
+
+if [ -n "$CONTAINER" ]; then
+  run "pip-audit" $DOCKER_BACKEND pip-audit --strict 2>/dev/null || skip "pip-audit" "pip-audit not installed in container"
+else
+  skip "pip-audit" "Docker backend not running"
+fi
+echo ""
+
+# ── Contract Drift ────────────────────────────────────────────────────
+echo "── Contract Drift ──"
+if [ -f frontend/scripts/check-contract-drift.sh ]; then
+  run "API contract drift" bash -c "cd frontend && bash scripts/check-contract-drift.sh"
+else
+  skip "API contract drift" "Script not found"
 fi
 echo ""
 
