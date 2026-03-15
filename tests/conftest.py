@@ -88,6 +88,13 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 
     app.dependency_overrides[get_db] = override_get_db
 
+    # Disable in-memory cache for tests — set TTL to 0 so every request queries fresh
+    from screenshot_processor.web.cache import stats_cache
+
+    stats_cache.invalidate_all()
+    original_ttl = stats_cache._ttl
+    stats_cache._ttl = 0.0
+
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://test",
@@ -95,6 +102,8 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
         yield ac
 
     app.dependency_overrides.clear()
+    stats_cache.invalidate_all()
+    stats_cache._ttl = original_ttl
 
 
 @pytest_asyncio.fixture

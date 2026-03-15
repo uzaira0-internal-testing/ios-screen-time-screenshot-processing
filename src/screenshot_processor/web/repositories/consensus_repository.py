@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import String, cast, func, select
+from sqlalchemy import String, case, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -42,13 +42,11 @@ class ConsensusRepository:
         screenshot_id: int,
         has_consensus: bool,
         consensus_values: dict | None = None,
-        disagreement_count: int = 0,
     ) -> ConsensusResult:
         """Update or create consensus result."""
         result = await self.get_or_create_consensus_result(screenshot_id)
         result.has_consensus = has_consensus
         result.consensus_values = consensus_values
-        result.disagreement_count = disagreement_count
         return result
 
     async def get_all_groups(self) -> list[Group]:
@@ -57,11 +55,11 @@ class ConsensusRepository:
         return list(result.scalars().all())
 
     async def get_verified_screenshots_in_group(self, group_id: str) -> list[Screenshot]:
-        """Get all verified screenshots in a group with their annotations."""
+        """Get all verified screenshots in a group with their annotations and users."""
         # Note: JSON columns can have SQL NULL or JSON null (literal "null" string)
         result = await self.db.execute(
             select(Screenshot)
-            .options(selectinload(Screenshot.annotations))
+            .options(selectinload(Screenshot.annotations).selectinload(Annotation.user))
             .where(
                 Screenshot.group_id == group_id,
                 Screenshot.verified_by_user_ids.isnot(None),
@@ -114,64 +112,49 @@ class ConsensusRepository:
         return result.scalar_one_or_none()
 
     async def get_consensus_counts(self) -> dict:
-        """Get consensus-related counts for the summary endpoint.
-
-        Returns:
-            Dict with total_with_consensus, total_with_disagreements,
-            and total_completed counts.
-        """
-        total_with_consensus_stmt = select(func.count(ConsensusResult.id)).where(
-            ConsensusResult.has_consensus == True  # noqa: E712
+        """Get consensus-related counts for the summary endpoint (single query)."""
+        stmt = select(
+            func.count(
+                case((ConsensusResult.has_consensus == True, 1))  # noqa: E712
+            ).label("total_with_consensus"),
+            func.count(
+                case((ConsensusResult.has_consensus == False, 1))  # noqa: E712
+            ).label("total_with_disagreements"),
+            select(func.count(Screenshot.id)).where(
+                Screenshot.current_annotation_count >= Screenshot.target_annotations
+            ).scalar_subquery().label("total_completed"),
         )
-        result = await self.db.execute(total_with_consensus_stmt)
-        total_with_consensus = result.scalar_one()
-
-        total_with_disagreements_stmt = select(func.count(ConsensusResult.id)).where(
-            ConsensusResult.has_consensus == False  # noqa: E712
-        )
-        result = await self.db.execute(total_with_disagreements_stmt)
-        total_with_disagreements = result.scalar_one()
-
-        total_annotations_stmt = select(func.count(Screenshot.id)).where(
-            Screenshot.current_annotation_count >= Screenshot.target_annotations
-        )
-        result = await self.db.execute(total_annotations_stmt)
-        total_completed = result.scalar_one()
+        result = await self.db.execute(stmt)
+        row = result.one()
 
         return {
-            "total_with_consensus": total_with_consensus,
-            "total_with_disagreements": total_with_disagreements,
-            "total_completed": total_completed,
+            "total_with_consensus": row.total_with_consensus,
+            "total_with_disagreements": row.total_with_disagreements,
+            "total_completed": row.total_completed,
         }
 
     async def get_consensus_summary_stats(self) -> dict:
-        """Get summary statistics for consensus analysis."""
-        # Total screenshots
-        total_result = await self.db.execute(select(func.count(Screenshot.id)))
-        total = total_result.scalar_one()
-
-        # Screenshots with consensus results
-        with_consensus_result = await self.db.execute(select(func.count(ConsensusResult.id)))
-        with_consensus = with_consensus_result.scalar_one()
-
-        # Screenshots with disagreements
-        with_disagreements_result = await self.db.execute(
-            select(func.count(ConsensusResult.id)).where(
-                ConsensusResult.has_consensus == False  # noqa: E712
-            )
+        """Get summary statistics for consensus analysis (single query)."""
+        stmt = select(
+            select(func.count(Screenshot.id)).scalar_subquery().label("total_screenshots"),
+            func.count(ConsensusResult.id).label("with_consensus"),
+            func.count(
+                case((ConsensusResult.has_consensus == False, 1))  # noqa: E712
+            ).label("with_disagreements"),
+            # disagreement_count column doesn't exist — count disagreement rows instead
+            func.count(
+                case((ConsensusResult.has_consensus == False, 1))  # noqa: E712
+            ).label("total_disagreements"),
         )
-        with_disagreements = with_disagreements_result.scalar_one()
-
-        # Total disagreements
-        total_disagreements_result = await self.db.execute(select(func.sum(ConsensusResult.disagreement_count)))
-        total_disagreements = total_disagreements_result.scalar_one() or 0
+        result = await self.db.execute(stmt)
+        row = result.one()
 
         return {
-            "total_screenshots": total,
-            "screenshots_with_consensus": with_consensus,
-            "screenshots_with_disagreements": with_disagreements,
-            "total_disagreements": total_disagreements,
+            "total_screenshots": row.total_screenshots,
+            "screenshots_with_consensus": row.with_consensus,
+            "screenshots_with_disagreements": row.with_disagreements,
+            "total_disagreements": row.total_disagreements,
             "avg_disagreements_per_screenshot": (
-                total_disagreements / with_disagreements if with_disagreements > 0 else 0
+                row.total_disagreements / row.with_disagreements if row.with_disagreements > 0 else 0
             ),
         }

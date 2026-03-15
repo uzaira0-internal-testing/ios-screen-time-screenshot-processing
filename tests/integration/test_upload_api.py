@@ -32,8 +32,8 @@ from screenshot_processor.web.database.models import (
 from tests.conftest import auth_headers
 def api_key_header() -> dict[str, str]:
     """Create API key header for uploads."""
-    # Get API key from environment or use test default
-    api_key = os.environ.get("UPLOAD_API_KEY", "test-api-key")
+    # Use the same default as Settings.UPLOAD_API_KEY
+    api_key = os.environ.get("UPLOAD_API_KEY", "dev-upload-key-change-in-production")
     return {"X-API-Key": api_key}
 
 
@@ -182,7 +182,7 @@ class TestSingleUpload:
 
         assert response.status_code == 400
         data = response.json()
-        assert data["detail"]["error_code"] == "INVALID_BASE64"
+        assert data["detail"]["error_code"] == "invalid_base64"
 
 
 @pytest.mark.asyncio

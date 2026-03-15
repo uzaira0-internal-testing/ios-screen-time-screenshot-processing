@@ -163,8 +163,6 @@ class ScreenshotRepository:
         Returns:
             PaginatedResult with items, total count, and pagination info
         """
-        from sqlalchemy import literal
-
         stmt = select(Screenshot)
         count_stmt = select(func.count(Screenshot.id))
 
@@ -179,11 +177,19 @@ class ScreenshotRepository:
             conditions.append(Screenshot.processing_status == processing_status)
 
         # Helper to check if user ID is in verified_by_user_ids array
-        # Column is JSON type, need to cast both sides to JSONB for @> operator
-        from sqlalchemy.dialects.postgresql import JSONB
-
+        # Database-agnostic: cast JSON to string, match integer with boundary patterns
+        # Works on both PostgreSQL (JSON stored as jsonb) and SQLite (JSON stored as text)
         def user_in_verified_list(user_id: int):
-            return cast(Screenshot.verified_by_user_ids, JSONB).op("@>")(cast(literal(f"[{user_id}]"), JSONB))
+            id_str = cast(Screenshot.verified_by_user_ids, String)
+            uid = str(user_id)
+            # LIKE patterns with exact delimiters prevent false positives:
+            # [1,% does NOT match [15,...] because LIKE requires [1, not [15
+            return or_(
+                id_str.like(f"[{uid}]"),  # exact single: [5]
+                id_str.like(f"[{uid},%"),  # first: [5, ...]
+                id_str.like(f"%, {uid},%"),  # middle: [..., 5, ...]
+                id_str.like(f"%, {uid}]"),  # last: [..., 5]
+            )
 
         def has_verifications():
             return and_(
@@ -262,74 +268,50 @@ class ScreenshotRepository:
         """Get comprehensive screenshot statistics.
 
         Uses conditional aggregation to minimize database round trips.
+        Combined into 2 queries (screenshots+annotations+consensus, users).
         """
-        # Query 1: Screenshot stats using conditional aggregation
-        screenshot_stats_stmt = select(
+        # Query 1: All screenshot, annotation, and consensus stats in one shot
+        # Uses scalar subqueries for annotation count and consensus stats
+        # to avoid JOINs that would multiply rows
+        combined_stmt = select(
             func.count(Screenshot.id).label("total"),
             func.count(
-                case(
-                    (
-                        and_(
-                            Screenshot.annotation_status == AnnotationStatus.PENDING,
-                        ),
-                        1,
-                    )
-                )
+                case((Screenshot.annotation_status == AnnotationStatus.PENDING, 1))
             ).label("pending_annotation"),
             func.count(
-                case(
-                    (
-                        and_(
-                            Screenshot.current_annotation_count >= Screenshot.target_annotations,
-                        ),
-                        1,
-                    )
-                )
+                case((Screenshot.current_annotation_count >= Screenshot.target_annotations, 1))
             ).label("completed_annotation"),
             func.count(case((Screenshot.processing_status == ProcessingStatus.PENDING, 1))).label("pending_processing"),
             func.count(case((Screenshot.processing_status == ProcessingStatus.COMPLETED, 1))).label("auto_processed"),
             func.count(case((Screenshot.processing_status == ProcessingStatus.FAILED, 1))).label("failed"),
             func.count(case((Screenshot.processing_status == ProcessingStatus.SKIPPED, 1))).label("skipped"),
+            # Inline scalar subqueries
+            select(func.count(Annotation.id)).scalar_subquery().label("total_annotations"),
+            select(
+                func.count(case((ConsensusResult.has_consensus == True, 1)))  # noqa: E712
+            ).scalar_subquery().label("with_consensus"),
+            select(
+                func.count(case((ConsensusResult.has_consensus == False, 1)))  # noqa: E712
+            ).scalar_subquery().label("with_disagreements"),
+            select(func.count(User.id)).where(
+                User.is_active == True  # noqa: E712
+            ).scalar_subquery().label("users_active"),
         )
-        result = await self.db.execute(screenshot_stats_stmt)
-        screenshot_stats = result.one()
-
-        # Query 2: Annotation count
-        annotation_count_stmt = select(func.count(Annotation.id))
-        result = await self.db.execute(annotation_count_stmt)
-        total_annotations = result.scalar_one()
-
-        # Query 3: Consensus stats
-        consensus_stats_stmt = select(
-            func.count(
-                case((ConsensusResult.has_consensus == True, 1))  # noqa: E712
-            ).label("with_consensus"),
-            func.count(
-                case((ConsensusResult.has_consensus == False, 1))  # noqa: E712
-            ).label("with_disagreements"),
-        )
-        result = await self.db.execute(consensus_stats_stmt)
-        consensus_stats = result.one()
-
-        # Query 4: Active users
-        users_active_stmt = select(func.count(User.id)).where(
-            User.is_active == True  # noqa: E712
-        )
-        result = await self.db.execute(users_active_stmt)
-        users_active = result.scalar_one()
+        result = await self.db.execute(combined_stmt)
+        row = result.one()
 
         return ScreenshotStats(
-            total=screenshot_stats.total,
-            pending_annotation=screenshot_stats.pending_annotation,
-            completed_annotation=screenshot_stats.completed_annotation,
-            pending_processing=screenshot_stats.pending_processing,
-            auto_processed=screenshot_stats.auto_processed,
-            failed=screenshot_stats.failed,
-            skipped=screenshot_stats.skipped,
-            total_annotations=total_annotations,
-            with_consensus=consensus_stats.with_consensus,
-            with_disagreements=consensus_stats.with_disagreements,
-            users_active=users_active,
+            total=row.total,
+            pending_annotation=row.pending_annotation,
+            completed_annotation=row.completed_annotation,
+            pending_processing=row.pending_processing,
+            auto_processed=row.auto_processed,
+            failed=row.failed,
+            skipped=row.skipped,
+            total_annotations=row.total_annotations,
+            with_consensus=row.with_consensus,
+            with_disagreements=row.with_disagreements,
+            users_active=row.users_active,
         )
 
     async def list_groups(self) -> list[GroupRead]:
@@ -619,13 +601,6 @@ class ScreenshotRepository:
         Returns:
             NavigationResult with screenshot, index, total, and has_next/has_prev.
         """
-        # Get total count in filter
-        count_stmt = select(func.count(Screenshot.id))
-        if conditions:
-            count_stmt = count_stmt.where(and_(*conditions))
-        result = await self.db.execute(count_stmt)
-        total_in_filter = result.scalar_one()
-
         # Get the target screenshot based on direction
         if direction == "next":
             stmt = select(Screenshot).where(Screenshot.id > screenshot_id)
@@ -646,6 +621,12 @@ class ScreenshotRepository:
         screenshot = result.scalar_one_or_none()
 
         if not screenshot:
+            # Only need total count when screenshot not found
+            count_stmt = select(func.count(Screenshot.id))
+            if conditions:
+                count_stmt = count_stmt.where(and_(*conditions))
+            result = await self.db.execute(count_stmt)
+            total_in_filter = result.scalar_one()
             return NavigationResult(
                 screenshot=None,
                 current_index=0,
@@ -654,33 +635,24 @@ class ScreenshotRepository:
                 has_prev=False,
             )
 
-        # Calculate current index (1-indexed)
-        index_stmt = select(func.count(Screenshot.id)).where(Screenshot.id < screenshot.id)
-        if conditions:
-            index_stmt = index_stmt.where(and_(*conditions))
-        result = await self.db.execute(index_stmt)
-        current_index = result.scalar_one() + 1
-
-        # Check if there's a next screenshot
-        next_stmt = select(func.count(Screenshot.id)).where(Screenshot.id > screenshot.id)
-        if conditions:
-            next_stmt = next_stmt.where(and_(*conditions))
-        result = await self.db.execute(next_stmt)
-        has_next = result.scalar_one() > 0
-
-        # Check if there's a previous screenshot
-        prev_stmt = select(func.count(Screenshot.id)).where(Screenshot.id < screenshot.id)
-        if conditions:
-            prev_stmt = prev_stmt.where(and_(*conditions))
-        result = await self.db.execute(prev_stmt)
-        has_prev = result.scalar_one() > 0
+        # Single query: get total count AND count of items before this screenshot
+        # has_next/has_prev are derived from current_index and total (no extra queries)
+        base_conditions = and_(*conditions) if conditions else True
+        combined_stmt = select(
+            func.count(Screenshot.id).label("total"),
+            func.count(case((Screenshot.id < screenshot.id, 1))).label("before_count"),
+        ).where(base_conditions)
+        result = await self.db.execute(combined_stmt)
+        row = result.one()
+        total_in_filter = row.total
+        current_index = row.before_count + 1
 
         return NavigationResult(
             screenshot=screenshot,
             current_index=current_index,
             total_in_filter=total_in_filter,
-            has_next=has_next,
-            has_prev=has_prev,
+            has_next=current_index < total_in_filter,
+            has_prev=current_index > 1,
         )
 
     # =========================================================================

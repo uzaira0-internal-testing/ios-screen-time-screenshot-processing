@@ -108,6 +108,9 @@ class Screenshot(Base):
         Index("ix_screenshots_group_processing", "group_id", "processing_status"),
         Index("ix_screenshots_group_date", "group_id", "screenshot_date"),
         Index("ix_screenshots_group_id_asc", "group_id", "id"),
+        # Composite indexes for stats/queue queries
+        Index("ix_screenshots_status_annotation", "processing_status", "annotation_status"),
+        Index("ix_screenshots_dedup", "participant_id", "screenshot_date", "extracted_title", "extracted_total"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)

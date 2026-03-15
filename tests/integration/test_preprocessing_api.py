@@ -225,12 +225,15 @@ class TestBrowserUpload:
 
 class TestGetOriginalImage:
     @pytest.mark.asyncio
-    async def test_serves_original_image(self, client: AsyncClient, test_user, screenshot_with_image):
+    async def test_serves_original_image(self, client: AsyncClient, test_user, screenshot_with_image, tmp_path):
         """Should return the original PNG file."""
-        response = await client.get(
-            f"/api/v1/screenshots/{screenshot_with_image.id}/original-image",
-            headers=auth_headers(test_user.username),
-        )
+        # Patch UPLOAD_DIR so the path traversal check allows tmp_path
+        with patch("screenshot_processor.web.api.routes.screenshots.get_settings") as mock_gs:
+            mock_gs.return_value.UPLOAD_DIR = str(tmp_path)
+            response = await client.get(
+                f"/api/v1/screenshots/{screenshot_with_image.id}/original-image",
+                headers=auth_headers(test_user.username),
+            )
         assert response.status_code == 200
         assert response.headers["content-type"] in ("image/png", "image/png; charset=utf-8")
         # Verify it's a PNG
@@ -245,10 +248,11 @@ class TestGetOriginalImage:
         assert response.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_missing_file_on_disk(self, client: AsyncClient, test_user, db_session, test_group_for_preproc):
+    async def test_missing_file_on_disk(self, client: AsyncClient, test_user, db_session, test_group_for_preproc, tmp_path):
         """Screenshot exists in DB but file doesn't exist on disk."""
+        fake_path = str(tmp_path / "nonexistent" / "fake.png")
         screenshot = Screenshot(
-            file_path="/nonexistent/path/fake.png",
+            file_path=fake_path,
             image_type="screen_time",
             annotation_status="pending",
             processing_status="pending",
@@ -256,16 +260,19 @@ class TestGetOriginalImage:
             current_annotation_count=0,
             uploaded_by_id=test_user.id,
             group_id=test_group_for_preproc.id,
-            processing_metadata=_make_preprocessing_metadata("/nonexistent/path/fake.png"),
+            processing_metadata=_make_preprocessing_metadata(fake_path),
         )
         db_session.add(screenshot)
         await db_session.commit()
         await db_session.refresh(screenshot)
 
-        response = await client.get(
-            f"/api/v1/screenshots/{screenshot.id}/original-image",
-            headers=auth_headers(test_user.username),
-        )
+        # Patch UPLOAD_DIR so the path traversal check allows tmp_path
+        with patch("screenshot_processor.web.api.routes.screenshots.get_settings") as mock_gs:
+            mock_gs.return_value.UPLOAD_DIR = str(tmp_path)
+            response = await client.get(
+                f"/api/v1/screenshots/{screenshot.id}/original-image",
+                headers=auth_headers(test_user.username),
+            )
         assert response.status_code == 404
 
 

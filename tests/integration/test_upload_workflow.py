@@ -25,16 +25,18 @@ TEST_PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+
 TEST_API_KEY = "test_api_key_12345"
 
 
+
+
 @pytest.mark.asyncio
 class TestScreenshotUpload:
     """Test screenshot upload endpoint."""
 
     @pytest.fixture(autouse=True)
-    def mock_api_key(self):
+    def mock_api_key(self, tmp_path):
         """Mock API key validation and rate limiting settings."""
         with patch("screenshot_processor.web.api.routes.screenshots.get_settings") as mock_settings:
             mock_settings.return_value.UPLOAD_API_KEY = TEST_API_KEY
-            mock_settings.return_value.UPLOAD_DIR = "uploads"
+            mock_settings.return_value.UPLOAD_DIR = str(tmp_path / "uploads")
             mock_settings.return_value.RATE_LIMIT_UPLOAD = "100/minute"
             mock_settings.return_value.RATE_LIMIT_REPROCESS = "100/minute"
             yield

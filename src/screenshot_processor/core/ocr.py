@@ -21,6 +21,39 @@ logger = logging.getLogger(__name__)
 
 DEBUG_ENABLED = False
 
+# Pre-compiled regex patterns for OCR digit normalization (avoid re-compilation per call)
+_RE_1_BEFORE_UNIT = re.compile(r"([Il|])(\s*[hm]\b)")
+_RE_1_AFTER_DIGIT = re.compile(r"(\d)([Il|])(\s*[hms]\b)")
+_RE_1_BEFORE_DIGIT = re.compile(r"([Il|])(\d)")
+_RE_0_BEFORE_UNIT = re.compile(r"([O])(\s*[hms]\b)")
+_RE_0_AFTER_DIGIT = re.compile(r"(\d)([O])(\s*[hms]\b)")
+_RE_0_BEFORE_DIGIT = re.compile(r"([O])(\d)")
+_RE_0_BETWEEN_DIGITS = re.compile(r"(\d)([O])(\d)")
+_RE_4_BEFORE_UNIT = re.compile(r"([A])(\s*[hm]\b)")
+_RE_4_AFTER_DIGIT = re.compile(r"(\d)([A])(\s*[hms]\b)")
+_RE_5_BEFORE_UNIT = re.compile(r"([S])(\s*[hm]\b)")
+_RE_5_AFTER_DIGIT = re.compile(r"(\d)([S])(\s*[hm]\b)")
+_RE_5_BEFORE_DIGIT = re.compile(r"([S])(\d)")
+_RE_6_BEFORE_UNIT = re.compile(r"([Gb])(\s*[hms]\b)")
+_RE_6_AFTER_DIGIT = re.compile(r"(\d)([Gb])(\s*[hms]\b)")
+_RE_8_BEFORE_UNIT = re.compile(r"([B])(\s*[hms]\b)")
+_RE_8_AFTER_DIGIT = re.compile(r"(\d)([B])(\s*[hms]\b)")
+_RE_9_BEFORE_UNIT = re.compile(r"([gq])(\s*[hms]\b)")
+_RE_9_AFTER_DIGIT = re.compile(r"(\d)([gq])(\s*[hms]\b)")
+_RE_2_BEFORE_UNIT = re.compile(r"([Z])(\s*[hms]\b)")
+_RE_2_AFTER_DIGIT = re.compile(r"(\d)([Z])(\s*[hms]\b)")
+_RE_7_BEFORE_UNIT = re.compile(r"([T])(\s*[hms]\b)")
+_RE_7_AFTER_DIGIT = re.compile(r"(\d)([T])(\s*[hms]\b)")
+
+# Pre-compiled time extraction patterns
+_RE_HOUR_MIN = re.compile(r"(\d{1,2})\s*h\s*(\d{1,2})\s*m")
+_RE_HOUR_MIN_NO_M = re.compile(r"(\d{1,2})\s*h\s+(\d{1,2})(?!\s*[hms])")
+_RE_MIN_SEC = re.compile(r"(\d{1,2})\s*m\s*([0O]|\d{1,2})\s*s")
+_RE_MIN_ONLY = re.compile(r"(\d{1,2})\s*m\b")
+_RE_HOURS_ONLY = re.compile(r"(\d{1,2})\s*h\b")
+_RE_SEC_ONLY = re.compile(r"([0O]|\d{1,2})\s*s\b")
+_RE_HAS_TIME = re.compile(r"\d+\s*[hms]")
+
 
 def _ocr_results_to_dict(results: list[OCRResult]) -> dict:
     """Convert OCRResult list to pytesseract-style dict."""
@@ -309,49 +342,45 @@ def _normalize_ocr_digits(text: str) -> str:
     """
     result = text
 
-    # Pattern: letter(s) followed by time unit (h, m, s)
-    # This catches "Im" -> "1m", "Oh" -> "0h", "Am" -> "4m", etc.
-
     # 1-like characters: I, l, |
-    result = re.sub(r"([Il|])(\s*[hm]\b)", r"1\2", result)
-    result = re.sub(r"(\d)([Il|])(\s*[hms]\b)", r"\g<1>1\3", result)
-    result = re.sub(r"([Il|])(\d)", r"1\2", result)
+    result = _RE_1_BEFORE_UNIT.sub(r"1\2", result)
+    result = _RE_1_AFTER_DIGIT.sub(r"\g<1>1\3", result)
+    result = _RE_1_BEFORE_DIGIT.sub(r"1\2", result)
 
     # 0-like characters: O
-    result = re.sub(r"([O])(\s*[hms]\b)", r"0\2", result)
-    result = re.sub(r"(\d)([O])(\s*[hms]\b)", r"\g<1>0\3", result)
-    result = re.sub(r"([O])(\d)", r"0\2", result)
-    result = re.sub(r"(\d)([O])(\d)", r"\g<1>0\3", result)
+    result = _RE_0_BEFORE_UNIT.sub(r"0\2", result)
+    result = _RE_0_AFTER_DIGIT.sub(r"\g<1>0\3", result)
+    result = _RE_0_BEFORE_DIGIT.sub(r"0\2", result)
+    result = _RE_0_BETWEEN_DIGITS.sub(r"\g<1>0\3", result)
 
-    # 4-like characters: A (common: "Am" -> "4m", "4h" misread as "Ah")
-    result = re.sub(r"([A])(\s*[hm]\b)", r"4\2", result)
-    result = re.sub(r"(\d)([A])(\s*[hms]\b)", r"\g<1>4\3", result)
+    # 4-like characters: A
+    result = _RE_4_BEFORE_UNIT.sub(r"4\2", result)
+    result = _RE_4_AFTER_DIGIT.sub(r"\g<1>4\3", result)
 
-    # 5-like characters: S (but careful - 's' is a time unit!)
-    # Only replace S when followed by another digit or h/m (not when it IS the seconds unit)
-    result = re.sub(r"([S])(\s*[hm]\b)", r"5\2", result)
-    result = re.sub(r"(\d)([S])(\s*[hm]\b)", r"\g<1>5\3", result)
-    result = re.sub(r"([S])(\d)", r"5\2", result)
+    # 5-like characters: S
+    result = _RE_5_BEFORE_UNIT.sub(r"5\2", result)
+    result = _RE_5_AFTER_DIGIT.sub(r"\g<1>5\3", result)
+    result = _RE_5_BEFORE_DIGIT.sub(r"5\2", result)
 
     # 6-like characters: G, b
-    result = re.sub(r"([Gb])(\s*[hms]\b)", r"6\2", result)
-    result = re.sub(r"(\d)([Gb])(\s*[hms]\b)", r"\g<1>6\3", result)
+    result = _RE_6_BEFORE_UNIT.sub(r"6\2", result)
+    result = _RE_6_AFTER_DIGIT.sub(r"\g<1>6\3", result)
 
     # 8-like characters: B
-    result = re.sub(r"([B])(\s*[hms]\b)", r"8\2", result)
-    result = re.sub(r"(\d)([B])(\s*[hms]\b)", r"\g<1>8\3", result)
+    result = _RE_8_BEFORE_UNIT.sub(r"8\2", result)
+    result = _RE_8_AFTER_DIGIT.sub(r"\g<1>8\3", result)
 
     # 9-like characters: g, q
-    result = re.sub(r"([gq])(\s*[hms]\b)", r"9\2", result)
-    result = re.sub(r"(\d)([gq])(\s*[hms]\b)", r"\g<1>9\3", result)
+    result = _RE_9_BEFORE_UNIT.sub(r"9\2", result)
+    result = _RE_9_AFTER_DIGIT.sub(r"\g<1>9\3", result)
 
     # 2-like characters: Z
-    result = re.sub(r"([Z])(\s*[hms]\b)", r"2\2", result)
-    result = re.sub(r"(\d)([Z])(\s*[hms]\b)", r"\g<1>2\3", result)
+    result = _RE_2_BEFORE_UNIT.sub(r"2\2", result)
+    result = _RE_2_AFTER_DIGIT.sub(r"\g<1>2\3", result)
 
     # 7-like characters: T
-    result = re.sub(r"([T])(\s*[hms]\b)", r"7\2", result)
-    result = re.sub(r"(\d)([T])(\s*[hms]\b)", r"\g<1>7\3", result)
+    result = _RE_7_BEFORE_UNIT.sub(r"7\2", result)
+    result = _RE_7_AFTER_DIGIT.sub(r"\g<1>7\3", result)
 
     return result
 
@@ -361,55 +390,31 @@ def _extract_time_from_text(text: str) -> str:
     # First normalize OCR errors (I->1, O->0, l->1)
     text = _normalize_ocr_digits(text)
 
-    # Patterns - note: \s* allows zero or more spaces between h and minutes
-    # This handles cases like "4h 36m", "4h36m", "4h  36m"
-    hour_min_pattern = r"(\d{1,2})\s*h\s*(\d{1,2})\s*m"
-    # Fallback: "Xh YY" where OCR missed the 'm' - common failure mode
-    # e.g., "4h 36" should be interpreted as "4h 36m"
-    hour_min_no_m_pattern = r"(\d{1,2})\s*h\s+(\d{1,2})(?!\s*[hms])"
-    min_sec_pattern = r"(\d{1,2})\s*m\s*([0O]|\d{1,2})\s*s"
-    min_only_pattern = r"(\d{1,2})\s*m\b"
-    hours_only_pattern = r"(\d{1,2})\s*h\b"
-    sec_only_pattern = r"([0O]|\d{1,2})\s*s\b"
+    m = _RE_HOUR_MIN.search(text)
+    if m:
+        return f"{int(m.group(1))}h {int(m.group(2))}m"
 
-    hour_min_match = re.search(hour_min_pattern, text)
-    if hour_min_match:
-        hours = int(hour_min_match.group(1))
-        minutes = int(hour_min_match.group(2))
+    m = _RE_HOUR_MIN_NO_M.search(text)
+    if m:
+        hours, minutes = int(m.group(1)), int(m.group(2))
+        logger.info(f"OCR fallback: interpreted '{m.group(0)}' as '{hours}h {minutes}m' (missing 'm')")
         return f"{hours}h {minutes}m"
 
-    # Try fallback pattern for missing 'm' - "4h 36" -> "4h 36m"
-    hour_min_no_m_match = re.search(hour_min_no_m_pattern, text)
-    if hour_min_no_m_match:
-        hours = int(hour_min_no_m_match.group(1))
-        minutes = int(hour_min_no_m_match.group(2))
-        logger.info(
-            f"OCR fallback: interpreted '{hour_min_no_m_match.group(0)}' as '{hours}h {minutes}m' (missing 'm')"
-        )
-        return f"{hours}h {minutes}m"
+    m = _RE_MIN_SEC.search(text)
+    if m:
+        return f"{int(m.group(1))}m {int(m.group(2).replace('O', '0'))}s"
 
-    min_sec_match = re.search(min_sec_pattern, text)
-    if min_sec_match:
-        minutes = int(min_sec_match.group(1))
-        seconds_str = min_sec_match.group(2)
-        seconds = int(seconds_str.replace("O", "0"))
-        return f"{minutes}m {seconds}s"
+    m = _RE_HOURS_ONLY.search(text)
+    if m:
+        return f"{int(m.group(1))}h"
 
-    hours_match = re.search(hours_only_pattern, text)
-    if hours_match:
-        hours = int(hours_match.group(1))
-        return f"{hours}h"
+    m = _RE_MIN_ONLY.search(text)
+    if m:
+        return f"{int(m.group(1))}m"
 
-    min_match = re.search(min_only_pattern, text)
-    if min_match:
-        minutes = int(min_match.group(1))
-        return f"{minutes}m"
-
-    sec_match = re.search(sec_only_pattern, text)
-    if sec_match:
-        seconds_str = sec_match.group(1)
-        seconds = int(seconds_str.replace("O", "0"))
-        return f"{seconds}s"
+    m = _RE_SEC_ONLY.search(text)
+    if m:
+        return f"{int(m.group(1).replace('O', '0'))}s"
 
     return ""
 
@@ -528,7 +533,7 @@ def find_screenshot_total_usage(
         total_image_path = Path(debug_extracted_total_folder) / "total_extract.jpg"
         cv2.imwrite(str(total_image_path), total_image)
 
-    if not total or not re.search(r"\d+\s*[hms]", total):
+    if not total or not _RE_HAS_TIME.search(total):
         logger.info("Original method failed to find total time, trying regex approach...")
         regex_total, regex_image_path = find_screenshot_total_usage_regex(img, ocr_config)
 
@@ -587,14 +592,10 @@ def extract_all_text(
         except Exception as e:
             logger.warning(f"HybridOCR failed, falling back to Tesseract: {e}")
 
-    # Default: Tesseract with multiple PSM modes
+    # Default: Tesseract with PSM 3 (default) + PSM 13 (raw line)
     dictionary = pytesseract.image_to_data(image, output_type=Output.DICT)
-
-    for i in range(13, 14):
-        dictionary_temp = pytesseract.image_to_data(image, config="--psm " + str(i), output_type=Output.DICT)
-        dictionary = dictionary_temp | dictionary
-
-    return dictionary
+    dictionary_psm13 = pytesseract.image_to_data(image, config="--psm 13", output_type=Output.DICT)
+    return dictionary_psm13 | dictionary
 
 
 def clean_date_string(date_string: str) -> str:

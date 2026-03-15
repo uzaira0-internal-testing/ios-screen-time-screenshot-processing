@@ -45,9 +45,9 @@ def load_and_validate_image(filename: Path | str) -> np.ndarray:
         ImageProcessingError: If image cannot be loaded
     """
     img = cv2.imread(str(filename))
-    img = convert_dark_mode(img)
     if img is None:
         raise ImageProcessingError("Failed to load image.")
+    img = convert_dark_mode(img)
     return img
 
 
@@ -74,7 +74,7 @@ def extract_hourly_data_only(
     if img_raw is None:
         raise ImageProcessingError("Failed to load image.")
 
-    img = convert_dark_mode(img_raw.copy())
+    img = convert_dark_mode(img_raw)
     img = adjust_contrast_brightness(img, contrast=2.0, brightness=-220)
 
     upper_left_x, upper_left_y, roi_width, roi_height = calculate_roi_from_clicks(upper_left, lower_right, None, img)
@@ -121,8 +121,7 @@ def process_image_with_grid(
     """
     try:
         raw_img = load_and_validate_image(filename)
-        img_copy = raw_img.copy()
-        img = adjust_contrast_brightness(raw_img.copy(), contrast=2.0, brightness=-220)
+        img = adjust_contrast_brightness(raw_img, contrast=2.0, brightness=-220)
 
         snap_func = snap_to_grid if snap_to_grid else None
 
@@ -139,12 +138,12 @@ def process_image_with_grid(
 
         if is_battery:
             logger.debug("Extracting time...")
-            title = find_time(img_copy, roi_x, roi_y, roi_width, roi_height)
+            title = find_time(raw_img, roi_x, roi_y, roi_width, roi_height)
             total = "N/A"
             total_image_path = None
         else:
             logger.debug("Extracting title and total...")
-            title, _, total, total_image_path = find_title_and_total(img_copy, ocr_config)
+            title, _, total, total_image_path = find_title_and_total(raw_img, ocr_config)
 
         filename, row, graph_filename = save_image(
             filename, roi_x, roi_y, roi_width, roi_height, is_battery, preloaded_img=raw_img
@@ -175,7 +174,7 @@ def process_image(
         Tuple of (filename, graph_filename, row, title, total, total_image_path, grid_coords)
     """
     img = load_and_validate_image(filename)
-    return apply_processing(filename, img.copy(), is_battery, snap_to_grid, ocr_config, raw_img=img)
+    return apply_processing(filename, img, is_battery, snap_to_grid, ocr_config, raw_img=img)
 
 
 def apply_processing(
@@ -198,14 +197,13 @@ def apply_processing(
     Returns:
         Tuple of (filename, graph_filename, row, title, total, total_image_path, grid_coords)
     """
-    img = adjust_contrast_brightness(img, contrast=2.0, brightness=-220)
-    img_copy = img.copy()
+    img = adjust_contrast_brightness(img.copy(), contrast=2.0, brightness=-220)
     img_left, img_right, right_offset = prepare_image_chunks(img)
 
     d_left, d_right = perform_ocr(img_left, img_right, ocr_config)
     adjust_anchor_offsets(d_right, right_offset)
 
-    roi_params = find_grid_anchors_and_calculate_roi(d_left, d_right, img, img_copy, snap_to_grid, calculate_roi)
+    roi_params = find_grid_anchors_and_calculate_roi(d_left, d_right, img, img, snap_to_grid, calculate_roi)
     if roi_params is None:
         raise ValueError("Couldn't find graph anchors!")
 
@@ -219,7 +217,7 @@ def apply_processing(
     }
 
     if is_battery:
-        title = find_time(img_copy, roi_x, roi_y, roi_width, roi_height)
+        title = find_time(img, roi_x, roi_y, roi_width, roi_height)
         total, total_image_path = "N/A", None
     else:
         title, _, total, total_image_path = find_title_and_total(img, ocr_config)
@@ -267,16 +265,14 @@ def save_image(
     """
     logger.debug("Preparing to extract grid")
     img = preloaded_img if preloaded_img is not None else load_and_validate_image(filename)
-    img_copy = img.copy()
 
     if is_battery:
         logger.debug("Removing all but the dark blue color...")
-        img_new = remove_all_but(img_copy, np.array([255, 121, 0]))
+        img_new = remove_all_but(img.copy(), np.array([255, 121, 0]))
         no_dark_blue_detected = np.sum(255 - img_new[roi_y : roi_y + roi_height, roi_x : roi_x + roi_width]) < 10
         if no_dark_blue_detected:
             logger.debug("No dark blue color detected; assuming dark mode...")
-            img_copy = img.copy()
-            img_new = remove_all_but(img_copy, np.array([0, 255 - 121, 255]))
+            img_new = remove_all_but(img.copy(), np.array([0, 255 - 121, 255]))
         img = img_new
 
     row, img, scale_amount = slice_image(img, roi_x, roi_y, roi_width, roi_height)
@@ -374,7 +370,8 @@ def _save_debug_graph(filename: str | Path, row: list, roi_height: int) -> str:
 
 def mse_between_loaded_images(image1: np.ndarray, image2: np.ndarray) -> float:
     """Calculate mean squared error between two images."""
-    image2 = cv2.resize(image2, (image1.shape[1], image1.shape[0]))
+    if image2.shape[:2] != image1.shape[:2]:
+        image2 = cv2.resize(image2, (image1.shape[1], image1.shape[0]))
 
     height, width, _ = image1.shape
     diff = cv2.subtract(image1, image2)

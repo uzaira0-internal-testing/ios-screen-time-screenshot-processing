@@ -92,15 +92,11 @@ def scale_up(img, scale_amount):
 
 
 def remove_line_color(img: np.ndarray) -> np.ndarray:
-    line_color = np.array([203, 199, 199])
-    shape = np.shape(img)
-
-    for i in range(shape[0]):
-        for j in range(shape[1]):
-            pixel = img[i, j]
-            if is_close(pixel, line_color):
-                img[i, j] = [255, 255, 255]
-
+    line_color = np.array([203, 199, 199], dtype=np.int16)
+    # Vectorized: compute per-pixel L1 distance to line_color, threshold <= 3 (len*thresh)
+    diff = np.abs(img.astype(np.int16) - line_color)
+    distances = diff.sum(axis=2)
+    img[distances <= 3] = 255
     return img
 
 
@@ -123,31 +119,20 @@ def extract_line(img, x0: int, x1: int, y0: int, y1: int, line_extraction_mode: 
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
-    if line_extraction_mode == LineExtractionMode.HORIZONTAL:
-        shape = np.shape(sub_image)
+    # Vectorized pixel matching: L1 distance per pixel <= threshold (len * 1)
+    pixel_ref = pixel_value.astype(np.int16)
+    diff = np.abs(sub_image.astype(np.int16) - pixel_ref)
+    close_mask = diff.sum(axis=2) <= len(pixel_value)  # is_close with thresh=1
 
-        for i in range(shape[0]):
-            row_score = 0
-            for j in range(shape[1]):
-                pixel = sub_image[i, j]
-                if is_close(pixel, pixel_value):
-                    row_score = row_score + 1
-            if row_score > 0.5 * shape[1]:
-                return i
-        return 0
+    if line_extraction_mode == LineExtractionMode.HORIZONTAL:
+        row_scores = close_mask.sum(axis=1)
+        matches = np.where(row_scores > 0.5 * sub_image.shape[1])[0]
+        return int(matches[0]) if len(matches) > 0 else 0
 
     elif line_extraction_mode == LineExtractionMode.VERTICAL:
-        shape = np.shape(sub_image)
-        for j in range(shape[1]):
-            col_score = 0
-            for i in range(shape[0]):
-                pixel = sub_image[i, j]
-                if is_close(pixel, pixel_value):
-                    col_score = col_score + 1
-
-            if col_score > 0.25 * shape[0]:
-                return j
-        return 0
+        col_scores = close_mask.sum(axis=0)
+        matches = np.where(col_scores > 0.25 * sub_image.shape[0])[0]
+        return int(matches[0]) if len(matches) > 0 else 0
 
     else:
         msg = "Invalid mode for line extraction"
@@ -182,30 +167,19 @@ def extract_line_snap_to_grid(
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
-    count_color = pixel_value
+    count_color = np.asarray(pixel_value, dtype=np.int16)
+
+    # Vectorized pixel matching
+    diff = np.abs(sub_image.astype(np.int16) - count_color)
+    close_mask = diff.sum(axis=2) <= len(count_color)
 
     if line_extraction_mode == LineExtractionMode.HORIZONTAL:
-        shape = np.shape(sub_image)
-
-        for i in range(shape[0]):
-            row_score = 0
-            for j in range(shape[1]):
-                pixel = sub_image[i, j]
-                if is_close(pixel, count_color):
-                    row_score = row_score + 1
-            if row_score > 0.7 * shape[1]:
-                return i
+        row_scores = close_mask.sum(axis=1)
+        matches = np.where(row_scores > 0.7 * sub_image.shape[1])[0]
+        return int(matches[0]) if len(matches) > 0 else None
 
     if line_extraction_mode == LineExtractionMode.VERTICAL:
-        shape = np.shape(sub_image)
-        for j in range(shape[1]):
-            col_score = 0
-            for i in range(shape[0]):
-                pixel = sub_image[i, j]
-                if is_close(pixel, count_color):
-                    col_score = col_score + 1
-
-            if col_score > 0.3 * shape[0]:
-                return j
-        return None
+        col_scores = close_mask.sum(axis=0)
+        matches = np.where(col_scores > 0.3 * sub_image.shape[0])[0]
+        return int(matches[0]) if len(matches) > 0 else None
     return None

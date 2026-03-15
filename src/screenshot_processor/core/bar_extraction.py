@@ -79,13 +79,12 @@ def slice_image(
         is_black = pixel_sums == 0
         is_white = np.all(np.abs(column.astype(np.int16) - 255) <= 2, axis=1)
 
-        # Count bar height - must use loop due to reset logic
-        counter = 0
-        for y_coord in range(scaled_roi_height):
-            if is_black[y_coord]:
-                counter += 1
-            if is_white[y_coord] and y_coord < scaled_roi_height - lower_grid_buffer:
-                counter = 0
+        # Vectorized bar height: find last white pixel (reset point) above bottom buffer,
+        # then count black pixels below it
+        reset_region = is_white[: scaled_roi_height - lower_grid_buffer]
+        reset_indices = np.where(reset_region)[0]
+        start_after = int(reset_indices[-1]) + 1 if len(reset_indices) > 0 else 0
+        counter = int(np.sum(is_black[start_after:]))
 
         # Keep as float - rounding happens later based on config
         usage_at_time = max_y * counter / scaled_roi_height
@@ -180,11 +179,8 @@ def compute_bar_alignment_score(
                 blue_mask = (hue >= 90) & (hue <= 130) & (sat > 50) & (val > 100)
                 row_has_blue = np.any(blue_mask, axis=1)
 
-                bar_height = 0
-                for y in range(len(row_has_blue)):
-                    if row_has_blue[y]:
-                        bar_height = roi_height - y
-                        break
+                blue_rows = np.where(row_has_blue)[0]
+                bar_height = roi_height - int(blue_rows[0]) if len(blue_rows) > 0 else 0
 
                 normalized_height = (bar_height / roi_height) * 60
                 extracted_heights.append(normalized_height)
@@ -196,13 +192,10 @@ def compute_bar_alignment_score(
                     continue
 
                 col_avg = np.mean(gray_slice, axis=1)
-                threshold = np.mean(col_avg)
+                threshold = np.mean(col_avg) * 0.8
 
-                bar_height = 0
-                for y in range(len(col_avg)):
-                    if col_avg[y] < threshold * 0.8:
-                        bar_height = roi_height - y
-                        break
+                dark_rows = np.where(col_avg < threshold)[0]
+                bar_height = roi_height - int(dark_rows[0]) if len(dark_rows) > 0 else 0
 
                 normalized_height = (bar_height / roi_height) * 60
                 extracted_heights.append(normalized_height)

@@ -21,6 +21,15 @@ from screenshot_processor.web.database.models import (
 class TestStatsWorkflow:
     """Test statistics endpoints."""
 
+    @pytest.fixture(autouse=True)
+    def clear_cache(self):
+        """Clear stats cache before and after each test to avoid stale data."""
+        from screenshot_processor.web.cache import invalidate_stats_and_groups
+
+        invalidate_stats_and_groups()
+        yield
+        invalidate_stats_and_groups()
+
     async def test_get_stats_returns_all_fields(
         self,
         client: AsyncClient,
@@ -72,6 +81,9 @@ class TestStatsWorkflow:
         db_session.add(screenshot)
         await db_session.commit()
 
+        # Invalidate cache and expire session so stats query sees new data
+        from screenshot_processor.web.cache import invalidate_stats_and_groups
+
         # Get updated stats
         response2 = await client.get(
             "/api/v1/screenshots/stats",
@@ -104,6 +116,9 @@ class TestStatsWorkflow:
         )
         db_session.add(annotation)
         await db_session.commit()
+
+        # Invalidate cache and expire session so stats query sees new data
+        from screenshot_processor.web.cache import invalidate_stats_and_groups
 
         # Get updated stats
         response2 = await client.get(

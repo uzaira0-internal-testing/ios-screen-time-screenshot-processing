@@ -38,6 +38,7 @@ EXPECTED_CHAIN = [
     ("1dc90afb6cac", "i7j8k9l0m1n2"),             # add_processing_started_at
     ("i7j8k9l0m1n2", "3613c2977638"),             # add_missing_columns_annotation_status_
     ("3613c2977638", "8d2e3be6f7de"),              # add_content_hash_to_screenshots
+    ("8d2e3be6f7de", "j8k9l0m1n2o3"),              # add_composite_perf_indexes
 ]
 
 

@@ -203,9 +203,7 @@ class QueueRepository:
         MULTI-RATER DESIGN: "remaining" = screenshots this user hasn't annotated yet.
         All users see all screenshots, so remaining count is per-user.
 
-        Returns:
-            Dict with total_remaining, user_completed, auto_processed,
-            pending, failed, skipped counts.
+        Combined into 2 queries (status counts + remaining, user completed).
         """
         subquery_user_annotations = (
             select(Annotation.screenshot_id).where(Annotation.user_id == user_id).scalar_subquery()
@@ -222,44 +220,41 @@ class QueueRepository:
             .scalar_subquery()
         )
 
-        # Count screenshots this user hasn't annotated yet (excluding deleted)
-        total_remaining_stmt = select(func.count(Screenshot.id)).where(
-            and_(
-                Screenshot.processing_status.in_(
-                    [
-                        ProcessingStatus.PENDING,
-                        ProcessingStatus.COMPLETED,
-                        ProcessingStatus.FAILED,
-                        ProcessingStatus.SKIPPED,
-                    ]
-                ),
-                Screenshot.id.notin_(subquery_user_annotations),
-                Screenshot.id.notin_(subquery_user_skipped),
-            )
-        )
+        non_deleted_statuses = [
+            ProcessingStatus.PENDING,
+            ProcessingStatus.COMPLETED,
+            ProcessingStatus.FAILED,
+            ProcessingStatus.SKIPPED,
+        ]
 
-        result = await self.db.execute(total_remaining_stmt)
-        total_remaining = result.scalar_one()
-
-        user_completed_stmt = select(func.count(Annotation.id)).where(Annotation.user_id == user_id)
-        result = await self.db.execute(user_completed_stmt)
-        user_completed = result.scalar_one()
-
-        # Combine status counts into a single query using conditional aggregation
-        status_counts_stmt = select(
+        # Query 1: Status counts + remaining + user_completed in one query
+        # Uses scalar subqueries to avoid JOINs
+        combined_stmt = select(
             func.count(Screenshot.id)
             .filter(Screenshot.processing_status == ProcessingStatus.COMPLETED)
             .label("auto_processed"),
             func.count(Screenshot.id).filter(Screenshot.processing_status == ProcessingStatus.PENDING).label("pending"),
             func.count(Screenshot.id).filter(Screenshot.processing_status == ProcessingStatus.FAILED).label("failed"),
             func.count(Screenshot.id).filter(Screenshot.processing_status == ProcessingStatus.SKIPPED).label("skipped"),
+            # Remaining: non-deleted, not annotated by user, not skipped by user
+            select(func.count(Screenshot.id)).where(
+                and_(
+                    Screenshot.processing_status.in_(non_deleted_statuses),
+                    Screenshot.id.notin_(subquery_user_annotations),
+                    Screenshot.id.notin_(subquery_user_skipped),
+                )
+            ).scalar_subquery().label("total_remaining"),
+            # User completed
+            select(func.count(Annotation.id)).where(
+                Annotation.user_id == user_id
+            ).scalar_subquery().label("user_completed"),
         )
-        result = await self.db.execute(status_counts_stmt)
+        result = await self.db.execute(combined_stmt)
         row = result.one()
 
         return {
-            "total_remaining": total_remaining,
-            "user_completed": user_completed,
+            "total_remaining": row.total_remaining,
+            "user_completed": row.user_completed,
             "auto_processed": row.auto_processed,
             "pending": row.pending,
             "failed": row.failed,

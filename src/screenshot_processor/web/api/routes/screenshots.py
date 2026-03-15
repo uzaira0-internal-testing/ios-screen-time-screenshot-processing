@@ -434,6 +434,84 @@ async def unskip_screenshot(screenshot_id: int, db: DatabaseSession, repo: Scree
     return UnskipResponse(success=True, message="Screenshot has been restored to completed status")
 
 
+@router.post("/{screenshot_id}/soft-delete")
+async def soft_delete_screenshot(
+    screenshot_id: int,
+    db: DatabaseSession,
+    repo: ScreenshotRepo,
+    current_user: CurrentUser,
+):
+    """Soft delete a screenshot by setting processing_status to DELETED."""
+    from sqlalchemy.orm.attributes import flag_modified
+
+    screenshot = await get_screenshot_for_update(repo, screenshot_id)
+
+    if screenshot.processing_status == ProcessingStatus.DELETED:
+        return {"success": False, "message": "Screenshot is already deleted"}
+
+    previous_status = screenshot.processing_status.value
+
+    # Store pre-delete status in metadata for restore
+    metadata = dict(screenshot.processing_metadata or {})
+    metadata["pre_delete_status"] = previous_status
+    screenshot.processing_metadata = metadata
+    flag_modified(screenshot, "processing_metadata")
+    screenshot.processing_status = ProcessingStatus.DELETED
+
+    try:
+        await db.commit()
+        await db.refresh(screenshot)
+        invalidate_stats_and_groups()
+    except Exception:
+        await db.rollback()
+        raise
+
+    return {"success": True, "previous_status": previous_status}
+
+
+@router.post("/{screenshot_id}/restore")
+async def restore_screenshot(
+    screenshot_id: int,
+    db: DatabaseSession,
+    repo: ScreenshotRepo,
+    current_user: CurrentUser,
+):
+    """Restore a soft-deleted screenshot to its previous processing_status."""
+    from sqlalchemy.orm.attributes import flag_modified
+
+    screenshot = await get_screenshot_for_update(repo, screenshot_id)
+
+    if screenshot.processing_status != ProcessingStatus.DELETED:
+        raise HTTPException(status_code=400, detail="Screenshot is not deleted")
+
+    # Get previous status from metadata
+    metadata = dict(screenshot.processing_metadata or {})
+    previous_status = metadata.get("pre_delete_status", "completed")
+
+    try:
+        screenshot.processing_status = ProcessingStatus(previous_status)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Stored pre_delete_status '{previous_status}' is not a valid status",
+        )
+
+    # Clean up metadata
+    metadata.pop("pre_delete_status", None)
+    screenshot.processing_metadata = metadata if metadata else None
+    flag_modified(screenshot, "processing_metadata")
+
+    try:
+        await db.commit()
+        await db.refresh(screenshot)
+        invalidate_stats_and_groups()
+    except Exception:
+        await db.rollback()
+        raise
+
+    return {"success": True, "restored_status": previous_status}
+
+
 class VerifyRequest(BaseModel):
     """Optional grid coordinates to save when verifying."""
 
@@ -1144,74 +1222,63 @@ async def _process_single_upload(
         _raise_upload_error(UploadErrorCode.STORAGE_ERROR, f"Failed to save image: {e}")
     timings["file_write"] = (time.perf_counter() - t1) * 1000
 
-    # Create screenshot record using INSERT ON CONFLICT (upsert)
-    # This eliminates the separate duplicate check query
+    # Create screenshot record (database-agnostic: check-then-insert/update)
     t1 = time.perf_counter()
-    from sqlalchemy.dialects.postgresql import insert as pg_insert
-
-    # Upsert: on duplicate file_path, reset processing state and reprocess
-    insert_stmt = (
-        pg_insert(Screenshot)
-        .values(
-            file_path=str(file_path),
-            image_type=image_type,
-            target_annotations=1,
-            annotation_status=AnnotationStatus.PENDING,
-            processing_status=ProcessingStatus.PENDING,
-            current_annotation_count=0,
-            participant_id=participant_id,
-            group_id=group_id,
-            source_id=source_id,
-            device_type=detected_device_type,
-            original_filepath=original_filepath,
-            screenshot_date=screenshot_date,
-            processing_metadata={"callback_url": callback_url} if callback_url else None,
-            content_hash=content_hash,
-        )
-        .on_conflict_do_update(
-            index_elements=["file_path"],
-            set_={
-                # Reset processing state
-                "processing_status": ProcessingStatus.PENDING,
-                "processing_method": None,
-                # Clear OCR results for reprocessing
-                "extracted_title": None,
-                "extracted_total": None,
-                "extracted_hourly_data": None,
-                # Clear grid coords
-                "grid_upper_left_x": None,
-                "grid_upper_left_y": None,
-                "grid_lower_right_x": None,
-                "grid_lower_right_y": None,
-                # Update metadata
-                "device_type": detected_device_type,
-                "original_filepath": original_filepath,
-                "screenshot_date": screenshot_date,
-                "processing_metadata": {"callback_url": callback_url, "reprocessed": True}
-                if callback_url
-                else {"reprocessed": True},
-            },
-        )
-        .returning(Screenshot.id)
-    )
+    from sqlalchemy import select as sa_select
 
     is_duplicate = False
     try:
-        result = await db.execute(insert_stmt)
-        row = result.fetchone()
-        screenshot_id = row[0]
+        # Check for existing screenshot with same file_path
+        existing_result = await db.execute(
+            sa_select(Screenshot).where(Screenshot.file_path == str(file_path))
+        )
+        existing_screenshot = existing_result.scalar_one_or_none()
 
-        # Check if this was a duplicate by checking for existing annotations
-        # (If there are annotations, we need to clear them for a fresh start)
-        annotation_count = await repo.get_annotation_count(screenshot_id)
-
-        if annotation_count > 0:
+        if existing_screenshot:
+            # Update existing record (equivalent to ON CONFLICT DO UPDATE)
+            existing_screenshot.processing_status = ProcessingStatus.PENDING
+            existing_screenshot.processing_method = None
+            existing_screenshot.extracted_title = None
+            existing_screenshot.extracted_total = None
+            existing_screenshot.extracted_hourly_data = None
+            existing_screenshot.grid_upper_left_x = None
+            existing_screenshot.grid_upper_left_y = None
+            existing_screenshot.grid_lower_right_x = None
+            existing_screenshot.grid_lower_right_y = None
+            existing_screenshot.device_type = detected_device_type
+            existing_screenshot.original_filepath = original_filepath
+            existing_screenshot.screenshot_date = screenshot_date
+            existing_screenshot.processing_metadata = (
+                {"callback_url": callback_url, "reprocessed": True} if callback_url else {"reprocessed": True}
+            )
+            screenshot_id = existing_screenshot.id
             is_duplicate = True
 
             # Clear ALL existing data for fresh start
             await repo.clear_screenshot_related_data([screenshot_id])
             await repo.reset_screenshot_state([screenshot_id])
             logger.info("Duplicate upload: cleared all data, reprocessing", extra={"screenshot_id": screenshot_id})
+        else:
+            # Insert new screenshot
+            new_screenshot = Screenshot(
+                file_path=str(file_path),
+                image_type=image_type,
+                target_annotations=1,
+                annotation_status=AnnotationStatus.PENDING,
+                processing_status=ProcessingStatus.PENDING,
+                current_annotation_count=0,
+                participant_id=participant_id,
+                group_id=group_id,
+                source_id=source_id,
+                device_type=detected_device_type,
+                original_filepath=original_filepath,
+                screenshot_date=screenshot_date,
+                processing_metadata={"callback_url": callback_url} if callback_url else None,
+                content_hash=content_hash,
+            )
+            db.add(new_screenshot)
+            await db.flush()
+            screenshot_id = new_screenshot.id
 
         await db.commit()
         invalidate_stats_and_groups()
@@ -1326,22 +1393,24 @@ async def upload_screenshot(
         upload_request.sha256,
     )
 
-    # Check/create group with upsert to handle concurrent requests
+    # Check/create group - database-agnostic approach
     group_created = False
-    from sqlalchemy.dialects.postgresql import insert as pg_insert
-
-    insert_stmt = (
-        pg_insert(Group)
-        .values(
-            id=upload_request.group_id,
-            name=upload_request.group_id,
-            image_type=upload_request.image_type,
+    existing_group = await db.get(Group, upload_request.group_id)
+    if existing_group is None:
+        db.add(
+            Group(
+                id=upload_request.group_id,
+                name=upload_request.group_id,
+                image_type=upload_request.image_type,
+            )
         )
-        .on_conflict_do_nothing(index_elements=["id"])
-    )
-
-    result = await db.execute(insert_stmt)
-    group_created = result.rowcount > 0  # type: ignore[attr-defined]
+        try:
+            await db.flush()
+            group_created = True
+        except Exception:
+            # Concurrent insert created the group first — safe to continue
+            await db.rollback()
+            group_created = False
 
     # Process the upload
     return await _process_single_upload(
@@ -2754,7 +2823,87 @@ async def apply_redaction(
 # ============================================================================
 # Export Endpoints - Available to all authenticated users
 # ============================================================================
-# NOTE: JSON export removed - use CSV for large datasets (memory-efficient streaming)
+
+
+def _build_export_conditions(
+    group_id: str | None,
+    verified_only: bool,
+    has_annotations: bool,
+    processing_status: str | None,
+) -> list:
+    """Build SQLAlchemy filter conditions shared by JSON and CSV export endpoints."""
+    conditions = []
+    if group_id:
+        conditions.append(Screenshot.group_id == group_id)
+    if verified_only:
+        conditions.append(Screenshot.verified_by_user_ids.isnot(None))
+        conditions.append(cast(Screenshot.verified_by_user_ids, String) != "null")
+        conditions.append(cast(Screenshot.verified_by_user_ids, String) != "[]")
+    if has_annotations:
+        conditions.append(Screenshot.current_annotation_count > 0)
+    if processing_status:
+        conditions.append(Screenshot.processing_status == processing_status)
+    return conditions
+
+
+@router.get("/export/json", tags=["Export"])
+async def export_consensus_json(
+    repo: ScreenshotRepo,
+    current_user: CurrentUser,
+    group_id: str | None = Query(None, description="Filter by group ID"),
+    verified_only: bool = Query(False, description="Only export verified screenshots"),
+    has_annotations: bool = Query(False, description="Only export screenshots with annotations"),
+    processing_status: str | None = Query(None, description="Filter by processing status"),
+):
+    """Export consensus data as JSON."""
+    from datetime import datetime, timezone
+
+    conditions = _build_export_conditions(group_id, verified_only, has_annotations, processing_status)
+    rows = await repo.get_screenshots_with_consensus(conditions)
+
+    screenshots_data = []
+    for screenshot, consensus in rows:
+        hourly_values = {}
+        if screenshot.extracted_hourly_data:
+            hourly_values = screenshot.extracted_hourly_data
+
+        screenshot_dict = {
+            "id": screenshot.id,
+            "file_path": screenshot.file_path,
+            "participant_id": screenshot.participant_id,
+            "group_id": screenshot.group_id,
+            "image_type": screenshot.image_type,
+            "device_type": getattr(screenshot, "device_type", None),
+            "source_id": getattr(screenshot, "source_id", None),
+            "screenshot_date": str(screenshot.screenshot_date) if screenshot.screenshot_date else None,
+            "processing_status": screenshot.processing_status.value
+            if hasattr(screenshot.processing_status, "value")
+            else screenshot.processing_status,
+            "extracted_title": screenshot.extracted_title,
+            "extracted_total": screenshot.extracted_total,
+            "hourly_values": hourly_values,
+            "consensus": None,
+        }
+
+        if consensus:
+            screenshot_dict["consensus"] = {
+                "has_consensus": consensus.has_consensus,
+                "consensus_values": consensus.consensus_values,
+                "disagreement_details": consensus.disagreement_details,
+            }
+
+        screenshots_data.append(screenshot_dict)
+
+    response = {
+        "export_timestamp": datetime.now(timezone.utc).isoformat(),
+        "exported_by": current_user.username,
+        "total_screenshots": len(screenshots_data),
+        "screenshots": screenshots_data,
+    }
+    if group_id:
+        response["group_id"] = group_id
+
+    return response
 
 
 @router.get("/export/csv", tags=["Export"])
@@ -2789,25 +2938,7 @@ async def export_consensus_csv(
         f"(CSV, group={group_id}, verified_only={verified_only}, has_annotations={has_annotations})"
     )
 
-    # Build query with filters
-    conditions = []
-
-    if group_id:
-        conditions.append(Screenshot.group_id == group_id)
-
-    if verified_only:
-        # verified_by_user_ids is non-null, non-JSON-null, and non-empty array
-        # Note: JSON columns can have SQL NULL or JSON null (literal "null" string)
-        conditions.append(Screenshot.verified_by_user_ids.isnot(None))
-        conditions.append(cast(Screenshot.verified_by_user_ids, String) != "null")
-        conditions.append(cast(Screenshot.verified_by_user_ids, String) != "[]")
-
-    if has_annotations:
-        conditions.append(Screenshot.current_annotation_count > 0)
-
-    if processing_status:
-        conditions.append(Screenshot.processing_status == processing_status)
-
+    conditions = _build_export_conditions(group_id, verified_only, has_annotations, processing_status)
     rows = await repo.get_screenshots_with_consensus(conditions)
 
     output = io.StringIO()

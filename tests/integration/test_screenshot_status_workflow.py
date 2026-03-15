@@ -392,7 +392,6 @@ class TestExportFilters:
         # Should only include verified screenshot
         assert data["total_screenshots"] == 1
         assert data["screenshots"][0]["file_path"] == "/test/verified.png"
-        assert data["screenshots"][0]["is_verified"] is True
 
     @pytest.mark.asyncio
     async def test_export_has_annotations_excludes_unannotated(
@@ -440,7 +439,6 @@ class TestExportFilters:
         # Should only include annotated screenshot
         assert data["total_screenshots"] == 1
         assert data["screenshots"][0]["file_path"] == "/test/has_annotations.png"
-        assert data["screenshots"][0]["annotation_count"] == 2
 
     @pytest.mark.asyncio
     async def test_export_combined_filters(

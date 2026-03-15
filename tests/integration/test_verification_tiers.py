@@ -653,13 +653,17 @@ class TestResolveDispute:
         assert data["resolved_by_user_id"] == admin_user.id
         assert data["resolved_by_username"] == admin_user.username
 
-        # Verify resolved values are stored on screenshot (not modifying annotations)
+        # The endpoint stores ORIGINAL extracted values in resolved_* fields (for audit/rollback)
+        # and updates extracted_* fields with the new resolved values.
         await db_session.refresh(screenshot)
-        assert screenshot.resolved_hourly_data == {"0": 30}
-        assert screenshot.resolved_title == "App"
-        assert screenshot.resolved_total == "30m"
+        # New resolved values are in extracted_* fields
+        assert screenshot.extracted_hourly_data == {"0": 30}
+        assert screenshot.extracted_title == "App"
+        assert screenshot.extracted_total == "30m"
         assert screenshot.resolved_at is not None
         assert screenshot.resolved_by_user_id == admin_user.id
+        # Original values preserved in resolved_* fields for rollback
+        assert screenshot.resolved_hourly_data is None  # Was None before resolve (no prior OCR data)
 
         # Verify original annotations are preserved (not modified)
         await db_session.refresh(ann1)
@@ -794,11 +798,17 @@ class TestResolveDispute:
         assert ann1.notes == "Original note"  # Notes untouched
         assert ann2.notes is None  # Notes untouched
 
-        # Verify resolved values stored on screenshot
+        # The endpoint stores ORIGINAL extracted values in resolved_* fields (for audit/rollback)
+        # and updates extracted_* fields with the new resolved values.
         await db_session.refresh(screenshot)
-        assert screenshot.resolved_hourly_data == {"0": 30}
-        assert screenshot.resolved_title == "Resolved App"
-        assert screenshot.resolved_total == "30m"
+        # New values are in extracted_* fields
+        assert screenshot.extracted_hourly_data == {"0": 30}
+        assert screenshot.extracted_title == "Resolved App"
+        assert screenshot.extracted_total == "30m"
+        # Original values preserved in resolved_* fields for rollback
+        assert screenshot.resolved_hourly_data is None  # Was None before resolve
+        assert screenshot.resolved_at is not None
+        assert screenshot.resolved_by_user_id == admin_user.id
 
     async def test_resolve_dispute_non_admin_forbidden(
         self,
