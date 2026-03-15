@@ -2,7 +2,7 @@
 Golden file tests — compare function output against stored reference files.
 
 Golden files are stored in tests/golden/fixtures/. To update them:
-    pytest tests/golden/ --update-golden
+    UPDATE_GOLDEN=1 pytest tests/golden/
 
 These catch unintentional changes to output formats, serialization,
 and processing results.

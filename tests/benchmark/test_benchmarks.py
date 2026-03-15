@@ -83,7 +83,8 @@ class TestBarExtractionBenchmarks:
         """compute_bar_alignment_score should be <1ms."""
         bars = [float(i) for i in range(24)]
         roi = np.random.randint(0, 255, (200, 600, 3), dtype=np.uint8)
-        benchmark(compute_bar_alignment_score, bars, roi)
+        result = benchmark(compute_bar_alignment_score, roi, bars)
+        assert 0.0 <= result <= 1.0
 
 
 class TestImageUtilsBenchmarks:
