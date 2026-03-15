@@ -283,7 +283,7 @@ class QueueManager:
             return False  # Not found
 
         # Find and remove from queue
-        for queue_name, results in self._queues.items():
+        for _queue_name, results in self._queues.items():
             for i, result in enumerate(results):
                 if result.image_path == image_path:
                     results.pop(i)

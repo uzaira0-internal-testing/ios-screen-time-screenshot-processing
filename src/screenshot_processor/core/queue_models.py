@@ -296,7 +296,7 @@ class ProcessingMetadata:
         """
         return {
             "method": self.method.value if self.method else None,
-            "tags": sorted(list(self.tags)),  # Sort for consistent serialization
+            "tags": sorted(self.tags),  # Sort for consistent serialization
             "queue": self.queue.value,
             "y_shift": self.y_shift,
             "ocr_total_minutes": self.ocr_total_minutes,

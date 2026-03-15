@@ -10,10 +10,20 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validat
 # Import enums from models (single source of truth)
 from .models import (
     AnnotationStatus as AnnotationStatusEnum,
+)
+from .models import (
     ProcessingMethod as ProcessingMethodEnum,
+)
+from .models import (
     ProcessingStatus as ProcessingStatusEnum,
+)
+from .models import (
     QueueStateStatus as QueueStateStatusEnum,
+)
+from .models import (
     SubmissionStatus as SubmissionStatusEnum,
+)
+from .models import (
     UserRole as UserRoleEnum,
 )
 

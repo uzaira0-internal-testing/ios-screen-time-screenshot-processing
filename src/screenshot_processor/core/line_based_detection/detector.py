@@ -8,7 +8,7 @@ the daily hourly chart grid, without relying on OCR text recognition.
 from __future__ import annotations
 
 import logging
-from typing import Callable
+from collections.abc import Callable
 
 import numpy as np
 
@@ -279,7 +279,7 @@ class LineBasedDetector:
 
         # Boost confidence for agreeing results
         boosted_results = []
-        for result, agreements in zip(results, agreement_scores):
+        for result, agreements in zip(results, agreement_scores, strict=False):
             boost = agreements * 0.05  # 5% boost per agreement
             boosted_confidence = min(1.0, result.confidence + boost)
             boosted_results.append((result, boosted_confidence))

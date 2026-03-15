@@ -7,9 +7,9 @@ from .paddleocr_remote_engine import PaddleOCRRemoteEngine
 from .tesseract_engine import TesseractOCREngine
 
 __all__ = [
-    "TesseractOCREngine",
-    "PaddleOCREngine",
-    "PaddleOCRRemoteEngine",
     "HunyuanOCREngine",
     "HybridOCREngine",
+    "PaddleOCREngine",
+    "PaddleOCRRemoteEngine",
+    "TesseractOCREngine",
 ]

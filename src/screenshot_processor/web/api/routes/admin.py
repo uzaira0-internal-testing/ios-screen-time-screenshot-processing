@@ -8,8 +8,6 @@ from pydantic import BaseModel
 from screenshot_processor.core.image_utils import convert_dark_mode
 from screenshot_processor.core.ocr import find_screenshot_total_usage
 from screenshot_processor.web.api.dependencies import CurrentUser
-from screenshot_processor.web.database.models import UserRole
-from screenshot_processor.web.rate_limiting import ADMIN_DESTRUCTIVE_RATE_LIMIT, limiter
 from screenshot_processor.web.database import (
     DeleteGroupResponse,
     ResetTestDataResponse,
@@ -17,6 +15,8 @@ from screenshot_processor.web.database import (
     UserStatsRead,
     UserUpdateResponse,
 )
+from screenshot_processor.web.database.models import UserRole
+from screenshot_processor.web.rate_limiting import ADMIN_DESTRUCTIVE_RATE_LIMIT, limiter
 from screenshot_processor.web.repositories import AdminRepo
 from screenshot_processor.web.services import reprocess_screenshot
 
@@ -156,7 +156,7 @@ async def reset_test_data(request: Request, repo: AdminRepo, admin: User = Admin
         logger.error("Failed to reset test data", extra={"error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to reset test data: {str(e)}",
+            detail=f"Failed to reset test data: {e!s}",
         )
 
 
@@ -224,7 +224,7 @@ async def delete_group(
         logger.error("Failed to delete group", extra={"group_id": group_id, "error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete group: {str(e)}",
+            detail=f"Failed to delete group: {e!s}",
         )
 
 
@@ -331,7 +331,7 @@ async def recalculate_ocr_totals(
         logger.error("Failed to recalculate OCR totals", extra={"error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to recalculate OCR totals: {str(e)}",
+            detail=f"Failed to recalculate OCR totals: {e!s}",
         )
 
 
@@ -466,6 +466,7 @@ async def bulk_reprocess_screenshots(
 
         # Queue Celery tasks for each screenshot (non-blocking)
         from celery import group as celery_group
+
         from screenshot_processor.web.tasks import reprocess_screenshot_task
 
         task_group = celery_group(
@@ -495,7 +496,7 @@ async def bulk_reprocess_screenshots(
         logger.error("Failed to queue bulk reprocess", extra={"error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to queue bulk reprocess: {str(e)}",
+            detail=f"Failed to queue bulk reprocess: {e!s}",
         )
 
 
@@ -565,6 +566,7 @@ async def retry_stuck_screenshots(
         requeued = 0
         if screenshot_ids:
             from celery import group as celery_group
+
             from screenshot_processor.web.tasks import process_screenshot_task
 
             task_group = celery_group(process_screenshot_task.s(sid) for sid in screenshot_ids)
@@ -600,7 +602,7 @@ async def retry_stuck_screenshots(
         logger.error("Failed to retry stuck screenshots", extra={"error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retry stuck screenshots: {str(e)}",
+            detail=f"Failed to retry stuck screenshots: {e!s}",
         )
 
 
@@ -674,5 +676,5 @@ async def cleanup_orphaned_entries(request: Request, repo: AdminRepo, admin: Use
         logger.error("Failed to cleanup orphaned entries", extra={"error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to cleanup: {str(e)}",
+            detail=f"Failed to cleanup: {e!s}",
         )

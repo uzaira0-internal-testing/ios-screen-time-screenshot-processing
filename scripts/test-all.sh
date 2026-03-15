@@ -122,9 +122,95 @@ else
 fi
 echo ""
 
+# ── Static Analysis ───────────────────────────────────────────────────
+echo "── Static Analysis ──"
+if command -v semgrep &>/dev/null; then
+  run "SAST (semgrep)" semgrep --config=auto --error --quiet src/
+else
+  skip "SAST (semgrep)" "semgrep not installed"
+fi
+
+if command -v vulture &>/dev/null; then
+  run "Dead code (vulture)" vulture src/ vulture_whitelist.py --min-confidence 80
+else
+  skip "Dead code (vulture)" "vulture not installed"
+fi
+
+if command -v radon &>/dev/null; then
+  run "Complexity (radon)" bash -c "radon cc src/ -a -nc | grep -q 'Average complexity' && echo OK"
+else
+  skip "Complexity (radon)" "radon not installed"
+fi
+
+if command -v hadolint &>/dev/null; then
+  run "Dockerfile lint (hadolint)" bash -c "find docker/ -name 'Dockerfile*' | xargs hadolint"
+else
+  skip "Dockerfile lint (hadolint)" "hadolint not installed"
+fi
+echo ""
+
+# ── Fuzz Tests ────────────────────────────────────────────────────────
+echo "── Fuzz Tests ──"
+if [ -n "$CONTAINER" ]; then
+  run "API fuzz tests (schemathesis)" "${DOCKER_BACKEND[@]}" python -m pytest tests/fuzz/ -q --hypothesis-seed=0 2>/dev/null
+else
+  skip "API fuzz tests" "Docker backend not running"
+fi
+echo ""
+
+# ── Benchmarks ────────────────────────────────────────────────────────
+echo "── Benchmarks ──"
+if [ -n "$CONTAINER" ]; then
+  run "Benchmark tests" "${DOCKER_BACKEND[@]}" python -m pytest tests/benchmark/ --benchmark-only --benchmark-disable-gc -q 2>/dev/null
+else
+  skip "Benchmark tests" "Docker backend not running"
+fi
+echo ""
+
+# ── Golden File Tests ─────────────────────────────────────────────────
+echo "── Golden File Tests ──"
+if [ -n "$CONTAINER" ]; then
+  run "Golden file tests" "${DOCKER_BACKEND[@]}" python -m pytest tests/golden/ -q 2>/dev/null
+else
+  skip "Golden file tests" "Docker backend not running"
+fi
+echo ""
+
 # ── Bundle Size ────────────────────────────────────────────────────────
 echo "── Build Checks ──"
 run "Frontend build" bash -c "cd frontend && bun run build 2>&1 | tail -1"
+echo ""
+
+# ── Load Testing ─────────────────────────────────────────────────────
+echo "── Load Testing ──"
+if command -v k6 &>/dev/null; then
+  if curl -sf http://localhost:8002/health > /dev/null 2>&1; then
+    K6_ENV=""
+    if [ -f docker/.env ]; then
+      K6_SITE_PW=$(grep "^SITE_PASSWORD=" docker/.env 2>/dev/null | cut -d= -f2 || true)
+      [ -n "$K6_SITE_PW" ] && K6_ENV="--env SITE_PASSWORD=$K6_SITE_PW"
+    fi
+    run "k6 smoke test" bash -c "k6 run $K6_ENV tests/load/smoke.js --quiet 2>&1 | tail -10"
+  else
+    skip "k6 smoke test" "Backend not reachable"
+  fi
+else
+  skip "k6 smoke test" "k6 not installed"
+fi
+echo ""
+
+# ── Docker Build Testing ─────────────────────────────────────────────
+echo "── Docker Build Testing ──"
+if command -v docker &>/dev/null; then
+  run "Dockerfile validation" bash tests/docker/test_dockerfiles.sh
+else
+  skip "Dockerfile validation" "docker not installed"
+fi
+echo ""
+
+# ── License Compliance ───────────────────────────────────────────────
+echo "── License Compliance ──"
+run "License check" bash scripts/check-licenses.sh
 echo ""
 
 # ── Summary ────────────────────────────────────────────────────────────

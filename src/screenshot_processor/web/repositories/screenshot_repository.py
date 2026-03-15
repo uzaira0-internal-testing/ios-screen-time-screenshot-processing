@@ -6,8 +6,8 @@ providing a clean separation between HTTP handling and data access.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 
 from sqlalchemy import String, and_, case, cast, delete, extract, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession

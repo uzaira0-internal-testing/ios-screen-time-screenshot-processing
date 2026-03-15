@@ -9,9 +9,9 @@ from .lookup import LookupTableStrategy
 from .vertical_lines import VerticalLineStrategy
 
 __all__ = [
-    "LookupTableStrategy",
-    "HorizontalLineStrategy",
-    "VerticalLineStrategy",
     "ColorValidationStrategy",
     "CombinedStrategy",
+    "HorizontalLineStrategy",
+    "LookupTableStrategy",
+    "VerticalLineStrategy",
 ]

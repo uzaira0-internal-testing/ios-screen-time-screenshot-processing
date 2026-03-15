@@ -50,7 +50,7 @@ def _compare_annotations(annotations: list[Annotation]) -> tuple[bool, list[Fiel
             values[str(ann.user_id)] = ann.hourly_values.get(hour_key)
 
         # Check if all values are the same
-        unique_values = set(v for v in values.values() if v is not None)
+        unique_values = {v for v in values.values() if v is not None}
         if len(unique_values) > 1:
             differences.append(FieldDifference(field=f"hourly_{hour}", values=values))
 
@@ -58,7 +58,7 @@ def _compare_annotations(annotations: list[Annotation]) -> tuple[bool, list[Fiel
     title_values: dict[str, str | None] = {}
     for ann in annotations:
         title_values[str(ann.user_id)] = ann.extracted_title
-    unique_titles = set(v for v in title_values.values() if v is not None)
+    unique_titles = {v for v in title_values.values() if v is not None}
     if len(unique_titles) > 1:
         differences.append(FieldDifference(field="title", values=title_values))
 
@@ -66,7 +66,7 @@ def _compare_annotations(annotations: list[Annotation]) -> tuple[bool, list[Fiel
     total_values: dict[str, str | None] = {}
     for ann in annotations:
         total_values[str(ann.user_id)] = ann.extracted_total
-    unique_totals = set(v for v in total_values.values() if v is not None)
+    unique_totals = {v for v in total_values.values() if v is not None}
     if len(unique_totals) > 1:
         differences.append(FieldDifference(field="total", values=total_values))
 

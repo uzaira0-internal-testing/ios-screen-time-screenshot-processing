@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -119,7 +119,7 @@ async def health_check(db: AsyncSession = Depends(get_db), include_celery: bool 
     except Exception as e:
         logger.error("Health check - database error", extra={"error": str(e)})
         health_status = "unhealthy"
-        checks_dict["database"] = f"error: {str(e)}"
+        checks_dict["database"] = f"error: {e!s}"
 
     # Optional Celery health check
     if include_celery:
@@ -136,7 +136,7 @@ async def health_check(db: AsyncSession = Depends(get_db), include_celery: bool 
                 # Don't mark unhealthy - Celery may be optional
         except Exception as e:
             logger.warning("Health check - celery error", extra={"error": str(e)})
-            checks_dict["celery"] = f"error: {str(e)}"
+            checks_dict["celery"] = f"error: {e!s}"
 
     # Return appropriate status code
     status_code = 200 if health_status == "healthy" else 503

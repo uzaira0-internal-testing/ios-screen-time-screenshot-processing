@@ -85,7 +85,7 @@ def process_screenshot_task(self, screenshot_id: int, max_shift: int = 5) -> dic
                 screenshot = db.query(Screenshot).filter(Screenshot.id == screenshot_id).first()
                 if screenshot:
                     screenshot.processing_status = ProcessingStatus.FAILED
-                    screenshot.processing_issues = [f"Max retries exceeded: {str(e)}"]
+                    screenshot.processing_issues = [f"Max retries exceeded: {e!s}"]
                     db.commit()
                     logger.info("Marked screenshot as FAILED after max retries", extra={"screenshot_id": screenshot_id})
             except Exception as db_err:
@@ -157,7 +157,7 @@ def reprocess_screenshot_task(
                 screenshot = db.query(Screenshot).filter(Screenshot.id == screenshot_id).first()
                 if screenshot:
                     screenshot.processing_status = ProcessingStatus.FAILED
-                    screenshot.processing_issues = [f"Max retries exceeded: {str(e)}"]
+                    screenshot.processing_issues = [f"Max retries exceeded: {e!s}"]
                     db.commit()
                     logger.info("Marked screenshot as FAILED after max retries", extra={"screenshot_id": screenshot_id})
             except Exception as db_err:

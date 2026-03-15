@@ -1,4 +1,4 @@
-from .dependencies import CurrentUser, CurrentAdmin, DatabaseSession
-from .routes import auth, screenshots, annotations, consensus
+from .dependencies import CurrentAdmin, CurrentUser, DatabaseSession
+from .routes import annotations, auth, consensus, screenshots
 
-__all__ = ["CurrentUser", "CurrentAdmin", "DatabaseSession", "auth", "screenshots", "annotations", "consensus"]
+__all__ = ["CurrentAdmin", "CurrentUser", "DatabaseSession", "annotations", "auth", "consensus", "screenshots"]

@@ -80,10 +80,6 @@ class IOCREngine(Protocol):
 class OCREngineError(Exception):
     """Base exception for OCR engine errors."""
 
-    pass
-
 
 class OCREngineNotAvailableError(OCREngineError):
     """Raised when an OCR engine is not available or not properly configured."""
-
-    pass

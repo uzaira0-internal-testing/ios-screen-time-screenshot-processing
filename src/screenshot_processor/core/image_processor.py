@@ -12,8 +12,8 @@ and extracting bar graph data. It coordinates between specialized modules:
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 import cv2
 import matplotlib.pyplot as plt

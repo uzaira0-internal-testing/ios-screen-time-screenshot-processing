@@ -4,10 +4,9 @@ This module provides a shared rate limiter instance that can be used
 across different route modules.
 """
 
-from starlette.requests import Request
-
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from starlette.requests import Request
 
 from .config import get_settings
 

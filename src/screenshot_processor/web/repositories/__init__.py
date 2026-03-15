@@ -24,7 +24,6 @@ from .consensus_repository import ConsensusRepository
 from .queue_repository import QueueRepository
 from .screenshot_repository import NavigationResult, ScreenshotRepository
 
-
 # =============================================================================
 # Dependency Injection Factories
 # =============================================================================

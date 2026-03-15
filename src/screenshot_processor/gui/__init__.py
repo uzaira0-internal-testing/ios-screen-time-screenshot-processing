@@ -4,11 +4,11 @@ import sys
 
 from PyQt6.QtWidgets import QApplication
 
-from .main_window import ScreenshotApp
 from .magnifying_label import MagnifyingLabel
+from .main_window import ScreenshotApp
 from .ui_components import ScreenshotAppUI
 
-__all__ = ["ScreenshotApp", "ScreenshotAppUI", "MagnifyingLabel", "main"]
+__all__ = ["MagnifyingLabel", "ScreenshotApp", "ScreenshotAppUI", "main"]
 
 
 def main() -> None:

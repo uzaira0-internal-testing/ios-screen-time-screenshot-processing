@@ -298,11 +298,11 @@ def init_preprocessing_metadata(screenshot: Any) -> dict:
         pp["base_file_path"] = screenshot.file_path
         pp["events"] = []
         pp["current_events"] = {}
-        pp["stage_status"] = {s: "pending" for s in STAGE_ORDER}
+        pp["stage_status"] = dict.fromkeys(STAGE_ORDER, "pending")
     # Ensure all keys exist (for screenshots initialized before event log)
     pp.setdefault("events", [])
     pp.setdefault("current_events", {})
-    pp.setdefault("stage_status", {s: "pending" for s in STAGE_ORDER})
+    pp.setdefault("stage_status", dict.fromkeys(STAGE_ORDER, "pending"))
     screenshot.processing_metadata = metadata
     return pp
 

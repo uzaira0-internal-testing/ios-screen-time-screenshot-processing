@@ -1,5 +1,3 @@
-from typing import Annotated, NoReturn
-
 import asyncio
 import base64
 import hashlib
@@ -8,6 +6,7 @@ import re
 import secrets
 import uuid
 from pathlib import Path
+from typing import Annotated, NoReturn
 
 import aiofiles
 import cv2
@@ -22,7 +21,6 @@ from screenshot_processor.core.image_utils import convert_dark_mode
 from screenshot_processor.core.ocr import find_screenshot_total_usage
 from screenshot_processor.web.api.dependencies import CurrentUser, DatabaseSession
 from screenshot_processor.web.config import get_settings
-from screenshot_processor.web.rate_limiting import limiter
 from screenshot_processor.web.database import (
     AnnotationStatus,
     ApplyPHIRedactionRequest,
@@ -32,8 +30,8 @@ from screenshot_processor.web.database import (
     BatchPreprocessResponse,
     BatchUploadRequest,
     BatchUploadResponse,
-    BrowserUploadRequest,
     BrowserUploadItemResult,
+    BrowserUploadRequest,
     BrowserUploadResponse,
     Group,
     GroupRead,
@@ -43,9 +41,9 @@ from screenshot_processor.web.database import (
     ManualPHIRegionsRequest,
     ManualPHIRegionsResponse,
     NextScreenshotResponse,
+    OCRStageRequest,
     PHIDetectionStageRequest,
     PHIRedactionStageRequest,
-    OCRStageRequest,
     PHIRegionRect,
     PHIRegionsResponse,
     PreprocessingDetailsResponse,
@@ -67,8 +65,9 @@ from screenshot_processor.web.database import (
     StatsResponse,
     UploadErrorCode,
 )
-from screenshot_processor.web.services import QueueService, reprocess_screenshot
+from screenshot_processor.web.rate_limiting import limiter
 from screenshot_processor.web.repositories import ScreenshotRepo, ScreenshotRepository
+from screenshot_processor.web.services import QueueService, reprocess_screenshot
 
 logger = logging.getLogger(__name__)
 
@@ -455,7 +454,7 @@ async def verify_screenshot(
 
         # Add user if not already verified
         if current_user.id not in old_verified_ids:
-            new_verified_ids = old_verified_ids + [current_user.id]
+            new_verified_ids = [*old_verified_ids, current_user.id]
             # Assign a new list to ensure SQLAlchemy detects the change
             screenshot.verified_by_user_ids = new_verified_ids
             flag_modified(screenshot, "verified_by_user_ids")
@@ -584,7 +583,6 @@ async def get_screenshot_navigation(
     Returns the current, next, or previous screenshot based on direction.
     """
     from sqlalchemy import and_, literal, or_
-
     from sqlalchemy.dialects.postgresql import JSONB
 
     # Build base conditions for the filtered set
@@ -750,7 +748,7 @@ async def recalculate_ocr_total(
         logger.error("Error recalculating OCR total", extra={"screenshot_id": screenshot_id, "error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to recalculate OCR total: {str(e)}",
+            detail=f"Failed to recalculate OCR total: {e!s}",
         )
 
 
@@ -1068,6 +1066,7 @@ async def _process_single_upload(
 ) -> ScreenshotUploadResponse:
     """Process a single screenshot upload and return response with full metadata."""
     import time
+
     from screenshot_processor.web.database import UploadErrorCode
 
     timings = {}
@@ -1792,6 +1791,7 @@ async def preprocess_screenshots_batch(
 
     try:
         from celery import group as celery_group
+
         from screenshot_processor.web.tasks import preprocess_screenshot_task
 
         task_group = celery_group(
@@ -1943,6 +1943,7 @@ async def run_device_detection_stage(
         )
 
     from celery import group as celery_group
+
     from screenshot_processor.web.tasks import device_detection_task
 
     task_group = celery_group(device_detection_task.s(sid) for sid in ids)
@@ -1974,6 +1975,7 @@ async def run_cropping_stage(
         )
 
     from celery import group as celery_group
+
     from screenshot_processor.web.tasks import cropping_task
 
     task_group = celery_group(cropping_task.s(sid) for sid in ids)
@@ -2005,6 +2007,7 @@ async def run_phi_detection_stage(
         )
 
     from celery import group as celery_group
+
     from screenshot_processor.web.tasks import phi_detection_task
 
     task_group = celery_group(
@@ -2045,6 +2048,7 @@ async def run_phi_redaction_stage(
         )
 
     from celery import group as celery_group
+
     from screenshot_processor.web.tasks import phi_redaction_task
 
     task_group = celery_group(phi_redaction_task.s(sid, method=request.phi_redaction_method) for sid in ids)
@@ -2213,7 +2217,7 @@ async def upload_browser(
     successful = 0
     failed = 0
 
-    for i, (item, upload_file) in enumerate(zip(meta.items, files)):
+    for i, (item, upload_file) in enumerate(zip(meta.items, files, strict=False)):
         try:
             # Read file content
             file_data = await upload_file.read()

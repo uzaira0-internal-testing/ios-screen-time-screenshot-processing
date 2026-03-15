@@ -5,8 +5,6 @@ import logging
 from fastapi import APIRouter, HTTPException, Query, status
 
 from screenshot_processor.web.api.dependencies import CurrentUser, DatabaseSession
-from screenshot_processor.web.database.models import SubmissionStatus, UserRole
-from screenshot_processor.web.repositories import AnnotationRepo, ScreenshotRepo, ScreenshotRepository
 from screenshot_processor.web.database import (
     Annotation,
     AnnotationCreate,
@@ -17,7 +15,8 @@ from screenshot_processor.web.database import (
     ProcessingIssueRead,
     Screenshot,
 )
-from screenshot_processor.web.database.models import AnnotationAuditLog
+from screenshot_processor.web.database.models import AnnotationAuditLog, SubmissionStatus, UserRole
+from screenshot_processor.web.repositories import AnnotationRepo, ScreenshotRepo, ScreenshotRepository
 from screenshot_processor.web.services import ConsensusService
 
 

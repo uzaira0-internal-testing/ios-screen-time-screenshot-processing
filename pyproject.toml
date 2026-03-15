@@ -77,6 +77,10 @@ dev = [
     "hypothesis>=6.0",
     "mutmut>=3.0",
     "pip-audit>=2.0",
+    "schemathesis>=3.0",
+    "vulture>=2.0",
+    "radon>=6.0",
+    "pytest-benchmark>=4.0",
 ]
 
 [project.scripts]
@@ -112,6 +116,21 @@ ignore = [
     "E501",   # line length (handled by formatter)
     "B008",   # function call in default arg (FastAPI Depends pattern)
     "RET504", # unnecessary assignment before return (readability)
+    "RET505", # unnecessary else after return (readability preference)
+    "UP017",  # datetime.UTC alias (bulk change, do separately)
+    "UP037",  # remove quotes from annotations (bulk change)
+    "UP042",  # Optional[X] → X | None (bulk change)
+    "T201",   # print found (legitimate in scripts/CLI)
+    "F403",   # wildcard imports (used in __init__.py re-exports)
+    "SIM108", # ternary instead of if-else (readability preference)
+    "B904",   # raise from (bulk change across exception handlers)
+    "RUF059", # unused __all__ entries (re-exports)
+    "RUF022", # unsorted __all__ (cosmetic)
+    "SIM102", # collapsible if (readability preference)
+    "SIM105", # use contextlib.suppress (readability preference)
+    "RUF046", # unnecessary int() cast (round() returns int in py3)
+    "SIM103", # return condition directly (readability preference)
+    "RUF012", # mutable class var default (ClassVar annotation noise)
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -124,6 +143,7 @@ addopts = "--strict-markers -v --tb=short"
 asyncio_mode = "auto"
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "benchmark: marks benchmark tests (run with --benchmark-only)",
 ]
 
 [tool.mypy]
@@ -163,6 +183,10 @@ reportCallIssue = "warning"
 reportReturnType = "warning"
 reportAssignmentType = "warning"
 reportFunctionMemberAccess = "warning"  # Celery task.s() signatures
+
+[tool.deptry]
+extend_default_ignore = ["DEP003"]  # Allow transitive imports (common in monorepo)
+ignore = ["DEP002"]  # Missing deps OK (monorepo packages)
 
 # NOTE: [tool.uv.sources] removed for Docker compatibility.
 # In Docker, packages are installed by path from the monorepo.

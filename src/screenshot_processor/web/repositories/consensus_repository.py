@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 from sqlalchemy import String, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
