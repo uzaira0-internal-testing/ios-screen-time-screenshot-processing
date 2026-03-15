@@ -13,6 +13,8 @@ from typing import AsyncGenerator
 # Set required environment variables BEFORE importing the app
 # SECRET_KEY is required for security, must be at least 32 chars
 os.environ["SECRET_KEY"] = "test-secret-key-at-least-32-chars-long-for-testing"
+# Clear SITE_PASSWORD so tests don't require it (production may have it set)
+os.environ.pop("SITE_PASSWORD", None)
 
 # Reset settings singleton to pick up test environment variables
 from screenshot_processor.web.config import reset_settings
