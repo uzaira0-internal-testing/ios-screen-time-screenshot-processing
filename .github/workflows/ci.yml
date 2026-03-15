@@ -1,14 +1,21 @@
 name: CI
 
 on:
-  pull_request:
-    branches: [main]
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  frontend:
-    name: Frontend Check
+  # ---------------------------------------------------------------------------
+  # Fast checks (parallel)
+  # ---------------------------------------------------------------------------
+  frontend-checks:
+    name: Frontend Lint & Typecheck
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -24,7 +31,7 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        run: bun install --ignore-scripts
+        run: bun install --frozen-lockfile
 
       - name: Type check
         run: bun run typecheck
@@ -32,8 +39,8 @@ jobs:
       - name: Lint
         run: bun run lint
 
-  backend:
-    name: Backend Check
+  backend-checks:
+    name: Backend Lint & Format
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -49,4 +56,241 @@ jobs:
         run: pip install ruff
 
       - name: Lint
-        run: ruff check src/ && ruff format --check src/
+        run: ruff check src/
+
+      - name: Format check
+        run: ruff format --check src/
+
+  # ---------------------------------------------------------------------------
+  # Tests (parallel)
+  # ---------------------------------------------------------------------------
+  backend-unit-tests:
+    name: Backend Unit Tests
+    runs-on: ubuntu-latest
+    # Monorepo dependencies (global-pass-honor-username-auth, db-toolkit, etc.)
+    # are not available in CI. Some imports will fail until those packages are
+    # published or stubbed. Allow failures so the rest of the pipeline still
+    # provides signal.
+    continue-on-error: true
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        run: pip install -e ".[web,dev]"
+
+      - name: Run unit tests
+        run: pytest tests/unit/ -v --tb=short
+
+  backend-integration-tests:
+    name: Backend Integration Tests
+    runs-on: ubuntu-latest
+    # Same monorepo dependency caveat as unit tests, plus needs PostgreSQL.
+    continue-on-error: true
+    permissions:
+      contents: read
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: screenshot
+          POSTGRES_PASSWORD: screenshot
+          POSTGRES_DB: screenshot_annotations
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U screenshot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://screenshot:screenshot@localhost:5432/screenshot_annotations
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        run: pip install -e ".[web,dev]"
+
+      - name: Run integration tests
+        run: pytest tests/integration/ -v --tb=short
+
+  # ---------------------------------------------------------------------------
+  # Contract & Security (parallel)
+  # ---------------------------------------------------------------------------
+  contract-drift:
+    name: API Contract Drift
+    runs-on: ubuntu-latest
+    # Monorepo deps required for backend import (openapi spec generation).
+    continue-on-error: true
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install backend dependencies
+        run: pip install -e ".[web,dev]"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: bun install --frozen-lockfile
+
+      - name: Regenerate API types
+        working-directory: frontend
+        run: bun run generate:api-types
+
+      - name: Check for drift
+        working-directory: frontend
+        run: git diff --exit-code src/types/api-schema.ts
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    # pip-audit or npm audit may flag issues in transitive deps we don't
+    # control — keep as advisory.
+    continue-on-error: true
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install backend dependencies
+        run: pip install -e ".[web,dev]"
+
+      - name: pip-audit
+        run: |
+          pip install pip-audit
+          pip-audit
+
+      - name: npm audit
+        working-directory: frontend
+        run: |
+          bun install --frozen-lockfile
+          npm audit --omit=dev || true
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ---------------------------------------------------------------------------
+  # Build checks
+  # ---------------------------------------------------------------------------
+  bundle-size:
+    name: Bundle Size Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build frontend
+        run: bun run build
+
+      - name: Check bundle size
+        run: bunx size-limit || true
+
+  migration-test:
+    name: Migration Round-Trip
+    runs-on: ubuntu-latest
+    # Monorepo deps needed for Alembic env.py imports.
+    continue-on-error: true
+    permissions:
+      contents: read
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: screenshot
+          POSTGRES_PASSWORD: screenshot
+          POSTGRES_DB: screenshot_annotations
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U screenshot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://screenshot:screenshot@localhost:5432/screenshot_annotations
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        run: pip install -e ".[web,dev]"
+
+      - name: Upgrade to head
+        run: alembic upgrade head
+
+      - name: Downgrade to base
+        run: alembic downgrade base
+
+      - name: Upgrade to head again
+        run: alembic upgrade head
+
+  container-scan:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          exit-code: 0

@@ -18,6 +18,9 @@
     "test:e2e:headed": "bunx playwright test --headed",
     "test:e2e:debug": "bunx playwright test --debug",
     "test:e2e:report": "bunx playwright show-report",
+    "test:a11y": "bunx playwright test tests/accessibility/",
+    "check-drift": "./scripts/check-contract-drift.sh",
+    "size-check": "bun run build && bunx size-limit",
     "tauri:dev": "npx tauri dev",
     "tauri:build": "npx tauri build"
   },
@@ -73,6 +76,9 @@
     "@tauri-apps/cli": "^2",
     "vite": "^6",
     "@vitejs/plugin-react": "^4",
-    "@tailwindcss/vite": "^4"
+    "@tailwindcss/vite": "^4",
+    "size-limit": "^11",
+    "@size-limit/preset-app": "^11",
+    "fast-check": "^4"
   }
 }

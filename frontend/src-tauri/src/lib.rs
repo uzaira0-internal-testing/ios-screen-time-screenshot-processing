@@ -108,3 +108,85 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_scan_image_files_finds_images() {
+        let dir = TempDir::new().unwrap();
+
+        // Create test image files
+        fs::write(dir.path().join("photo.png"), b"fake png").unwrap();
+        fs::write(dir.path().join("photo.jpg"), b"fake jpg").unwrap();
+        fs::write(dir.path().join("photo.jpeg"), b"fake jpeg").unwrap();
+        fs::write(dir.path().join("photo.webp"), b"fake webp").unwrap();
+        fs::write(dir.path().join("photo.heic"), b"fake heic").unwrap();
+
+        let result = scan_image_files(dir.path()).unwrap();
+        assert_eq!(result.len(), 5, "Should find all 5 image files");
+    }
+
+    #[test]
+    fn test_scan_image_files_ignores_non_images() {
+        let dir = TempDir::new().unwrap();
+
+        fs::write(dir.path().join("document.pdf"), b"fake pdf").unwrap();
+        fs::write(dir.path().join("readme.txt"), b"text").unwrap();
+        fs::write(dir.path().join("data.json"), b"{}").unwrap();
+        fs::write(dir.path().join("photo.png"), b"fake png").unwrap();
+
+        let result = scan_image_files(dir.path()).unwrap();
+        assert_eq!(result.len(), 1, "Should only find the PNG");
+        assert_eq!(result[0].name, "photo.png");
+    }
+
+    #[test]
+    fn test_scan_image_files_empty_directory() {
+        let dir = TempDir::new().unwrap();
+        let result = scan_image_files(dir.path()).unwrap();
+        assert!(result.is_empty(), "Empty directory should return no files");
+    }
+
+    #[test]
+    fn test_scan_image_files_skips_directories() {
+        let dir = TempDir::new().unwrap();
+        fs::create_dir(dir.path().join("subdir")).unwrap();
+        fs::write(dir.path().join("photo.png"), b"fake png").unwrap();
+
+        let result = scan_image_files(dir.path()).unwrap();
+        assert_eq!(result.len(), 1, "Should skip subdirectories");
+    }
+
+    #[test]
+    fn test_scan_image_files_case_insensitive_extension() {
+        let dir = TempDir::new().unwrap();
+        fs::write(dir.path().join("PHOTO.PNG"), b"fake").unwrap();
+        fs::write(dir.path().join("Image.JPG"), b"fake").unwrap();
+
+        let result = scan_image_files(dir.path()).unwrap();
+        assert_eq!(result.len(), 2, "Should handle uppercase extensions");
+    }
+
+    #[test]
+    fn test_selected_file_has_correct_fields() {
+        let dir = TempDir::new().unwrap();
+        let img_path = dir.path().join("test-screenshot.png");
+        fs::write(&img_path, b"fake png").unwrap();
+
+        let result = scan_image_files(dir.path()).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name, "test-screenshot.png");
+        assert!(result[0].path.ends_with("test-screenshot.png"));
+    }
+
+    #[test]
+    fn test_scan_nonexistent_directory() {
+        let result = scan_image_files(&PathBuf::from("/nonexistent/path"));
+        assert!(result.is_err(), "Should return error for nonexistent directory");
+    }
+}
