@@ -29,13 +29,7 @@ from screenshot_processor.web.database.models import (
     Screenshot,
     User,
 )
-
-
-def auth_headers(username: str) -> dict[str, str]:
-    """Create authentication headers."""
-    return {"X-Username": username}
-
-
+from tests.conftest import auth_headers
 # Path to test fixtures
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures" / "images"
 TEST_API_KEY = "test_api_key_12345"

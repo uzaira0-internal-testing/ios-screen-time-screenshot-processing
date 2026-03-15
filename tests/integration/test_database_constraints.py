@@ -36,6 +36,7 @@ from screenshot_processor.web.database.models import (
     User,
     UserQueueState,
 )
+from tests.conftest import auth_headers
 
 
 # Note: SQLite doesn't enforce FK constraints by default, so we can't test
@@ -45,13 +46,6 @@ from screenshot_processor.web.database.models import (
 # =============================================================================
 # Helper Functions
 # =============================================================================
-
-
-def auth_headers(username: str) -> dict[str, str]:
-    """Create authentication headers."""
-    return {"X-Username": username}
-
-
 async def create_full_test_data(db_session: AsyncSession) -> dict:
     """
     Create a complete test dataset with all related entities.

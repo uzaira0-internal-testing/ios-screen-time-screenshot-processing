@@ -32,13 +32,7 @@ from screenshot_processor.web.database.models import (
     User,
     UserQueueState,
 )
-
-
-def auth_headers(username: str) -> dict[str, str]:
-    """Create authentication headers."""
-    return {"X-Username": username}
-
-
+from tests.conftest import auth_headers
 @pytest.mark.asyncio
 class TestAdminUserManagement:
     """Test admin user management endpoints."""

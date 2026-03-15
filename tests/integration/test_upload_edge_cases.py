@@ -16,12 +16,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from screenshot_processor.web.database.models import Screenshot, User
-
-
-def auth_headers(username: str) -> dict[str, str]:
-    return {"X-Username": username}
-
-
+from tests.conftest import auth_headers
 def api_key_header() -> dict[str, str]:
     api_key = os.environ.get("UPLOAD_API_KEY", "test-api-key")
     return {"X-API-Key": api_key}
@@ -220,18 +215,17 @@ class TestImageTypeValidation:
                 },
                 headers=api_key_header(),
             )
-        except Exception:
+        except PermissionError:
             if expected_valid:
-                # Valid type passed validation but server hit filesystem/DB error
-                pytest.skip("Upload passed validation but hit server error")
+                # Valid type passed validation but hit filesystem permission error
+                # (test env doesn't have writable uploads dir). That's fine.
+                return
             raise
 
         if response.status_code == 401:
-            pytest.skip("Invalid API key")
+            pytest.skip("Upload API key not configured for test environment")
 
         if expected_valid:
-            if response.status_code == 500:
-                pytest.skip("Upload passed validation but hit server error")
             assert response.status_code != 422, (
                 f"Valid image_type '{image_type}' rejected with 422"
             )

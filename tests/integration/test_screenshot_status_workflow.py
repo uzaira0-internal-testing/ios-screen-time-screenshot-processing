@@ -22,13 +22,7 @@ from screenshot_processor.web.database.models import (
     Screenshot,
     User,
 )
-
-
-def auth_headers(username: str) -> dict[str, str]:
-    """Create authentication headers."""
-    return {"X-Username": username}
-
-
+from tests.conftest import auth_headers
 class TestAutoProcessedScreenshotStatus:
     """Test that auto-processed screenshots have correct initial status."""
 

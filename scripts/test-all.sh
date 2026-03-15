@@ -16,17 +16,20 @@ PASSED=0
 FAILED=0
 SKIPPED=0
 
+LOGFILE=$(mktemp /tmp/test-output.XXXXXX.log)
+trap "rm -f $LOGFILE" EXIT
+
 run() {
   local name="$1"
   shift
   printf "${YELLOW}▸ %-40s${NC}" "$name"
-  if "$@" > /tmp/test-output.log 2>&1; then
+  if "$@" > "$LOGFILE" 2>&1; then
     printf "${GREEN}PASS${NC}\n"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
   else
     printf "${RED}FAIL${NC}\n"
-    cat /tmp/test-output.log | tail -5 | sed 's/^/  /'
-    ((FAILED++))
+    tail -5 "$LOGFILE" | sed 's/^/  /'
+    FAILED=$((FAILED + 1))
   fi
 }
 
@@ -34,11 +37,11 @@ skip() {
   local name="$1"
   local reason="$2"
   printf "${YELLOW}▸ %-40s${NC}SKIP (%s)\n" "$name" "$reason"
-  ((SKIPPED++))
+  SKIPPED=$((SKIPPED + 1))
 }
 
 MODE="${1:-full}"
-DOCKER_BACKEND="docker compose --env-file docker/.env -f docker/docker-compose.dev.yml exec -T backend"
+DOCKER_BACKEND=(docker compose --env-file docker/.env -f docker/docker-compose.dev.yml exec -T backend)
 CONTAINER=$(docker compose --env-file docker/.env -f docker/docker-compose.dev.yml ps -q backend 2>/dev/null || true)
 
 echo "================================================"
@@ -57,7 +60,7 @@ echo ""
 # ── Unit Tests ─────────────────────────────────────────────────────────
 echo "── Unit Tests ──"
 if [ -n "$CONTAINER" ]; then
-  run "Python unit tests" $DOCKER_BACKEND python -m pytest tests/unit/ -v --tb=short -q
+  run "Python unit tests" "${DOCKER_BACKEND[@]}" python -m pytest tests/unit/ -v --tb=short -q
 else
   skip "Python unit tests" "Docker backend not running"
 fi
@@ -68,13 +71,14 @@ if [ "$MODE" = "quick" ]; then
   echo "================================================"
   printf "  Results: ${GREEN}%d passed${NC}, ${RED}%d failed${NC}, %d skipped\n" "$PASSED" "$FAILED" "$SKIPPED"
   echo "================================================"
-  exit $FAILED
+  [ "$FAILED" -eq 0 ] || exit 1
+  exit 0
 fi
 
 # ── Integration Tests ──────────────────────────────────────────────────
 echo "── Integration Tests ──"
 if [ -n "$CONTAINER" ]; then
-  run "Python integration tests" $DOCKER_BACKEND python -m pytest tests/integration/ -v --tb=short -q
+  run "Python integration tests" "${DOCKER_BACKEND[@]}" python -m pytest tests/integration/ -v --tb=short -q
 else
   skip "Python integration tests" "Docker backend not running"
 fi
@@ -90,7 +94,7 @@ else
 fi
 
 if [ -n "$CONTAINER" ]; then
-  run "pip-audit" $DOCKER_BACKEND pip-audit --strict 2>/dev/null || skip "pip-audit" "pip-audit not installed in container"
+  run "pip-audit" "${DOCKER_BACKEND[@]}" pip-audit --strict
 else
   skip "pip-audit" "Docker backend not running"
 fi
@@ -108,12 +112,11 @@ echo ""
 # ── Smoke Test ─────────────────────────────────────────────────────────
 echo "── Smoke Test ──"
 if curl -sf http://localhost:8002/health > /dev/null 2>&1; then
-  # Load site password if available
   SITE_PASSWORD=""
   if [ -f docker/.env ]; then
     SITE_PASSWORD=$(grep "^SITE_PASSWORD=" docker/.env 2>/dev/null | cut -d= -f2 || true)
   fi
-  run "Deployment smoke test" bash -c "SITE_PASSWORD='$SITE_PASSWORD' bash scripts/smoke-test.sh"
+  SITE_PASSWORD="$SITE_PASSWORD" run "Deployment smoke test" bash scripts/smoke-test.sh
 else
   skip "Deployment smoke test" "Backend not reachable"
 fi
@@ -128,5 +131,10 @@ echo ""
 echo "================================================"
 printf "  Results: ${GREEN}%d passed${NC}, ${RED}%d failed${NC}, %d skipped\n" "$PASSED" "$FAILED" "$SKIPPED"
 echo "================================================"
+
+if [ "$SKIPPED" -gt 0 ] && [ "$PASSED" -eq 0 ] && [ "$FAILED" -eq 0 ]; then
+  echo "WARNING: All checks were skipped — nothing was actually tested!"
+  exit 1
+fi
 
 [ "$FAILED" -eq 0 ] || exit 1

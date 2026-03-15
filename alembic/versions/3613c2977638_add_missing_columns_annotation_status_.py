@@ -31,7 +31,6 @@ def upgrade() -> None:
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
         sa.PrimaryKeyConstraint('id'),
     )
-    op.create_index(op.f('ix_groups_id'), 'groups', ['id'], unique=False)
 
     op.drop_index(op.f('ix_preprocessing_jobs_status'), table_name='preprocessing_jobs')
     op.drop_index(op.f('ix_preprocessing_jobs_user_id'), table_name='preprocessing_jobs')
@@ -127,6 +126,5 @@ def downgrade() -> None:
     op.create_index(op.f('ix_preprocessing_jobs_status'), 'preprocessing_jobs', ['status'], unique=False)
 
     # Drop groups table (created in upgrade)
-    op.drop_index(op.f('ix_groups_id'), table_name='groups')
     op.drop_table('groups')
     # ### end Alembic commands ###

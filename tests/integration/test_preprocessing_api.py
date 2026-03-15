@@ -28,6 +28,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from screenshot_processor.web.database.models import Group, Screenshot
+from tests.conftest import auth_headers
 
 REQUIRES_POSTGRES = pytest.mark.skip(reason="Requires PostgreSQL with INSERT ON CONFLICT support")
 
@@ -70,12 +71,6 @@ def create_minimal_png(width: int = 4, height: int = 4, color: tuple = (255, 0, 
     iend = _chunk(b"IEND", b"")
 
     return b"\x89PNG\r\n\x1a\n" + ihdr + idat + iend
-
-
-def auth_headers(username: str = "testuser") -> dict[str, str]:
-    return {"X-Username": username}
-
-
 def _make_preprocessing_metadata(
     file_path: str,
     *,
