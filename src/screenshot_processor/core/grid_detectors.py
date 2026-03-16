@@ -134,6 +134,7 @@ class LineBasedGridDetector(IGridDetector):
     def detect(self, image: np.ndarray, **kwargs) -> GridDetectionResult:
         """
         Detect grid using visual line patterns.
+        Tries Rust (30x faster) first, falls back to Python.
 
         Args:
             image: BGR image array
@@ -144,6 +145,43 @@ class LineBasedGridDetector(IGridDetector):
             GridDetectionResult with bounds if successful
         """
         resolution = kwargs.get("resolution")
+
+        # Try Rust acceleration first (saves image to temp file, calls leptess-based detector)
+        try:
+            from .rust_accelerator import _check_rust
+
+            if _check_rust():
+                import tempfile
+
+                import cv2
+
+                from .rust_accelerator import _rs
+
+                with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+                    cv2.imwrite(f.name, image)
+                    rust_result = _rs.detect_grid(f.name, "line_based")
+                    import os
+
+                    os.unlink(f.name)
+
+                if rust_result is not None:
+                    bounds = GridBounds(
+                        upper_left_x=rust_result["upper_left_x"],
+                        upper_left_y=rust_result["upper_left_y"],
+                        lower_right_x=rust_result["lower_right_x"],
+                        lower_right_y=rust_result["lower_right_y"],
+                    )
+                    return GridDetectionResult(
+                        success=True,
+                        bounds=bounds,
+                        confidence=1.0,
+                        method=self.method,
+                        diagnostics={"engine": "rust"},
+                    )
+                # Rust returned None (no grid found) — fall through to Python
+                logger.debug("Rust grid detection returned None, trying Python")
+        except Exception as e:
+            logger.debug(f"Rust grid detection failed, falling back to Python: {e}")
 
         try:
             # Convert dark mode if needed (same as OCRAnchoredGridDetector)
