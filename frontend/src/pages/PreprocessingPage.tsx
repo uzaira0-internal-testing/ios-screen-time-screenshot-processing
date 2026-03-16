@@ -337,22 +337,6 @@ export const PreprocessingPage = () => {
             <div className="mt-3 flex flex-wrap items-center gap-4 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
               {activeStage === "phi_detection" && (
                 <>
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                      Preset:
-                    </label>
-                    <select
-                      value={phiPreset}
-                      onChange={(e) => setPhiPreset(e.target.value)}
-                      className="text-sm border border-slate-300 dark:border-slate-600 rounded-md px-2 py-1 dark:bg-slate-700 dark:text-slate-100"
-                    >
-                      <option value="screen_time">Screen Time</option>
-                      <option value="fast">Fast</option>
-                      <option value="balanced">Balanced</option>
-                      <option value="hipaa_compliant">HIPAA Compliant</option>
-                      <option value="thorough">Thorough</option>
-                    </select>
-                  </div>
                   <div className="flex items-center gap-2 border-l border-slate-300 dark:border-slate-600 pl-4">
                     <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
                       <input
