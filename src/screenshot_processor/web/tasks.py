@@ -499,6 +499,8 @@ def phi_detection_task(
     self,
     screenshot_id: int,
     preset: str = "screen_time",
+    ocr_engine: str = "tesseract",
+    ner_detector: str = "presidio",
     llm_endpoint: str | None = None,
     llm_model: str | None = None,
     llm_api_key: str | None = None,
@@ -537,7 +539,8 @@ def phi_detection_task(
         image_bytes = Path(input_file).read_bytes()
 
         detection = detect_phi(
-            image_bytes, preset=preset, llm_endpoint=llm_endpoint, llm_model=llm_model, llm_api_key=llm_api_key
+            image_bytes, preset=preset, llm_endpoint=llm_endpoint, llm_model=llm_model, llm_api_key=llm_api_key,
+            ocr_engine=ocr_engine, ner_detector=ner_detector,
         )
 
         result_data = {

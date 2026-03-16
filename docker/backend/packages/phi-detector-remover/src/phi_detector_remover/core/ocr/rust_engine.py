@@ -52,7 +52,7 @@ class RustOCREngine:
 
     @property
     def name(self) -> str:
-        return "rust"
+        return "leptess"
 
     def is_available(self) -> bool:
         return _check_rust()

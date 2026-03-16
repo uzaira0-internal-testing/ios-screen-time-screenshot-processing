@@ -143,11 +143,14 @@ def _register_builtin_engines() -> None:
 
     register_engine("tesseract", TesseractEngine)
 
-    # Register Rust OCR engine (leptess via PyO3 — faster than pytesseract)
+    # Also register as "pytesseract" (user-facing name)
+    register_engine("pytesseract", TesseractEngine)
+
+    # Register leptess OCR engine (Tesseract C API via PyO3 — faster than pytesseract)
     try:
         from phi_detector_remover.core.ocr.rust_engine import RustOCREngine
 
-        register_engine("rust", RustOCREngine)
+        register_engine("leptess", RustOCREngine)
     except ImportError:
         pass
 

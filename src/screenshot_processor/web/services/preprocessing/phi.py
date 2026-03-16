@@ -34,7 +34,7 @@ def detect_phi(
     llm_endpoint: str | None = None,
     llm_model: str | None = None,
     llm_api_key: str | None = None,
-    ocr_engine: str = "tesseract",
+    ocr_engine: str = "pytesseract",
     ner_detector: str = "presidio",
 ) -> PHIDetectionResult:
     """Detect PHI regions in an image.
@@ -90,7 +90,8 @@ def detect_phi(
             builder_fn = builders.get(preset, PHIPipelineBuilder.screen_time)
             builder = builder_fn()
             # Override OCR engine if non-default
-            if ocr_engine != "tesseract":
+            if ocr_engine != "pytesseract":
+                # Non-default presets use "tesseract" internally; override if user chose leptess
                 builder = builder.with_ocr(ocr_engine)
 
         if llm_endpoint and llm_model:

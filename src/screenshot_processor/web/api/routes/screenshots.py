@@ -2114,6 +2114,8 @@ async def run_phi_detection_stage(
         phi_detection_task.s(
             sid,
             preset=request.phi_pipeline_preset,
+            ocr_engine=request.phi_ocr_engine,
+            ner_detector=request.phi_ner_detector,
             llm_endpoint=request.llm_endpoint,
             llm_model=request.llm_model,
             llm_api_key=request.llm_api_key,

@@ -238,8 +238,8 @@ function SyncSection() {
 }
 
 const PHI_OCR_ENGINE_OPTIONS = [
-  { value: "tesseract" as const, label: "Tesseract", desc: "Standard (262ms)" },
-  { value: "rust" as const, label: "Rust (leptess)", desc: "Faster C API" },
+  { value: "pytesseract" as const, label: "pytesseract", desc: "Standard (262ms)" },
+  { value: "leptess" as const, label: "leptess", desc: "Direct C API (faster)" },
 ];
 
 const PHI_NER_DETECTOR_OPTIONS = [

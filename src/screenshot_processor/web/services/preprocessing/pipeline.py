@@ -41,7 +41,7 @@ def preprocess_screenshot_file(
     phi_detection_enabled: bool = True,
     phi_pipeline_preset: str = "hipaa_compliant",
     phi_redaction_method: str = "redbox",
-    phi_ocr_engine: str = "tesseract",
+    phi_ocr_engine: str = "pytesseract",
     phi_ner_detector: str = "presidio",
 ) -> PreprocessingResult:
     """Run full preprocessing pipeline on a screenshot file. No DB operations.
@@ -173,7 +173,7 @@ def preprocess_screenshot_sync(
     )
     effective_phi_preset = phi_pipeline_preset or getattr(settings, "PHI_PIPELINE_PRESET", "hipaa_compliant")
     effective_phi_method = phi_redaction_method or getattr(settings, "PHI_REDACTION_METHOD", "redbox")
-    effective_phi_ocr = phi_ocr_engine or getattr(settings, "PHI_OCR_ENGINE", "tesseract")
+    effective_phi_ocr = phi_ocr_engine or getattr(settings, "PHI_OCR_ENGINE", "pytesseract")
     effective_phi_ner = phi_ner_detector or getattr(settings, "PHI_NER_DETECTOR", "presidio")
 
     # Always preprocess from the original file, not a previously preprocessed version

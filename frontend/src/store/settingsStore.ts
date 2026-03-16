@@ -10,7 +10,7 @@ export interface ProcessingSettings {
   /** Auto-run OCR processing when screenshots are uploaded */
   autoProcessOnUpload: boolean;
   /** OCR engine for PHI detection: tesseract (default) or rust (faster) */
-  phiOcrEngine: "tesseract" | "rust";
+  phiOcrEngine: "pytesseract" | "leptess";
   /** NER detector for PHI detection: presidio (fast) or gliner (accurate) */
   phiNerDetector: "presidio" | "gliner";
   /** PHI pipeline preset */
@@ -26,7 +26,7 @@ const DEFAULTS: ProcessingSettings = {
   gridDetectionMethod: "line_based",
   maxShift: 5,
   autoProcessOnUpload: false,
-  phiOcrEngine: "tesseract",
+  phiOcrEngine: "pytesseract",
   phiNerDetector: "presidio",
   phiPipelinePreset: "screen_time",
   phiRedactionMethod: "redbox",

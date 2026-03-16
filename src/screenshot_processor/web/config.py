@@ -148,8 +148,8 @@ class Settings(AuthSettingsMixin, BaseSettings):
         description="PHI redaction method: redbox, blackbox, pixelate",
     )
     PHI_OCR_ENGINE: str = Field(
-        default="tesseract",
-        description="OCR engine for PHI detection: tesseract (default), rust (faster via leptess C API)",
+        default="pytesseract",
+        description="OCR engine for PHI detection: pytesseract (default), leptess (faster via C API)",
     )
     PHI_NER_DETECTOR: str = Field(
         default="presidio",
