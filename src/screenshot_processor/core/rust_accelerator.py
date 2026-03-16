@@ -1,24 +1,18 @@
 """Rust acceleration layer — try Rust (PyO3) first, fall back to Python.
 
-This module provides accelerated versions of core processing functions.
 If screenshot_processor_rs is installed, functions run in Rust (~30x faster).
 Otherwise, they transparently fall back to the pure-Python implementations.
+Runtime Rust errors also fall back to Python (not just import failures).
 
 Usage:
-    from screenshot_processor.core.rust_accelerator import slice_image, detect_grid
-
-    # These automatically use Rust if available, Python if not.
-    row = slice_image(img, roi_x, roi_y, roi_width, roi_height)
+    from screenshot_processor.core.rust_accelerator import (
+        normalize_ocr_digits, extract_time_from_text, detect_grid, process_image,
+    )
 """
 
 from __future__ import annotations
 
 import logging
-import tempfile
-from pathlib import Path
-
-import cv2
-import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +26,8 @@ def _check_rust():
         try:
             import screenshot_processor_rs
 
+            # Set _rs BEFORE _RUST_AVAILABLE to prevent race where another
+            # thread sees True but _rs is still None
             _rs = screenshot_processor_rs
             _RUST_AVAILABLE = True
             logger.info("Rust acceleration enabled (screenshot_processor_rs)")
@@ -44,7 +40,10 @@ def _check_rust():
 def normalize_ocr_digits(text: str) -> str:
     """Normalize OCR digit confusions. Rust if available, else Python."""
     if _check_rust():
-        return _rs.normalize_ocr_digits(text)
+        try:
+            return _rs.normalize_ocr_digits(text)
+        except Exception:
+            pass
     from .ocr import _normalize_ocr_digits
 
     return _normalize_ocr_digits(text)
@@ -53,7 +52,10 @@ def normalize_ocr_digits(text: str) -> str:
 def extract_time_from_text(text: str) -> str:
     """Extract time from OCR text. Rust if available, else Python."""
     if _check_rust():
-        return _rs.extract_time_from_text(text)
+        try:
+            return _rs.extract_time_from_text(text)
+        except Exception:
+            pass
     from .ocr import _extract_time_from_text
 
     return _extract_time_from_text(text)
@@ -62,7 +64,10 @@ def extract_time_from_text(text: str) -> str:
 def detect_grid(image_path: str, method: str = "line_based") -> dict | None:
     """Detect grid bounds. Rust if available, else Python."""
     if _check_rust():
-        return _rs.detect_grid(image_path, method)
+        try:
+            return _rs.detect_grid(image_path, method)
+        except Exception as e:
+            logger.debug(f"Rust detect_grid failed, falling back to Python: {e}")
 
     from .image_processor import load_and_validate_image
     from .line_based_detection import LineBasedDetector
@@ -89,12 +94,16 @@ def process_image(
 ) -> dict:
     """Full pipeline processing. Rust if available, else Python."""
     if _check_rust():
-        return _rs.process_image(image_path, image_type, detection_method)
+        try:
+            return _rs.process_image(image_path, image_type, detection_method)
+        except Exception as e:
+            logger.debug(f"Rust process_image failed, falling back to Python: {e}")
 
     # Python fallback
     from .image_processor import process_image as py_process_image
 
-    result = py_process_image(image_path, is_battery=(image_type == "battery"))
+    is_battery = image_type == "battery"
+    result = py_process_image(image_path, is_battery, snap_to_grid=None)
     if result is None:
         raise RuntimeError("Python process_image returned None")
 
