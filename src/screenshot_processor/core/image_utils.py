@@ -73,15 +73,13 @@ def remove_all_but(img: np.ndarray, color: np.ndarray, threshold: int = 30):
 
 
 def darken_non_white(img: np.ndarray) -> np.ndarray:
-    # Convert to grayscale, then zero out all non-white pixels using SIMD ops.
-    # cv2.threshold + cv2.bitwise_and are compiled C++ with SIMD — much faster
-    # than numpy boolean fancy indexing (img[mask] = 0).
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    _, mask = cv2.threshold(gray, 240, 255, cv2.THRESH_BINARY)
-    # mask: 255 where gray > 240 (white, keep), 0 where gray <= 240 (darken)
-    # bitwise_and with 3-channel mask: keeps white pixels, zeros the rest
-    mask_3ch = cv2.merge((mask, mask, mask))
-    cv2.bitwise_and(img, mask_3ch, dst=img)
+    # Zero out non-white pixels using simple (R+G+B)/3 > 240 threshold.
+    # Uses integer sum > 720 to match the Rust implementation exactly.
+    # This avoids cv2.cvtColor's weighted grayscale (0.299R + 0.587G + 0.114B)
+    # which can differ from the simple average on edge-case pixels.
+    channel_sum = img.astype(np.uint16).sum(axis=2)  # (H, W)
+    mask = channel_sum > 720  # equivalent to (R+G+B)/3 > 240
+    img[~mask] = 0
     return img
 
 
