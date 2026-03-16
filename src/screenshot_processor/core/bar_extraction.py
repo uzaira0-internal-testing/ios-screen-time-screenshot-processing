@@ -72,20 +72,26 @@ def slice_image(
     # White check: all channels >= 253 (equivalent to abs(ch-255) <= 2, no int16 alloc)
     is_white = np.all(columns >= 253, axis=2)  # (H, 24)
 
-    # Compute bar heights for all 24 slices
-    row = []
-    # Adjust buffer for original resolution (was 2 at 4x scale = 0.5 original pixels)
+    # Compute bar heights for all 24 slices — fully vectorized (no Python loop)
     reset_limit = max(1, roi_height - max(1, lower_grid_buffer // scale_amount))
-    for s in range(num_slice):
-        reset_region = is_white[:reset_limit, s]
-        reset_indices = np.where(reset_region)[0]
-        start_after = int(reset_indices[-1]) + 1 if len(reset_indices) > 0 else 0
-        counter = int(np.sum(is_black[start_after:, s]))
-        usage_at_time = max_y * counter / roi_height
-        row.append(usage_at_time)
 
-        if DEBUG_ENABLED:
-            logger.debug(f"Slice {s}: {usage_at_time:.2f}")
+    # Find last white pixel row per column using flipped argmax
+    white_region = is_white[:reset_limit]  # (reset_limit, 24)
+    flipped = white_region[::-1]  # flip vertically
+    has_white = flipped.any(axis=0)  # (24,) — does column have any white?
+    first_true_flipped = np.argmax(flipped, axis=0)  # (24,) — first True in flipped
+    last_white = reset_limit - 1 - first_true_flipped  # (24,) — last white in original
+    start_after = np.where(has_white, last_white + 1, 0)  # (24,)
+
+    # Count black pixels below start_after for each column
+    row_indices = np.arange(roi_height)[:, np.newaxis]  # (H, 1)
+    active_mask = row_indices >= start_after[np.newaxis, :]  # (H, 24) broadcast
+    counters = (is_black & active_mask).sum(axis=0)  # (24,)
+    row = (max_y * counters / roi_height).tolist()
+
+    if DEBUG_ENABLED:
+        for s in range(num_slice):
+            logger.debug(f"Slice {s}: {row[s]:.2f}")
 
     # Append total
     row.append(np.sum(row))
