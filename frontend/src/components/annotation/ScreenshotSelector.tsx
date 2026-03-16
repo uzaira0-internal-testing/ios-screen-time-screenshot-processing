@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { Screenshot, ScreenshotListResponse } from "@/core/models";
-import { PROCESSING_STATUS_LABELS, type ProcessingStatus } from "@/constants/processingStatus";
+import { FILTER_STATUS_LABELS, type FilterStatus } from "@/constants/processingStatus";
 
 interface ScreenshotSelectorProps {
   currentScreenshot: Screenshot | null;
@@ -257,7 +257,7 @@ export const ScreenshotSelector = ({
                     <span
                       className={`text-xs flex-shrink-0 ml-2 ${getStatusColor(screenshot.processing_status)}`}
                     >
-                      {PROCESSING_STATUS_LABELS[screenshot.processing_status as ProcessingStatus] || screenshot.processing_status}
+                      {FILTER_STATUS_LABELS[screenshot.processing_status as FilterStatus] || screenshot.processing_status}
                     </span>
                   </button>
                 );

@@ -1,16 +1,17 @@
 /**
- * Shared constants for processing statuses
- * These must match the backend ProcessingStatus enum values
+ * Processing statuses shown as filter buttons in the preprocessing UI.
+ * This is a SUBSET of the full ProcessingStatus type from types/index.ts.
+ * "processing" and "deleted" are excluded because they are transient/hidden states.
  */
 
-export const PROCESSING_STATUSES = ['pending', 'completed', 'failed', 'skipped'] as const;
+export const FILTER_STATUSES = ['pending', 'completed', 'failed', 'skipped'] as const;
 
-export type ProcessingStatus = typeof PROCESSING_STATUSES[number];
+export type FilterStatus = typeof FILTER_STATUSES[number];
 
 /**
- * Human-readable labels for processing statuses
+ * Human-readable labels for filter statuses
  */
-export const PROCESSING_STATUS_LABELS: Record<ProcessingStatus, string> = {
+export const FILTER_STATUS_LABELS: Record<FilterStatus, string> = {
   pending: 'Pending',
   completed: 'Preprocessed',
   failed: 'Failed',
@@ -20,7 +21,7 @@ export const PROCESSING_STATUS_LABELS: Record<ProcessingStatus, string> = {
 /**
  * Colors for processing status badges
  */
-export const PROCESSING_STATUS_COLORS: Record<ProcessingStatus, string> = {
+export const FILTER_STATUS_COLORS: Record<FilterStatus, string> = {
   pending: 'text-primary-600 bg-primary-50',
   completed: 'text-green-600 bg-green-50',
   failed: 'text-red-600 bg-red-50',

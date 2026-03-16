@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useSearchParams, useLocation, useNavigate } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
-import { PROCESSING_STATUS_LABELS, type ProcessingStatus } from "@/constants/processingStatus";
+import { FILTER_STATUS_LABELS, type FilterStatus } from "@/constants/processingStatus";
 import { Menu, X, LogOut } from "lucide-react";
 import { useThemeStore, THEME_OPTIONS, THEME_CYCLE } from "@/store/themeStore";
 import { useFeatures } from "@/core/hooks/useServices";
@@ -93,7 +93,7 @@ export const Header = () => {
                             : "text-slate-600"
                     )}
                   >
-                    {PROCESSING_STATUS_LABELS[processingStatus as ProcessingStatus] || processingStatus}
+                    {FILTER_STATUS_LABELS[processingStatus as FilterStatus] || processingStatus}
                   </span>
                 </>
               )}

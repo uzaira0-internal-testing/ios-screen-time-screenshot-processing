@@ -39,7 +39,7 @@ class PreprocessingResult:
 def preprocess_screenshot_file(
     file_path: str,
     phi_detection_enabled: bool = True,
-    phi_pipeline_preset: str = "hipaa_compliant",
+    phi_pipeline_preset: str = "screen_time",
     phi_redaction_method: str = "redbox",
     phi_ocr_engine: str = "pytesseract",
     phi_ner_detector: str = "presidio",
@@ -171,7 +171,7 @@ def preprocess_screenshot_sync(
     effective_phi_detection = (
         phi_detection_enabled if phi_detection_enabled is not None else getattr(settings, "PHI_DETECTION_ENABLED", True)
     )
-    effective_phi_preset = phi_pipeline_preset or getattr(settings, "PHI_PIPELINE_PRESET", "hipaa_compliant")
+    effective_phi_preset = phi_pipeline_preset or getattr(settings, "PHI_PIPELINE_PRESET", "screen_time")
     effective_phi_method = phi_redaction_method or getattr(settings, "PHI_REDACTION_METHOD", "redbox")
     effective_phi_ocr = phi_ocr_engine or getattr(settings, "PHI_OCR_ENGINE", "pytesseract")
     effective_phi_ner = phi_ner_detector or getattr(settings, "PHI_NER_DETECTOR", "presidio")

@@ -519,7 +519,7 @@ export const api = {
         {
           params: { path: { screenshot_id: id } },
           body: {
-            phi_pipeline_preset: options.phi_pipeline_preset ?? "hipaa_compliant",
+            phi_pipeline_preset: options.phi_pipeline_preset ?? "screen_time",
             phi_redaction_method: options.phi_redaction_method ?? "redbox",
             phi_detection_enabled: options.phi_detection_enabled ?? true,
             phi_ocr_engine: options.phi_ocr_engine ?? "pytesseract",
@@ -549,7 +549,7 @@ export const api = {
             group_id: request.group_id,
             screenshot_ids: request.screenshot_ids ?? null,
             phi_pipeline_preset:
-              request.phi_pipeline_preset ?? "hipaa_compliant",
+              request.phi_pipeline_preset ?? "screen_time",
             phi_redaction_method: request.phi_redaction_method ?? "redbox",
             phi_detection_enabled: request.phi_detection_enabled ?? true,
             phi_ocr_engine: request.phi_ocr_engine ?? "pytesseract",
@@ -595,7 +595,7 @@ export const api = {
         group_id: options.group_id ?? null,
       };
       if (stage === "phi_detection") {
-        body.phi_pipeline_preset = options.phi_pipeline_preset ?? "hipaa_compliant";
+        body.phi_pipeline_preset = options.phi_pipeline_preset ?? "screen_time";
         body.phi_ocr_engine = options.phi_ocr_engine ?? "pytesseract";
         body.phi_ner_detector = options.phi_ner_detector ?? "presidio";
         if (options.llm_endpoint) body.llm_endpoint = options.llm_endpoint;

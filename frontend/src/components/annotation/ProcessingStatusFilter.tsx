@@ -1,19 +1,19 @@
 import {
-  PROCESSING_STATUSES,
-  PROCESSING_STATUS_LABELS,
-  type ProcessingStatus,
+  FILTER_STATUSES,
+  FILTER_STATUS_LABELS,
+  type FilterStatus,
 } from "@/constants/processingStatus";
 
 interface ProcessingStatusFilterProps {
-  value: ProcessingStatus | "all";
-  onChange: (value: ProcessingStatus | "all") => void;
+  value: FilterStatus | "all";
+  onChange: (value: FilterStatus | "all") => void;
 }
 
-const filterOptions: { value: ProcessingStatus | "all"; label: string }[] = [
+const filterOptions: { value: FilterStatus | "all"; label: string }[] = [
   { value: "all", label: "All Statuses" },
-  ...PROCESSING_STATUSES.map((status) => ({
+  ...FILTER_STATUSES.map((status) => ({
     value: status,
-    label: PROCESSING_STATUS_LABELS[status],
+    label: FILTER_STATUS_LABELS[status],
   })),
 ];
 

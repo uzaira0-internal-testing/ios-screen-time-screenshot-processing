@@ -20,7 +20,7 @@ import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { TotalsDisplay } from "./TotalsDisplay";
 import { AlignmentWarning } from "./AlignmentWarning";
 import type { ProcessingStatus } from "@/types";
-import type { ProcessingStatus as FilterProcessingStatus } from "@/constants/processingStatus";
+import type { FilterStatus } from "@/constants/processingStatus";
 import { PreprocessingSummary } from "./PreprocessingSummary";
 import { useScreenshotImage } from "@/hooks/useScreenshotImage";
 import { PHIRegionEditor } from "@/components/preprocessing/PHIRegionEditor";
@@ -316,7 +316,7 @@ export const AnnotationWorkspace = ({
             <div>
               <div className="text-xs text-slate-500 dark:text-slate-400 mb-2 font-medium">Processing Status</div>
               <ProcessingStatusFilter
-                value={(processingStatus as FilterProcessingStatus) || "all"}
+                value={(processingStatus as FilterStatus) || "all"}
                 onChange={handleProcessingStatusChange}
               />
             </div>
@@ -508,7 +508,7 @@ export const AnnotationWorkspace = ({
                 <div>
                   <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Status</div>
                   <ProcessingStatusFilter
-                    value={(processingStatus as FilterProcessingStatus) || "all"}
+                    value={(processingStatus as FilterStatus) || "all"}
                     onChange={handleProcessingStatusChange}
                   />
                 </div>

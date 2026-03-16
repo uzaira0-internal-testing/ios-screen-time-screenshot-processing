@@ -140,7 +140,7 @@ class Settings(AuthSettingsMixin, BaseSettings):
         description="Enable PHI detection/redaction during preprocessing",
     )
     PHI_PIPELINE_PRESET: str = Field(
-        default="hipaa_compliant",
+        default="screen_time",
         description="PHI detection pipeline preset: fast, balanced, hipaa_compliant, thorough, screen_time",
     )
     PHI_REDACTION_METHOD: str = Field(
