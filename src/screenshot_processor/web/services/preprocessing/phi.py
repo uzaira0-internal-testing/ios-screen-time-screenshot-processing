@@ -120,13 +120,9 @@ def detect_phi(
     except ImportError:
         logger.debug("phi-detector-remover not installed, skipping PHI detection")
         return PHIDetectionResult(phi_detected=False, regions_count=0)
-    except Exception as e:
-        logger.error(
-            "PHI detection failed — treating as no PHI detected, but this may mask real PHI",
-            exc_info=True,
-            extra={"error": str(e)},
-        )
-        return PHIDetectionResult(phi_detected=False, regions_count=0)
+    except Exception:
+        logger.error("PHI detection failed", exc_info=True)
+        raise
 
 
 def redact_phi(
@@ -182,11 +178,9 @@ def redact_phi(
     except ImportError:
         logger.debug("phi-detector-remover not installed, skipping PHI redaction")
         return PHIRedactionResult(image_bytes=image_bytes, regions_redacted=0, redaction_method=redaction_method)
-    except Exception as e:
-        logger.error(
-            "PHI redaction failed — returning unredacted image, review manually", exc_info=True, extra={"error": str(e)}
-        )
-        return PHIRedactionResult(image_bytes=image_bytes, regions_redacted=0, redaction_method=redaction_method)
+    except Exception:
+        logger.error("PHI redaction failed", exc_info=True)
+        raise
 
 
 def serialize_phi_regions(regions: list) -> list[dict]:

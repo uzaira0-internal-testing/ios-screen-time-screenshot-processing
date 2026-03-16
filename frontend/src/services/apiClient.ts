@@ -522,7 +522,7 @@ export const api = {
             phi_pipeline_preset: options.phi_pipeline_preset ?? "screen_time",
             phi_redaction_method: options.phi_redaction_method ?? "redbox",
             phi_detection_enabled: options.phi_detection_enabled ?? true,
-            phi_ocr_engine: options.phi_ocr_engine ?? "pytesseract",
+            phi_ocr_engine: options.phi_ocr_engine ?? "leptess",
             phi_ner_detector: options.phi_ner_detector ?? "presidio",
             run_ocr_after: options.run_ocr_after ?? false,
           },
@@ -552,7 +552,7 @@ export const api = {
               request.phi_pipeline_preset ?? "screen_time",
             phi_redaction_method: request.phi_redaction_method ?? "redbox",
             phi_detection_enabled: request.phi_detection_enabled ?? true,
-            phi_ocr_engine: request.phi_ocr_engine ?? "pytesseract",
+            phi_ocr_engine: request.phi_ocr_engine ?? "leptess",
             phi_ner_detector: request.phi_ner_detector ?? "presidio",
             run_ocr_after: request.run_ocr_after ?? false,
           },
@@ -596,7 +596,7 @@ export const api = {
       };
       if (stage === "phi_detection") {
         body.phi_pipeline_preset = options.phi_pipeline_preset ?? "screen_time";
-        body.phi_ocr_engine = options.phi_ocr_engine ?? "pytesseract";
+        body.phi_ocr_engine = options.phi_ocr_engine ?? "leptess";
         body.phi_ner_detector = options.phi_ner_detector ?? "presidio";
         if (options.llm_endpoint) body.llm_endpoint = options.llm_endpoint;
         if (options.llm_model) body.llm_model = options.llm_model;

@@ -382,7 +382,8 @@ function PHISection() {
             PHI Detection
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Configure how personal health information is detected and redacted
+            Configure how personal health information is detected and redacted.
+            Text is extracted using Rust-native OCR (leptess), then scanned for PHI.
           </p>
         </div>
       </div>
