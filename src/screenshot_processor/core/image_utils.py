@@ -73,13 +73,15 @@ def remove_all_but(img: np.ndarray, color: np.ndarray, threshold: int = 30):
 
 
 def darken_non_white(img: np.ndarray) -> np.ndarray:
-    # Fused grayscale + threshold in one pass using vectorized weighted sum.
-    # cv2.COLOR_BGR2GRAY weights: B*0.114 + G*0.587 + R*0.299
-    # We compute the gray value and threshold (>240) directly, avoiding the
-    # intermediate gray array allocation + separate threshold call.
+    # Convert to grayscale, then zero out all non-white pixels using SIMD ops.
+    # cv2.threshold + cv2.bitwise_and are compiled C++ with SIMD — much faster
+    # than numpy boolean fancy indexing (img[mask] = 0).
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    # Single boolean mask instead of thresh + comparison
-    img[gray <= 240] = 0
+    _, mask = cv2.threshold(gray, 240, 255, cv2.THRESH_BINARY)
+    # mask: 255 where gray > 240 (white, keep), 0 where gray <= 240 (darken)
+    # bitwise_and with 3-channel mask: keeps white pixels, zeros the rest
+    mask_3ch = cv2.merge((mask, mask, mask))
+    cv2.bitwise_and(img, mask_3ch, dst=img)
     return img
 
 
