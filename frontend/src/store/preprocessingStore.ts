@@ -289,7 +289,10 @@ export function createPreprocessingStore(service: IPreprocessingService) {
             stageStatusJson(item) !== prevCache[i]
           );
         if (changed) {
-          set({ screenshots: next, imageVersion: get().imageVersion + 1 });
+          // Don't increment imageVersion during polling — it causes every
+          // row's image to re-fetch and flash. Only bump imageVersion for
+          // explicit user actions (crop, redact) via bumpImageVersion().
+          set({ screenshots: next });
         }
       }
     } catch (err) {
