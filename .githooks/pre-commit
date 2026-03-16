@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Git pre-commit hook: check API type drift when Pydantic schemas change.
+#
+# Install: git config core.hooksPath .githooks
+set -euo pipefail
+
+# Only run if schema-related files are staged
+if git diff --cached --name-only | grep -qE "schemas\.py|routes/.*\.py|main\.py"; then
+    echo "[pre-commit] Checking API type sync..."
+    if ! scripts/check-api-types.sh; then
+        echo ""
+        echo "Commit blocked: API types are stale."
+        echo "Run: scripts/check-api-types.sh --fix"
+        echo "Then: git add frontend/openapi.json frontend/src/types/api-schema.ts"
+        exit 1
+    fi
+fi
