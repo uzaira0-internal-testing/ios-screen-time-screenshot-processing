@@ -238,6 +238,9 @@ issue_screenshots/
 # Benchmark results
 .benchmarks/
 
+# Autoresearch runtime log
+autoresearch.jsonl
+
 # Profiling reports
 profiling-reports/
 
