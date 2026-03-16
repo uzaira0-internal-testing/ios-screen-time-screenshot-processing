@@ -8,10 +8,11 @@
 
 FROM python:3.12-slim
 
-# Install system dependencies including Tesseract OCR
+# Install system dependencies including Tesseract OCR and Rust build deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     libtesseract-dev \
+    libleptonica-dev \
     libgl1 \
     libglib2.0-0 \
     libsm6 \
@@ -19,7 +20,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrender-dev \
     libgomp1 \
     curl \
+    build-essential \
+    libclang-dev \
+    patchelf \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Rust toolchain (for PyO3/maturin build of screenshot_processor_rs)
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Set working directory
 WORKDIR /app
@@ -62,6 +70,15 @@ RUN uv pip install --system --no-cache-dir \
 
 # Install app dependencies (cached unless pyproject.toml changes)
 RUN uv pip install --system --no-cache-dir -e ".[web,preprocessing]" alembic
+
+# Build and install PyO3 Rust extension (screenshot_processor_rs — leptess OCR via C API)
+COPY apps/ios-screen-time-screenshot-processing/crates/ /tmp/crates/
+COPY apps/ios-screen-time-screenshot-processing/rust-python/ /tmp/rust-python/
+RUN sed -i 's|path = "../crates/processing"|path = "/tmp/crates/processing"|' /tmp/rust-python/Cargo.toml && \
+    pip install maturin && \
+    cd /tmp/rust-python && maturin build --release --interpreter python3.12 && \
+    pip install /tmp/rust-python/target/wheels/*.whl && \
+    rm -rf /tmp/rust-python /tmp/crates /root/.cargo/registry
 
 # Copy application source code
 COPY apps/ios-screen-time-screenshot-processing/src/ ./src/

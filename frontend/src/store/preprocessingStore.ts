@@ -351,7 +351,7 @@ export function createPreprocessingStore(service: IPreprocessingService) {
       };
       if (stage === "phi_detection") {
         const settings = useSettingsStore.getState();
-        options.phi_ocr_engine = "leptess";  // Always use Rust (falls back to pytesseract automatically)
+        options.phi_ocr_engine = "leptess";  // Rust OCR via PyO3 (server) or native (Tauri)
         options.phi_ner_detector = settings.phiNerDetector;
         if (llmEnabled) {
           options.llm_endpoint = llmEndpoint;
