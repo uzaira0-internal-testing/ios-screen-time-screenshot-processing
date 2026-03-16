@@ -2529,7 +2529,7 @@
           "Screenshots"
         ],
         "summary": "Run Device Detection Stage",
-        "description": "Queue device detection for a batch of screenshots.",
+        "description": "Run device detection synchronously (3ms/image \u2014 faster than Celery overhead).",
         "operationId": "run_device_detection_stage_api_v1_screenshots_preprocess_stage_device_detection_post",
         "parameters": [
           {
@@ -2605,7 +2605,7 @@
           "Screenshots"
         ],
         "summary": "Run Cropping Stage",
-        "description": "Queue cropping for a batch of screenshots.",
+        "description": "Run cropping synchronously (8-18ms/image \u2014 faster than Celery overhead).",
         "operationId": "run_cropping_stage_api_v1_screenshots_preprocess_stage_cropping_post",
         "parameters": [
           {
@@ -6398,11 +6398,19 @@
           },
           "phi_ocr_engine": {
             "type": "string",
+            "enum": [
+              "pytesseract",
+              "leptess"
+            ],
             "title": "Phi Ocr Engine",
-            "default": "tesseract"
+            "default": "pytesseract"
           },
           "phi_ner_detector": {
             "type": "string",
+            "enum": [
+              "presidio",
+              "gliner"
+            ],
             "title": "Phi Ner Detector",
             "default": "presidio"
           },
@@ -7622,12 +7630,20 @@
           },
           "phi_ocr_engine": {
             "type": "string",
+            "enum": [
+              "pytesseract",
+              "leptess"
+            ],
             "title": "Phi Ocr Engine",
-            "description": "OCR engine: tesseract, rust",
-            "default": "tesseract"
+            "description": "OCR engine: pytesseract, leptess",
+            "default": "pytesseract"
           },
           "phi_ner_detector": {
             "type": "string",
+            "enum": [
+              "presidio",
+              "gliner"
+            ],
             "title": "Phi Ner Detector",
             "description": "NER detector: presidio, gliner",
             "default": "presidio"
@@ -7950,12 +7966,20 @@
           },
           "phi_ocr_engine": {
             "type": "string",
+            "enum": [
+              "pytesseract",
+              "leptess"
+            ],
             "title": "Phi Ocr Engine",
-            "description": "OCR engine for PHI text extraction: tesseract (default), rust (faster via leptess C API)",
-            "default": "tesseract"
+            "description": "OCR engine for PHI text extraction: pytesseract (default), leptess (faster C API)",
+            "default": "pytesseract"
           },
           "phi_ner_detector": {
             "type": "string",
+            "enum": [
+              "presidio",
+              "gliner"
+            ],
             "title": "Phi Ner Detector",
             "description": "NER detector: presidio (fast, 6ms), gliner (accurate, F1=0.98, 112ms)",
             "default": "presidio"

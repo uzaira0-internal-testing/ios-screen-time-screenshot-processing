@@ -688,7 +688,7 @@ export interface paths {
         put?: never;
         /**
          * Run Device Detection Stage
-         * @description Queue device detection for a batch of screenshots.
+         * @description Run device detection synchronously (3ms/image — faster than Celery overhead).
          */
         post: operations["run_device_detection_stage_api_v1_screenshots_preprocess_stage_device_detection_post"];
         delete?: never;
@@ -708,7 +708,7 @@ export interface paths {
         put?: never;
         /**
          * Run Cropping Stage
-         * @description Queue cropping for a batch of screenshots.
+         * @description Run cropping synchronously (8-18ms/image — faster than Celery overhead).
          */
         post: operations["run_cropping_stage_api_v1_screenshots_preprocess_stage_cropping_post"];
         delete?: never;
@@ -1729,14 +1729,16 @@ export interface components {
             phi_detection_enabled: boolean;
             /**
              * Phi Ocr Engine
-             * @default tesseract
+             * @default pytesseract
+             * @enum {string}
              */
-            phi_ocr_engine: string;
+            phi_ocr_engine: "pytesseract" | "leptess";
             /**
              * Phi Ner Detector
              * @default presidio
+             * @enum {string}
              */
-            phi_ner_detector: string;
+            phi_ner_detector: "presidio" | "gliner";
             /**
              * Run Ocr After
              * @default false
@@ -2303,16 +2305,18 @@ export interface components {
             phi_pipeline_preset: string;
             /**
              * Phi Ocr Engine
-             * @description OCR engine: tesseract, rust
-             * @default tesseract
+             * @description OCR engine: pytesseract, leptess
+             * @default pytesseract
+             * @enum {string}
              */
-            phi_ocr_engine: string;
+            phi_ocr_engine: "pytesseract" | "leptess";
             /**
              * Phi Ner Detector
              * @description NER detector: presidio, gliner
              * @default presidio
+             * @enum {string}
              */
-            phi_ner_detector: string;
+            phi_ner_detector: "presidio" | "gliner";
             /**
              * Llm Endpoint
              * @description LLM API endpoint for assisted detection
@@ -2492,16 +2496,18 @@ export interface components {
             phi_detection_enabled: boolean;
             /**
              * Phi Ocr Engine
-             * @description OCR engine for PHI text extraction: tesseract (default), rust (faster via leptess C API)
-             * @default tesseract
+             * @description OCR engine for PHI text extraction: pytesseract (default), leptess (faster C API)
+             * @default pytesseract
+             * @enum {string}
              */
-            phi_ocr_engine: string;
+            phi_ocr_engine: "pytesseract" | "leptess";
             /**
              * Phi Ner Detector
              * @description NER detector: presidio (fast, 6ms), gliner (accurate, F1=0.98, 112ms)
              * @default presidio
+             * @enum {string}
              */
-            phi_ner_detector: string;
+            phi_ner_detector: "presidio" | "gliner";
             /**
              * Run Ocr After
              * @description Whether to chain OCR processing after preprocessing

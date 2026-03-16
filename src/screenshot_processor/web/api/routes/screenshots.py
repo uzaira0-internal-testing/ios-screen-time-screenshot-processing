@@ -2032,7 +2032,7 @@ async def run_device_detection_stage(
     repo: ScreenshotRepo,
     current_user: CurrentUser,
 ):
-    """Queue device detection for a batch of screenshots."""
+    """Run device detection synchronously (3ms/image — faster than Celery overhead)."""
     ids = await _get_eligible_screenshot_ids(repo, "device_detection", request.group_id, request.screenshot_ids)
     if not ids:
         return StagePreprocessResponse(
@@ -2042,19 +2042,97 @@ async def run_device_detection_stage(
             message="No eligible screenshots for device detection",
         )
 
-    from celery import group as celery_group
+    # Device detection is ~3ms per image. Running 9,000 images synchronously
+    # takes ~27 seconds. Using Celery would add ~75ms overhead per task (Redis
+    # round-trip + worker pickup + DB query), making it 11+ minutes instead.
+    from sqlalchemy.orm.attributes import flag_modified
 
-    from screenshot_processor.web.tasks import device_detection_task
+    from screenshot_processor.web.services.preprocessing_service import (
+        append_error_event,
+        append_event,
+        detect_device,
+        get_current_input_file,
+        init_preprocessing_metadata,
+        set_stage_running,
+    )
 
-    task_group = celery_group(device_detection_task.s(sid) for sid in ids)
-    task_group.apply_async()
+    db = repo._session  # Use the existing async session's sync equivalent
+    processed = 0
 
-    logger.info("Device detection queued", extra={"count": len(ids), "username": current_user.username})
+    # Run synchronously in a thread to avoid blocking the event loop
+    import asyncio
+    from functools import partial
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from screenshot_processor.web.config import get_settings
+
+    settings = get_settings()
+
+    def _run_batch(screenshot_ids: list[int]) -> int:
+        engine = create_engine(settings.DATABASE_URL.replace("+asyncpg", ""))
+        SyncSession = sessionmaker(bind=engine)
+        sync_db = SyncSession()
+        count = 0
+        try:
+            from screenshot_processor.web.database.models import Screenshot
+
+            screenshots = sync_db.query(Screenshot).filter(Screenshot.id.in_(screenshot_ids)).all()
+            for screenshot in screenshots:
+                try:
+                    init_preprocessing_metadata(screenshot)
+                    set_stage_running(screenshot, "device_detection")
+
+                    input_file = get_current_input_file(screenshot, "device_detection")
+                    device = detect_device(input_file)
+
+                    result_data = {
+                        "detected": device.detected,
+                        "device_category": device.device_category,
+                        "device_model": device.device_model,
+                        "confidence": device.confidence,
+                        "is_ipad": device.is_ipad,
+                        "is_iphone": device.is_iphone,
+                        "orientation": device.orientation,
+                        "width": device.width,
+                        "height": device.height,
+                    }
+
+                    if device.detected:
+                        if device.is_ipad:
+                            screenshot.device_type = "ipad"
+                        elif device.is_iphone:
+                            screenshot.device_type = "iphone"
+
+                    append_event(screenshot, "device_detection", "auto", {}, result_data, input_file=input_file)
+                    flag_modified(screenshot, "processing_metadata")
+                    count += 1
+                except Exception as e:
+                    logger.warning(f"Device detection failed for {screenshot.id}: {e}")
+                    try:
+                        append_error_event(screenshot, "device_detection", "auto", {}, str(e))
+                        flag_modified(screenshot, "processing_metadata")
+                    except Exception:
+                        pass
+
+            sync_db.commit()
+        except Exception:
+            sync_db.rollback()
+            raise
+        finally:
+            sync_db.close()
+            engine.dispose()
+        return count
+
+    processed = await asyncio.to_thread(_run_batch, ids)
+
+    logger.info("Device detection completed synchronously", extra={"count": processed, "total": len(ids), "username": current_user.username})
     return StagePreprocessResponse(
-        queued_count=len(ids),
+        queued_count=processed,
         screenshot_ids=ids,
         stage="device_detection",
-        message=f"Device detection queued for {len(ids)} screenshots",
+        message=f"Device detection completed for {processed}/{len(ids)} screenshots",
     )
 
 
@@ -2064,7 +2142,7 @@ async def run_cropping_stage(
     repo: ScreenshotRepo,
     current_user: CurrentUser,
 ):
-    """Queue cropping for a batch of screenshots."""
+    """Run cropping synchronously (8-18ms/image — faster than Celery overhead)."""
     ids = await _get_eligible_screenshot_ids(repo, "cropping", request.group_id, request.screenshot_ids)
     if not ids:
         return StagePreprocessResponse(
@@ -2074,19 +2152,92 @@ async def run_cropping_stage(
             message="No eligible screenshots for cropping",
         )
 
-    from celery import group as celery_group
+    import asyncio
 
-    from screenshot_processor.web.tasks import cropping_task
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.orm.attributes import flag_modified
 
-    task_group = celery_group(cropping_task.s(sid) for sid in ids)
-    task_group.apply_async()
+    from screenshot_processor.web.config import get_settings
+    from screenshot_processor.web.services.preprocessing_service import (
+        append_error_event,
+        append_event,
+        crop_screenshot_if_ipad,
+        detect_device,
+        get_current_input_file,
+        get_next_version,
+        get_stage_output_path,
+        init_preprocessing_metadata,
+        set_stage_running,
+    )
 
-    logger.info("Cropping queued", extra={"count": len(ids), "username": current_user.username})
+    settings = get_settings()
+
+    def _run_batch(screenshot_ids: list[int]) -> int:
+        engine = create_engine(settings.DATABASE_URL.replace("+asyncpg", ""))
+        SyncSession = sessionmaker(bind=engine)
+        sync_db = SyncSession()
+        count = 0
+        try:
+            from pathlib import Path
+
+            from screenshot_processor.web.database.models import Screenshot
+
+            screenshots = sync_db.query(Screenshot).filter(Screenshot.id.in_(screenshot_ids)).all()
+            for screenshot in screenshots:
+                try:
+                    init_preprocessing_metadata(screenshot)
+                    set_stage_running(screenshot, "cropping")
+
+                    input_file = get_current_input_file(screenshot, "cropping")
+                    image_bytes = Path(input_file).read_bytes()
+
+                    # Detect device for cropping decision
+                    device = detect_device(input_file)
+                    cropped_bytes, was_cropped, was_patched = crop_screenshot_if_ipad(image_bytes, device)
+
+                    result_data = {
+                        "was_cropped": was_cropped,
+                        "was_patched": was_patched,
+                        "is_ipad": device.is_ipad,
+                    }
+
+                    output_file = None
+                    if was_cropped:
+                        version = get_next_version(screenshot, "cropping")
+                        base = init_preprocessing_metadata(screenshot).get("base_file_path", screenshot.file_path)
+                        output_path = get_stage_output_path(base, "cropping", version)
+                        output_path.write_bytes(cropped_bytes)
+                        output_file = str(output_path)
+
+                    append_event(screenshot, "cropping", "auto", {}, result_data, output_file=output_file, input_file=input_file)
+                    flag_modified(screenshot, "processing_metadata")
+                    count += 1
+                except Exception as e:
+                    logger.warning(f"Cropping failed for {screenshot.id}: {e}")
+                    try:
+                        append_error_event(screenshot, "cropping", "auto", {}, str(e))
+                        flag_modified(screenshot, "processing_metadata")
+                    except Exception:
+                        pass
+
+            sync_db.commit()
+        except Exception:
+            sync_db.rollback()
+            raise
+        finally:
+            sync_db.close()
+            engine.dispose()
+        return count
+
+    processed = await asyncio.to_thread(_run_batch, ids)
+
+    logger.info("Cropping completed synchronously", extra={"count": processed, "total": len(ids), "username": current_user.username})
     return StagePreprocessResponse(
-        queued_count=len(ids),
+        queued_count=processed,
         screenshot_ids=ids,
         stage="cropping",
-        message=f"Cropping queued for {len(ids)} screenshots",
+        message=f"Cropping completed for {processed}/{len(ids)} screenshots",
     )
 
 
