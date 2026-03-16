@@ -62,8 +62,11 @@ def reduce_color_count(img: np.ndarray, num_colors: int) -> np.ndarray:
 
 
 def remove_all_but(img: np.ndarray, color: np.ndarray, threshold: int = 30):
-    distances = np.linalg.norm(img - color, axis=2)
-    mask = distances <= threshold
+    # Squared L2 distance avoids sqrt (faster than np.linalg.norm).
+    # threshold² comparison is equivalent to threshold comparison on norm.
+    diff = img.astype(np.int16) - color.astype(np.int16)
+    sq_dist = (diff * diff).sum(axis=2)
+    mask = sq_dist <= threshold * threshold
     img[mask] = [0, 0, 0]
     img[~mask] = [255, 255, 255]
     return img
