@@ -90,7 +90,8 @@ export const CropAdjustModal = ({
     let cancelled = false;
     let blobUrl: string | undefined;
     const img = new Image();
-    img.crossOrigin = "anonymous";
+    // Don't set crossOrigin — images are same-origin through the proxy.
+    // Setting crossOrigin="anonymous" forces a CORS preflight that fails.
     img.onload = () => {
       if (cancelled) return;
       setImage(img);

@@ -178,11 +178,6 @@ export const PHIRegionEditor = ({
       if (cancelled) return;
       blobUrlRef.current = imageUrl;
       const img = new Image();
-      // Don't set crossOrigin — images are same-origin through the proxy.
-      // Setting crossOrigin="anonymous" forces a CORS preflight that fails
-      // because the backend doesn't return Access-Control-Allow-Origin on
-      // image endpoints (they're served via FileResponse, not the CORS middleware).
-      img.src = imageUrl;
       img.onload = () => { if (!cancelled) setImage(img); };
       img.onerror = () => {
         if (!cancelled) {
@@ -190,6 +185,7 @@ export const PHIRegionEditor = ({
           setImageError(true);
         }
       };
+      img.src = imageUrl;
     }).catch((err) => {
       if (!cancelled) {
         console.error(`[PHIRegionEditor] Failed to get image URL for screenshot ${screenshotId}:`, err);
@@ -209,6 +205,11 @@ export const PHIRegionEditor = ({
 
     return () => {
       cancelled = true;
+      // Reset so a re-run of this effect (e.g. React strict mode remount)
+      // doesn't skip the fetch due to the early-return guard above.
+      if (loadedScreenshotRef.current === screenshotId) {
+        loadedScreenshotRef.current = null;
+      }
     };
   }, [isOpen, inline, screenshotId, preprocessingService]);
 
