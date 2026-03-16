@@ -35,26 +35,47 @@ async fn select_screenshot_folder(app: tauri::AppHandle) -> Result<Vec<SelectedF
     scan_image_files(&folder)
 }
 
+/// Check if an extension (as OsStr) matches a known image extension,
+/// handling case-insensitive comparison without allocating.
+fn is_image_extension(ext: &std::ffi::OsStr) -> bool {
+    // Fast path: try as ASCII bytes directly to avoid allocation
+    let bytes = ext.as_encoded_bytes();
+    if bytes.len() > 4 {
+        return false;
+    }
+    // Lowercase the bytes in-place on the stack
+    let mut buf = [0u8; 4];
+    let len = bytes.len();
+    for (i, &b) in bytes.iter().enumerate() {
+        buf[i] = b.to_ascii_lowercase();
+    }
+    let lower = &buf[..len];
+    matches!(lower, b"png" | b"jpg" | b"jpeg" | b"heic" | b"webp")
+}
+
 fn scan_image_files(dir: &Path) -> Result<Vec<SelectedFile>, String> {
     let entries = fs::read_dir(dir).map_err(|e| format!("Failed to read directory: {e}"))?;
 
-    let mut files = Vec::new();
+    // Pre-allocate with a reasonable capacity hint to reduce reallocations
+    let mut files = Vec::with_capacity(entries.size_hint().0.max(64));
+
     for entry in entries {
         let entry = entry.map_err(|e| format!("Failed to read entry: {e}"))?;
-        let path = entry.path();
 
-        if !path.is_file() {
+        // Use entry.file_type() instead of path.is_file() to avoid an extra stat syscall.
+        // read_dir already has the file type from the directory entry (d_type on Unix).
+        let ft = entry
+            .file_type()
+            .map_err(|e| format!("Failed to read file type: {e}"))?;
+        if !ft.is_file() {
             continue;
         }
 
-        let ext = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("")
-            .to_lowercase();
-
-        if !matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "heic" | "webp") {
-            continue;
+        // Check extension using OsStr comparison — no heap allocation for lowercase
+        let path = entry.path();
+        match path.extension() {
+            Some(ext) if is_image_extension(ext) => {}
+            _ => continue,
         }
 
         let name = path
@@ -63,7 +84,7 @@ fn scan_image_files(dir: &Path) -> Result<Vec<SelectedFile>, String> {
             .unwrap_or("unknown")
             .to_string();
 
-        let path_str = path.to_string_lossy().to_string();
+        let path_str = path.to_string_lossy().into_owned();
 
         files.push(SelectedFile {
             name,
