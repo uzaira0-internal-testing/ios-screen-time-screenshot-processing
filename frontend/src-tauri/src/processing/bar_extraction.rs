@@ -5,7 +5,7 @@
 
 use image::RgbImage;
 
-use super::image_utils::{darken_non_white, reduce_color_count, rgb_to_hsv};
+use super::image_utils::{darken_and_binarize, rgb_to_hsv};
 
 /// Number of hourly slices in the bar graph.
 const NUM_SLICES: usize = 24;
@@ -38,10 +38,9 @@ pub fn slice_image(
         return vec![0.0; NUM_SLICES + 1];
     }
 
-    // Extract ROI and process in-place (single allocation)
+    // Extract ROI and process: fused darken + binarize in a single pass
     let mut roi_processed = image::imageops::crop_imm(img, roi_x, roi_y, roi_width, roi_height).to_image();
-    darken_non_white(&mut roi_processed);
-    reduce_color_count(&mut roi_processed, 2);
+    darken_and_binarize(&mut roi_processed);
 
     let h = roi_height as usize;
     let rw = roi_width as usize;
@@ -113,7 +112,9 @@ pub fn compute_bar_alignment_score(roi: &RgbImage, hourly_values: &[f64]) -> f64
 
     let slice_width = roi_width as usize / NUM_SLICES;
 
-    // Extract bar heights from image using HSV blue detection
+    // Extract bar heights from image using HSV blue detection (raw buffer access)
+    let raw = roi.as_raw();
+    let stride = roi_width as usize * 3;
     let mut extracted_heights = Vec::with_capacity(NUM_SLICES);
 
     for i in 0..NUM_SLICES {
@@ -123,11 +124,11 @@ pub fn compute_bar_alignment_score(roi: &RgbImage, hourly_values: &[f64]) -> f64
         let mut first_blue_row: Option<usize> = None;
 
         for y in 0..roi_height as usize {
+            let row_off = y * stride;
             let mut has_blue = false;
             for x in mid_start..mid_end {
-                let p = roi.get_pixel(x as u32, y as u32);
-                let (h, s, v) = rgb_to_hsv(p[0], p[1], p[2]);
-                // Blue bars: hue 90-130, saturation > 50, value > 100
+                let idx = row_off + x * 3;
+                let (h, s, v) = rgb_to_hsv(raw[idx], raw[idx + 1], raw[idx + 2]);
                 if h >= 90 && h <= 130 && s > 50 && v > 100 {
                     has_blue = true;
                     break;
