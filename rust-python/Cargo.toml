@@ -1,6 +1,6 @@
 [package]
 name = "screenshot-processor-rs"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 description = "PyO3 Python extension wrapping ios-screen-time-image-pipeline for server-side Rust processing"
 

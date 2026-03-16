@@ -1,6 +1,6 @@
 [package]
 name = "ios-screen-time-image-pipeline"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 description = "Bar graph extraction, grid detection, and OCR for iOS Screen Time screenshots — shared between Tauri desktop app and PyO3 Python extension"
 
