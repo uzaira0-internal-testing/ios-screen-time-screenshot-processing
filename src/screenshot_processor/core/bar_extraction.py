@@ -69,7 +69,8 @@ def slice_image(
     # Batch pixel analysis for all 24 columns simultaneously
     pixel_sums = columns.sum(axis=2)  # (H, 24)
     is_black = pixel_sums == 0  # (H, 24)
-    is_white = np.all(np.abs(columns.astype(np.int16) - 255) <= 2, axis=2)  # (H, 24)
+    # White check: all channels >= 253 (equivalent to abs(ch-255) <= 2, no int16 alloc)
+    is_white = np.all(columns >= 253, axis=2)  # (H, 24)
 
     # Compute bar heights for all 24 slices
     row = []
