@@ -470,11 +470,31 @@ def get_stage_output_path(base_path: str, stage: str, version: int) -> Path:
 
 
 def get_next_version(screenshot: Any, stage: str) -> int:
-    """Get the next version number for a stage's output file."""
+    """Get the next version number for a stage's output file.
+
+    Only counts the current (non-superseded) event. After a reset,
+    the version resets to 1 instead of accumulating forever.
+    """
     pp = screenshot.processing_metadata.get("preprocessing", {})
+    current_events = pp.get("current_events", {})
+    current_eid = current_events.get(stage)
+
+    if current_eid is None:
+        # No current event — this is a fresh run (after reset or first time)
+        return 1
+
+    # There's a current event — increment from it
     events = pp.get("events", [])
-    count = sum(1 for e in events if e["stage"] == stage and e.get("output_file"))
-    return count + 1
+    current = next((e for e in events if e["event_id"] == current_eid), None)
+    if current and current.get("output_file"):
+        # Reuse the same version to avoid accumulation
+        import re
+
+        m = re.search(r"_v(\d+)\.", current["output_file"])
+        if m:
+            return int(m.group(1))
+
+    return 1
 
 
 def get_stage_counts(screenshots: list, stage: str) -> dict:
