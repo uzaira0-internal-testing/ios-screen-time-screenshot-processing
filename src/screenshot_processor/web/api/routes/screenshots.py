@@ -2035,11 +2035,23 @@ async def reset_stage(
 
 
 def _run_sync_stage_batch(stage: str, screenshot_ids: list[int], process_fn) -> None:
-    """Run a fast preprocessing stage in-process with chunked commits.
+    """Run a fast preprocessing stage in a thread with chunked commits.
 
     Commits every 100 images so the frontend's polling sees progress.
-    Used for device detection (~3ms/image) and cropping (~15ms/image).
+    Runs in a thread to avoid blocking the async event loop (which would
+    prevent image serving and other API requests during processing).
     """
+    import threading
+
+    def _worker():
+        _run_sync_stage_batch_inner(stage, screenshot_ids, process_fn)
+
+    thread = threading.Thread(target=_worker, daemon=True)
+    thread.start()
+
+
+def _run_sync_stage_batch_inner(stage: str, screenshot_ids: list[int], process_fn) -> None:
+    """Inner function that does the actual batch processing."""
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     from sqlalchemy.orm.attributes import flag_modified
