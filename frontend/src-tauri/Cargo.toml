@@ -27,6 +27,12 @@ tauri-plugin-clipboard-manager = "2"
 tauri-plugin-os = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+image = "0.25"
+regex = "1"
+lazy_static = "1"
+thiserror = "2"
+log = "0.4"
+leptess = "0.14"
 dhat = { version = "0.3", optional = true }
 
 [dev-dependencies]
@@ -38,4 +44,8 @@ dhat-heap = ["dhat"]
 
 [[bench]]
 name = "scan_benchmark"
+harness = false
+
+[[bench]]
+name = "processing_benchmark"
 harness = false

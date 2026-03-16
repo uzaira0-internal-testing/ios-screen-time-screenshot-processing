@@ -1,9 +1,13 @@
+pub mod processing;
+
 use serde::Serialize;
 use std::fs;
 use std::path::Path;
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_log::{Target, TargetKind};
+
+use processing::types::{DetectionMethod, ImageType};
 
 #[derive(Clone, serde::Serialize)]
 struct SingleInstancePayload {
@@ -33,6 +37,49 @@ async fn select_screenshot_folder(app: tauri::AppHandle) -> Result<Vec<SelectedF
     };
 
     scan_image_files(&folder)
+}
+
+/// Process a screenshot with automatic grid detection.
+///
+/// Returns hourly values, grid bounds, alignment score, and OCR results.
+#[tauri::command]
+async fn process_screenshot(
+    path: String,
+    image_type: String,
+    detection_method: String,
+) -> Result<processing::ProcessingResult, String> {
+    let img_type = ImageType::from_str(&image_type);
+    let method = DetectionMethod::from_str(&detection_method);
+
+    processing::process_image(&path, img_type, method).map_err(|e| e.to_string())
+}
+
+/// Process a screenshot with user-provided grid coordinates.
+#[tauri::command]
+async fn process_screenshot_with_grid(
+    path: String,
+    upper_left: [i32; 2],
+    lower_right: [i32; 2],
+    image_type: String,
+) -> Result<processing::ProcessingResult, String> {
+    let img_type = ImageType::from_str(&image_type);
+
+    processing::process_image_with_grid(&path, upper_left, lower_right, img_type)
+        .map_err(|e| e.to_string())
+}
+
+/// Extract only hourly data (fast path — no OCR, no grid detection).
+#[tauri::command]
+async fn extract_hourly_data(
+    path: String,
+    upper_left: [i32; 2],
+    lower_right: [i32; 2],
+    image_type: String,
+) -> Result<Vec<f64>, String> {
+    let img_type = ImageType::from_str(&image_type);
+
+    processing::extract_hourly_data(&path, upper_left, lower_right, img_type)
+        .map_err(|e| e.to_string())
 }
 
 /// Check if an extension (as OsStr) matches a known image extension,
@@ -125,7 +172,12 @@ pub fn run() {
             app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![select_screenshot_folder])
+        .invoke_handler(tauri::generate_handler![
+            select_screenshot_folder,
+            process_screenshot,
+            process_screenshot_with_grid,
+            extract_hourly_data,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
