@@ -111,9 +111,7 @@ export function useScreenshotImageUrl(
   const prevIdRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
-    console.log(`[IMG] effect screenshotId=${screenshotId} service=${!!service} method=${method} refreshKey=${refreshKey}`);
     if (!service || screenshotId == null) {
-      console.log(`[IMG] early return: service=${!!service} screenshotId=${screenshotId}`);
       setUrl(null);
       return;
     }
@@ -137,7 +135,6 @@ export function useScreenshotImageUrl(
         } else {
           result = await service.getImageUrl(screenshotId);
         }
-        console.log(`[IMG] got result for ${screenshotId}: revoked=${revoked} url=${result?.substring(0, 80)}`);
         if (!revoked) {
           objectUrl = result;
           setUrl(result);
@@ -145,7 +142,7 @@ export function useScreenshotImageUrl(
           URL.revokeObjectURL(result);
         }
       } catch (err) {
-        console.error(`[IMG] FAILED for screenshot ${screenshotId}:`, err);
+        console.error(`[useScreenshotImageUrl] Failed to load image for screenshot ${screenshotId}:`, err);
         if (!revoked) setUrl(null);
       }
     })();

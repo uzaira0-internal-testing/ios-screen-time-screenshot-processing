@@ -178,7 +178,10 @@ export const PHIRegionEditor = ({
       if (cancelled) return;
       blobUrlRef.current = imageUrl;
       const img = new Image();
-      img.crossOrigin = "anonymous";
+      // Don't set crossOrigin — images are same-origin through the proxy.
+      // Setting crossOrigin="anonymous" forces a CORS preflight that fails
+      // because the backend doesn't return Access-Control-Allow-Origin on
+      // image endpoints (they're served via FileResponse, not the CORS middleware).
       img.src = imageUrl;
       img.onload = () => { if (!cancelled) setImage(img); };
       img.onerror = () => {
