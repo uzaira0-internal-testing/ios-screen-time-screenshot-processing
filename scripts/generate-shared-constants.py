@@ -183,6 +183,14 @@ def generate_typescript(data: dict, hash_val: str) -> str:
     return "\n".join(lines)
 
 
+def _rust_float(val) -> str:
+    """Format a number as a Rust f64 literal (safe for both int and float input)."""
+    s = str(val)
+    if "." not in s:
+        return s + ".0"
+    return s
+
+
 def generate_rust(data: dict, hash_val: str) -> str:
     """Generate Rust constants module."""
     lines = [
@@ -197,6 +205,7 @@ def generate_rust(data: dict, hash_val: str) -> str:
 
     # Lookup table
     lt = data["lookup_table"]
+    lines.append("#[derive(Debug, Clone, Copy)]")
     lines.append("pub struct LookupEntry { pub x: i32, pub y: i32, pub width: i32, pub height: i32 }")
     lines.append("")
     lines.append("lazy_static! {")
@@ -220,18 +229,18 @@ def generate_rust(data: dict, hash_val: str) -> str:
     # Processing constants
     pc = data["processing_constants"]
     lines.append(f"pub const NUM_SLICES: usize = {pc['bar_extraction']['num_slices']};")
-    lines.append(f"pub const MAX_Y: f64 = {pc['bar_extraction']['max_y']}.0;")
+    lines.append(f"pub const MAX_Y: f64 = {_rust_float(pc['bar_extraction']['max_y'])};")
     lines.append(f"pub const LOWER_GRID_BUFFER: usize = {pc['bar_extraction']['lower_grid_buffer']};")
-    lines.append(f"pub const DARK_MODE_THRESHOLD: f64 = {pc['dark_mode']['threshold']}.0;")
+    lines.append(f"pub const DARK_MODE_THRESHOLD: f64 = {_rust_float(pc['dark_mode']['threshold'])};")
     lines.append(f"pub const DARKEN_NON_WHITE_THRESHOLD: u16 = {pc['darken_non_white']['channel_sum_threshold']};")
     lines.append("")
     lines.append(f"pub const GRAY_MIN: u8 = {pc['horizontal_lines']['gray_min']};")
     lines.append(f"pub const GRAY_MAX: u8 = {pc['horizontal_lines']['gray_max']};")
-    lines.append(f"pub const MIN_WIDTH_PCT: f64 = {pc['horizontal_lines']['min_width_pct']};")
+    lines.append(f"pub const MIN_WIDTH_PCT: f64 = {_rust_float(pc['horizontal_lines']['min_width_pct'])};")
     lines.append(f"pub const MAX_SPACING_DEVIATION: i32 = {pc['horizontal_lines']['max_spacing_deviation']};")
     lines.append(f"pub const V_GRAY_MIN: u8 = {pc['vertical_lines']['gray_min']};")
     lines.append(f"pub const V_GRAY_MAX: u8 = {pc['vertical_lines']['gray_max']};")
-    lines.append(f"pub const MIN_HEIGHT_PCT: f64 = {pc['vertical_lines']['min_height_pct']};")
+    lines.append(f"pub const MIN_HEIGHT_PCT: f64 = {_rust_float(pc['vertical_lines']['min_height_pct'])};")
     lines.append(f"pub const GRID_LINE_GRAY_MIN: u8 = {pc['grid_edge_refinement']['gray_min']};")
     lines.append(f"pub const GRID_LINE_GRAY_MAX: u8 = {pc['grid_edge_refinement']['gray_max']};")
     lines.append("")
@@ -241,9 +250,10 @@ def generate_rust(data: dict, hash_val: str) -> str:
     lines.append(f"pub const BLUE_HUE_MIN: u8 = {cc['blue_hue_min']};")
     lines.append(f"pub const BLUE_HUE_MAX: u8 = {cc['blue_hue_max']};")
     lines.append(f"pub const CYAN_HUE_MIN: u8 = {cc['cyan_hue_min']};")
+    lines.append(f"pub const CYAN_HUE_MAX: u8 = {cc['cyan_hue_max']};")
     lines.append(f"pub const COLOR_MIN_SATURATION: u8 = {cc['min_saturation']};")
     lines.append(f"pub const COLOR_MIN_VALUE: u8 = {cc['min_value']};")
-    lines.append(f"pub const MIN_BLUE_RATIO: f64 = {cc['min_blue_ratio']};")
+    lines.append(f"pub const MIN_BLUE_RATIO: f64 = {_rust_float(cc['min_blue_ratio'])};")
     lines.append("")
 
     lines.append(f'pub const SHARED_CONSTANTS_HASH: &str = "{hash_val}";')

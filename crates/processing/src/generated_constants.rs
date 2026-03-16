@@ -5,6 +5,7 @@
 use std::collections::HashMap;
 use lazy_static::lazy_static;
 
+#[derive(Debug, Clone, Copy)]
 pub struct LookupEntry { pub x: i32, pub y: i32, pub width: i32, pub height: i32 }
 
 lazy_static! {
@@ -52,6 +53,7 @@ pub const GRID_LINE_GRAY_MAX: u8 = 220;
 pub const BLUE_HUE_MIN: u8 = 100;
 pub const BLUE_HUE_MAX: u8 = 130;
 pub const CYAN_HUE_MIN: u8 = 80;
+pub const CYAN_HUE_MAX: u8 = 100;
 pub const COLOR_MIN_SATURATION: u8 = 50;
 pub const COLOR_MIN_VALUE: u8 = 50;
 pub const MIN_BLUE_RATIO: f64 = 0.5;
