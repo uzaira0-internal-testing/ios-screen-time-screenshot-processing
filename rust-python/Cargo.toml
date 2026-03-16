@@ -1,0 +1,20 @@
+[package]
+name = "screenshot-processor-rs"
+version = "0.1.0"
+edition = "2021"
+description = "Rust-native image processing for iOS Screen Time screenshots (Python extension)"
+
+[lib]
+name = "screenshot_processor_rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.23", features = ["extension-module"] }
+image = "0.25"
+regex = "1"
+lazy_static = "1"
+thiserror = "2"
+log = "0.4"
+leptess = "0.14"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
