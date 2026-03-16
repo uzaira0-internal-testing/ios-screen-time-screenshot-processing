@@ -2056,12 +2056,8 @@ async def run_device_detection_stage(
         set_stage_running,
     )
 
-    db = repo._session  # Use the existing async session's sync equivalent
-    processed = 0
-
     # Run synchronously in a thread to avoid blocking the event loop
     import asyncio
-    from functools import partial
 
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
