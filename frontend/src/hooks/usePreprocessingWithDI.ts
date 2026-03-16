@@ -111,14 +111,14 @@ export function useScreenshotImageUrl(
   const prevIdRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
+    console.log(`[IMG] effect screenshotId=${screenshotId} service=${!!service} method=${method} refreshKey=${refreshKey}`);
     if (!service || screenshotId == null) {
+      console.log(`[IMG] early return: service=${!!service} screenshotId=${screenshotId}`);
       setUrl(null);
       return;
     }
 
-    // Only clear URL when screenshot ID changes — not on refreshKey or
-    // service reference changes. Clearing on every effect re-run causes
-    // images to flash to skeleton on every poll cycle during processing.
+    // Only clear URL when screenshot ID changes
     if (prevIdRef.current !== screenshotId) {
       setUrl(null);
       prevIdRef.current = screenshotId;
@@ -137,16 +137,15 @@ export function useScreenshotImageUrl(
         } else {
           result = await service.getImageUrl(screenshotId);
         }
+        console.log(`[IMG] got result for ${screenshotId}: revoked=${revoked} url=${result?.substring(0, 80)}`);
         if (!revoked) {
           objectUrl = result;
           setUrl(result);
         } else if (result.startsWith("blob:") && method !== "getImageUrl") {
-          // Revoke uncached blob URLs (getOriginalImageUrl and getStageImageUrl).
-          // Only getImageUrl uses the shared LRU cache and should NOT be revoked here.
           URL.revokeObjectURL(result);
         }
       } catch (err) {
-        console.error(`[useScreenshotImageUrl] Failed to load image for screenshot ${screenshotId}:`, err);
+        console.error(`[IMG] FAILED for screenshot ${screenshotId}:`, err);
         if (!revoked) setUrl(null);
       }
     })();
