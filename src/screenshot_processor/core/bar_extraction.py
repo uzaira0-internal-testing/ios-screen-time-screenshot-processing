@@ -61,37 +61,31 @@ def slice_image(
     scaled_roi_width = roi_width * scale_amount
     slice_width = scaled_roi_width // num_slice
 
+    # Extract all 24 middle columns at once (batch vectorized)
+    mid_cols = np.array(
+        [min(i * slice_width + slice_width // 2, scaled_roi_width - 1) for i in range(num_slice)]
+    )
+    # columns shape: (scaled_roi_height, 24, 3)
+    columns = roi_scaled[:, mid_cols, :]
+
+    # Batch pixel analysis for all 24 columns simultaneously
+    pixel_sums = columns.sum(axis=2)  # (H, 24)
+    is_black = pixel_sums == 0  # (H, 24)
+    is_white = np.all(np.abs(columns.astype(np.int16) - 255) <= 2, axis=2)  # (H, 24)
+
+    # Compute bar heights for all 24 slices
     row = []
-
-    for slice_index in range(num_slice):
-        slice_x = slice_index * slice_width
-
-        # Get the middle column of this slice
-        middle_col = slice_x + slice_width // 2
-        if middle_col >= scaled_roi_width:
-            middle_col = scaled_roi_width - 1
-
-        # Extract single column
-        column = roi_scaled[:, middle_col, :]
-
-        # Vectorized pixel analysis
-        pixel_sums = np.sum(column, axis=1)
-        is_black = pixel_sums == 0
-        is_white = np.all(np.abs(column.astype(np.int16) - 255) <= 2, axis=1)
-
-        # Vectorized bar height: find last white pixel (reset point) above bottom buffer,
-        # then count black pixels below it
-        reset_region = is_white[: scaled_roi_height - lower_grid_buffer]
+    reset_limit = scaled_roi_height - lower_grid_buffer
+    for s in range(num_slice):
+        reset_region = is_white[:reset_limit, s]
         reset_indices = np.where(reset_region)[0]
         start_after = int(reset_indices[-1]) + 1 if len(reset_indices) > 0 else 0
-        counter = int(np.sum(is_black[start_after:]))
-
-        # Keep as float - rounding happens later based on config
+        counter = int(np.sum(is_black[start_after:, s]))
         usage_at_time = max_y * counter / scaled_roi_height
         row.append(usage_at_time)
 
         if DEBUG_ENABLED:
-            logger.debug(f"Slice {slice_index}: {usage_at_time:.2f}")
+            logger.debug(f"Slice {s}: {usage_at_time:.2f}")
 
     # Append total
     row.append(np.sum(row))
