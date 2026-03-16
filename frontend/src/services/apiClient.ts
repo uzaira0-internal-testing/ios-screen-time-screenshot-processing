@@ -509,6 +509,8 @@ export const api = {
         phi_pipeline_preset?: string;
         phi_redaction_method?: string;
         phi_detection_enabled?: boolean;
+        phi_ocr_engine?: string;
+        phi_ner_detector?: string;
         run_ocr_after?: boolean;
       },
     ) {
@@ -520,6 +522,8 @@ export const api = {
             phi_pipeline_preset: options.phi_pipeline_preset ?? "hipaa_compliant",
             phi_redaction_method: options.phi_redaction_method ?? "redbox",
             phi_detection_enabled: options.phi_detection_enabled ?? true,
+            phi_ocr_engine: options.phi_ocr_engine ?? "tesseract",
+            phi_ner_detector: options.phi_ner_detector ?? "presidio",
             run_ocr_after: options.run_ocr_after ?? false,
           },
         },
@@ -534,6 +538,8 @@ export const api = {
       phi_pipeline_preset?: string;
       phi_redaction_method?: string;
       phi_detection_enabled?: boolean;
+      phi_ocr_engine?: string;
+      phi_ner_detector?: string;
       run_ocr_after?: boolean;
     }) {
       const { data, error } = await apiClient.POST(
@@ -546,6 +552,8 @@ export const api = {
               request.phi_pipeline_preset ?? "hipaa_compliant",
             phi_redaction_method: request.phi_redaction_method ?? "redbox",
             phi_detection_enabled: request.phi_detection_enabled ?? true,
+            phi_ocr_engine: request.phi_ocr_engine ?? "tesseract",
+            phi_ner_detector: request.phi_ner_detector ?? "presidio",
             run_ocr_after: request.run_ocr_after ?? false,
           },
         },

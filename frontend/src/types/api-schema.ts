@@ -146,6 +146,8 @@ export interface paths {
         /**
          * List Groups
          * @description List all groups with screenshot counts by processing_status.
+         *
+         *     Results are cached in-memory with a configurable TTL (default 10s).
          */
         get: operations["list_groups_api_v1_screenshots_groups_get"];
         put?: never;
@@ -220,6 +222,10 @@ export interface paths {
         /**
          * Get Screenshot Stats
          * @description Get screenshot statistics using consolidated queries.
+         *
+         *     Results are cached in-memory with a configurable TTL (default 10s,
+         *     set via STATS_CACHE_TTL_SECONDS env var) to avoid 6+ COUNT queries
+         *     on every page load.
          */
         get: operations["get_screenshot_stats_api_v1_screenshots_stats_get"];
         put?: never;
@@ -343,6 +349,46 @@ export interface paths {
          * @description Unskip a screenshot by restoring processing_status to 'completed'.
          */
         post: operations["unskip_screenshot_api_v1_screenshots__screenshot_id__unskip_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/screenshots/{screenshot_id}/soft-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Soft Delete Screenshot
+         * @description Soft delete a screenshot by setting processing_status to DELETED.
+         */
+        post: operations["soft_delete_screenshot_api_v1_screenshots__screenshot_id__soft_delete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/screenshots/{screenshot_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Screenshot
+         * @description Restore a soft-deleted screenshot to its previous processing_status.
+         */
+        post: operations["restore_screenshot_api_v1_screenshots__screenshot_id__restore_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -901,6 +947,26 @@ export interface paths {
          * @description Apply PHI redaction to confirmed regions.
          */
         post: operations["apply_redaction_api_v1_screenshots__screenshot_id__apply_redaction_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/screenshots/export/json": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Consensus Json
+         * @description Export consensus data as JSON.
+         */
+        get: operations["export_consensus_json_api_v1_screenshots_export_json_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1662,6 +1728,16 @@ export interface components {
              */
             phi_detection_enabled: boolean;
             /**
+             * Phi Ocr Engine
+             * @default tesseract
+             */
+            phi_ocr_engine: string;
+            /**
+             * Phi Ner Detector
+             * @default presidio
+             */
+            phi_ner_detector: string;
+            /**
              * Run Ocr After
              * @default false
              */
@@ -2226,6 +2302,18 @@ export interface components {
              */
             phi_pipeline_preset: string;
             /**
+             * Phi Ocr Engine
+             * @description OCR engine: tesseract, rust
+             * @default tesseract
+             */
+            phi_ocr_engine: string;
+            /**
+             * Phi Ner Detector
+             * @description NER detector: presidio, gliner
+             * @default presidio
+             */
+            phi_ner_detector: string;
+            /**
              * Llm Endpoint
              * @description LLM API endpoint for assisted detection
              */
@@ -2386,7 +2474,7 @@ export interface components {
         PreprocessRequest: {
             /**
              * Phi Pipeline Preset
-             * @description PHI detection pipeline preset: fast, balanced, hipaa_compliant, thorough
+             * @description PHI detection pipeline preset: fast, balanced, hipaa_compliant, thorough, screen_time
              * @default screen_time
              */
             phi_pipeline_preset: string;
@@ -2402,6 +2490,18 @@ export interface components {
              * @default true
              */
             phi_detection_enabled: boolean;
+            /**
+             * Phi Ocr Engine
+             * @description OCR engine for PHI text extraction: tesseract (default), rust (faster via leptess C API)
+             * @default tesseract
+             */
+            phi_ocr_engine: string;
+            /**
+             * Phi Ner Detector
+             * @description NER detector: presidio (fast, 6ms), gliner (accurate, F1=0.98, 112ms)
+             * @default presidio
+             */
+            phi_ner_detector: string;
             /**
              * Run Ocr After
              * @description Whether to chain OCR processing after preprocessing
@@ -4046,6 +4146,74 @@ export interface operations {
             };
         };
     };
+    soft_delete_screenshot_api_v1_screenshots__screenshot_id__soft_delete_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
+            path: {
+                screenshot_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_screenshot_api_v1_screenshots__screenshot_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
+            path: {
+                screenshot_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     verify_screenshot_api_v1_screenshots__screenshot_id__verify_post: {
         parameters: {
             query?: never;
@@ -5013,6 +5181,47 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApplyPHIRedactionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_consensus_json_api_v1_screenshots_export_json_get: {
+        parameters: {
+            query?: {
+                /** @description Filter by group ID */
+                group_id?: string | null;
+                /** @description Only export verified screenshots */
+                verified_only?: boolean;
+                /** @description Only export screenshots with annotations */
+                has_annotations?: boolean;
+                /** @description Filter by processing status */
+                processing_status?: string | null;
+            };
+            header?: {
+                "X-Username"?: string | null;
+                "X-Site-Password"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
