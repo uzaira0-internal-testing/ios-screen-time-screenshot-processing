@@ -377,14 +377,18 @@ export function createPreprocessingStore(service: IPreprocessingService) {
       if (result && result.queued_count > 0) {
         toast.success(result.message);
 
-        if (config.isLocalMode) {
-          // WASM mode: runStage already completed all work synchronously.
-          // Skip polling — just refresh and mark done.
+        // Check if the work already completed synchronously (device detection,
+        // cropping run in-process instead of Celery). The response message
+        // contains "completed" for sync stages, "queued" for async Celery stages.
+        const alreadyDone = config.isLocalMode || result.message?.includes("completed");
+
+        if (alreadyDone) {
+          // Work finished — just refresh and mark done.
           set({ isRunningStage: false, stageProgress: null });
           await get().loadScreenshots();
           await get().loadSummary();
         } else {
-          // Server mode: work is queued on Celery — poll for completion.
+          // Server mode async: work is queued on Celery — poll for completion.
           set({
             stageProgress: { completed: 0, total: result.queued_count },
             _queuedCount: result.queued_count,
