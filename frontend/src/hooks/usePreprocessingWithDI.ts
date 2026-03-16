@@ -108,6 +108,7 @@ export function useScreenshotImageUrl(
 ): string | null {
   const service = useContext(serviceContext);
   const [url, setUrl] = useState<string | null>(null);
+  const prevIdRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     if (!service || screenshotId == null) {
@@ -115,10 +116,13 @@ export function useScreenshotImageUrl(
       return;
     }
 
-    // Clear stale URL immediately so components don't render with a revoked
-    // blob URL during the async gap (e.g., after crop/redaction calls
-    // storeImageBlob which revokes the old URL synchronously).
-    setUrl(null);
+    // Only clear URL when screenshot ID changes — not on refreshKey or
+    // service reference changes. Clearing on every effect re-run causes
+    // images to flash to skeleton on every poll cycle during processing.
+    if (prevIdRef.current !== screenshotId) {
+      setUrl(null);
+      prevIdRef.current = screenshotId;
+    }
 
     let revoked = false;
     let objectUrl: string | null = null;
