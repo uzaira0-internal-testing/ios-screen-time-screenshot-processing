@@ -142,6 +142,34 @@ class PHIPipelineBuilder:
         }
         return self.add_text_detector("presidio", **config)
 
+    def add_gliner(
+        self,
+        labels: list[str] | None = None,
+        threshold: float = 0.3,
+        model_name: str = "urchade/gliner_multi_pii-v1",
+        **kwargs: Any,
+    ) -> PHIPipelineBuilder:
+        """Add GLiNER zero-shot NER detector (convenience method).
+
+        GLiNER detects entities by specifying labels at runtime.
+        Higher accuracy than Presidio on edge cases (F1=0.98).
+
+        Args:
+            labels: Entity types to detect (e.g., ["person_name", "email"])
+            threshold: Minimum confidence score (0.0-1.0)
+            model_name: HuggingFace model ID
+
+        Returns:
+            Self for chaining
+        """
+        config = {
+            "labels": labels,
+            "threshold": threshold,
+            "model_name": model_name,
+            **kwargs,
+        }
+        return self.add_text_detector("gliner", **config)
+
     def add_regex(
         self,
         patterns: dict[str, str] | None = None,

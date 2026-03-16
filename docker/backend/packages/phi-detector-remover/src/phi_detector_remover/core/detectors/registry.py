@@ -220,6 +220,14 @@ def _register_builtin_detectors() -> None:
     register_text_detector("presidio", PresidioDetector)
     register_text_detector("regex", RegexDetector)
 
+    # Register GLiNER detector if available
+    try:
+        from phi_detector_remover.core.detectors.gliner import GLiNERDetector
+
+        register_text_detector("gliner", GLiNERDetector)
+    except ImportError:
+        pass
+
     # Register LLM text detector if available
     try:
         from phi_detector_remover.core.detectors.llm import LLMTextDetector

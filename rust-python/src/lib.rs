@@ -151,6 +151,36 @@ fn slice_image_from_file(
     ))
 }
 
+/// Run Tesseract OCR on an image file and return word-level results.
+///
+/// Returns a list of dicts, each with: text, x, y, w, h, confidence.
+/// Uses leptess (direct C API via set_image_from_mem) — no subprocess overhead.
+#[pyfunction]
+#[pyo3(signature = (image_bytes, psm="3"))]
+fn ocr_extract(image_bytes: &[u8], psm: &str) -> PyResult<Vec<HashMap<String, PyObject>>> {
+    // Decode image bytes to RgbImage
+    let img = image::load_from_memory(image_bytes)
+        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Image decode: {e}")))?
+        .to_rgb8();
+
+    let words = processing::ocr::run_tesseract(&img, psm)
+        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
+
+    Python::with_gil(|py| {
+        let mut result = Vec::with_capacity(words.len());
+        for w in &words {
+            let mut map = HashMap::new();
+            map.insert("text".to_string(), w.text.as_str().into_pyobject(py)?.into_any().unbind());
+            map.insert("x".to_string(), w.x.into_pyobject(py)?.into_any().unbind());
+            map.insert("y".to_string(), w.y.into_pyobject(py)?.into_any().unbind());
+            map.insert("w".to_string(), w.w.into_pyobject(py)?.into_any().unbind());
+            map.insert("h".to_string(), w.h.into_pyobject(py)?.into_any().unbind());
+            result.push(map);
+        }
+        Ok(result)
+    })
+}
+
 /// Extract time from OCR text (e.g., "4h 36m" from "some text 4h 36m more").
 #[pyfunction]
 fn extract_time_from_text(text: &str) -> String {
@@ -171,6 +201,7 @@ fn screenshot_processor_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(extract_hourly_data, m)?)?;
     m.add_function(wrap_pyfunction!(detect_grid, m)?)?;
     m.add_function(wrap_pyfunction!(slice_image_from_file, m)?)?;
+    m.add_function(wrap_pyfunction!(ocr_extract, m)?)?;
     m.add_function(wrap_pyfunction!(extract_time_from_text, m)?)?;
     m.add_function(wrap_pyfunction!(normalize_ocr_digits, m)?)?;
     Ok(())

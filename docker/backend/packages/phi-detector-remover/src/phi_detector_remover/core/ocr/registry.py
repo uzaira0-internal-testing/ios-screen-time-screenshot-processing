@@ -143,8 +143,15 @@ def _register_builtin_engines() -> None:
 
     register_engine("tesseract", TesseractEngine)
 
+    # Register Rust OCR engine (leptess via PyO3 — faster than pytesseract)
+    try:
+        from phi_detector_remover.core.ocr.rust_engine import RustOCREngine
+
+        register_engine("rust", RustOCREngine)
+    except ImportError:
+        pass
+
     # Register placeholder engines for LVM-based OCR
-    # These will raise NotImplementedError until implemented
     try:
         from phi_detector_remover.core.ocr.hunyuan import HunyuanOCREngine
 
