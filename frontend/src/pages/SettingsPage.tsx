@@ -237,22 +237,9 @@ function SyncSection() {
   );
 }
 
-const PHI_OCR_ENGINE_OPTIONS = [
-  { value: "pytesseract" as const, label: "pytesseract", desc: "Standard (262ms)" },
-  { value: "leptess" as const, label: "leptess", desc: "Direct C API (faster)" },
-];
-
 const PHI_NER_DETECTOR_OPTIONS = [
-  { value: "presidio" as const, label: "Presidio", desc: "Fast (6ms)" },
-  { value: "gliner" as const, label: "GLiNER", desc: "Accurate (F1=0.98)" },
-];
-
-const PHI_PRESET_OPTIONS = [
-  { value: "screen_time" as const, label: "Screen Time" },
-  { value: "fast" as const, label: "Fast" },
-  { value: "balanced" as const, label: "Balanced" },
-  { value: "hipaa_compliant" as const, label: "HIPAA Compliant" },
-  { value: "thorough" as const, label: "Thorough" },
+  { value: "presidio" as const, label: "Presidio (Microsoft)", desc: "Fast — 6ms per image, good for common PHI patterns" },
+  { value: "gliner" as const, label: "GLiNER (zero-shot)", desc: "More accurate — F1=0.98, catches edge cases, 112ms per image" },
 ];
 
 const PHI_REDACTION_OPTIONS = [
@@ -382,7 +369,7 @@ function ProcessingSection() {
 
 function PHISection() {
   const {
-    phiOcrEngine, phiNerDetector, phiPipelinePreset, phiRedactionMethod,
+    phiNerDetector, phiRedactionMethod,
     set: setSetting,
   } = useSettingsStore();
 
@@ -401,39 +388,13 @@ function PHISection() {
       </div>
 
       <div className="space-y-5">
-        {/* OCR Engine */}
-        <div className="py-3 border-b border-slate-200 dark:border-slate-700">
-          <div className="font-medium text-slate-900 dark:text-slate-100 mb-1">
-            OCR Engine
-          </div>
-          <div className="text-sm text-slate-600 dark:text-slate-400 mb-3">
-            Engine used to extract text from screenshots for PHI detection
-          </div>
-          <div className="flex gap-2">
-            {PHI_OCR_ENGINE_OPTIONS.map(({ value, label, desc }) => (
-              <button
-                key={value}
-                onClick={() => setSetting("phiOcrEngine", value)}
-                className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors focus-ring ${
-                  phiOcrEngine === value
-                    ? "bg-primary-50 dark:bg-primary-900/30 border-primary-300 dark:border-primary-700 text-primary-700 dark:text-primary-400"
-                    : "bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600"
-                }`}
-              >
-                <div>{label}</div>
-                <div className="text-xs opacity-70 mt-0.5">{desc}</div>
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* NER Detector */}
         <div className="py-3 border-b border-slate-200 dark:border-slate-700">
           <div className="font-medium text-slate-900 dark:text-slate-100 mb-1">
-            NER Detector
+            Detection Model
           </div>
           <div className="text-sm text-slate-600 dark:text-slate-400 mb-3">
-            Named entity recognition model for identifying PHI in text
+            Which model identifies names, emails, and other PHI in the screenshot text
           </div>
           <div className="flex gap-2">
             {PHI_NER_DETECTOR_OPTIONS.map(({ value, label, desc }) => (
@@ -453,35 +414,10 @@ function PHISection() {
           </div>
         </div>
 
-        {/* Pipeline Preset */}
-        <div className="py-3 border-b border-slate-200 dark:border-slate-700">
-          <div className="font-medium text-slate-900 dark:text-slate-100 mb-1">
-            Detection Preset
-          </div>
-          <div className="text-sm text-slate-600 dark:text-slate-400 mb-3">
-            Pre-configured detection sensitivity levels
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {PHI_PRESET_OPTIONS.map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => setSetting("phiPipelinePreset", value)}
-                className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors focus-ring ${
-                  phiPipelinePreset === value
-                    ? "bg-primary-50 dark:bg-primary-900/30 border-primary-300 dark:border-primary-700 text-primary-700 dark:text-primary-400"
-                    : "bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* Redaction Method */}
         <div className="py-3">
           <div className="font-medium text-slate-900 dark:text-slate-100 mb-1">
-            Redaction Method
+            Redaction Style
           </div>
           <div className="text-sm text-slate-600 dark:text-slate-400 mb-3">
             How detected PHI regions are obscured in the image

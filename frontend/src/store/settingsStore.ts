@@ -9,12 +9,8 @@ export interface ProcessingSettings {
   maxShift: number;
   /** Auto-run OCR processing when screenshots are uploaded */
   autoProcessOnUpload: boolean;
-  /** OCR engine for PHI detection: tesseract (default) or rust (faster) */
-  phiOcrEngine: "pytesseract" | "leptess";
   /** NER detector for PHI detection: presidio (fast) or gliner (accurate) */
   phiNerDetector: "presidio" | "gliner";
-  /** PHI pipeline preset */
-  phiPipelinePreset: "fast" | "balanced" | "hipaa_compliant" | "thorough" | "screen_time";
   /** PHI redaction method */
   phiRedactionMethod: "redbox" | "blackbox" | "pixelate";
 }
@@ -26,9 +22,7 @@ const DEFAULTS: ProcessingSettings = {
   gridDetectionMethod: "line_based",
   maxShift: 5,
   autoProcessOnUpload: false,
-  phiOcrEngine: "pytesseract",
   phiNerDetector: "presidio",
-  phiPipelinePreset: "screen_time",
   phiRedactionMethod: "redbox",
 };
 
@@ -62,9 +56,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
         gridDetectionMethod: updated.gridDetectionMethod,
         maxShift: updated.maxShift,
         autoProcessOnUpload: updated.autoProcessOnUpload,
-        phiOcrEngine: updated.phiOcrEngine,
         phiNerDetector: updated.phiNerDetector,
-        phiPipelinePreset: updated.phiPipelinePreset,
         phiRedactionMethod: updated.phiRedactionMethod,
       });
       return { [key]: value };
