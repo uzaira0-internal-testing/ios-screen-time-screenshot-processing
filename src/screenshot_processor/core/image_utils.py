@@ -42,25 +42,19 @@ def is_close(pixel_1: np.ndarray | list[int], pixel_2: np.ndarray | list[int], t
 
 
 def reduce_color_count(img: np.ndarray, num_colors: int) -> np.ndarray:
-    # Build a 256-entry lookup table (LUT) that maps each input value to its
-    # quantized output value — identical to the original per-bin loop but done
-    # in a single vectorised pass via np.take / fancy indexing.
+    # Use OpenCV LUT for SIMD-optimized color quantization.
+    # Build a 256-entry lookup table mapping each value to its quantized bin.
     input_vals = np.arange(256, dtype=np.float64)
     bin_indices = np.clip((input_vals * num_colors / 255).astype(int), 0, num_colors - 1)
     output_vals = (bin_indices * 255 / (num_colors - 1)).astype(np.uint8)
-    # Ensure exact parity: the original loop excludes the upper boundary of
-    # the last bin (values == 255 when 255 == num_colors * 255 / num_colors),
-    # so 255 may stay unmapped.  Replicate that: only values in
-    # [i*255/n, (i+1)*255/n) are mapped; values >= num_colors*255/num_colors
-    # are left untouched.
-    lut = np.arange(256, dtype=np.uint8)  # identity by default (untouched)
-    for i in range(num_colors):
-        lo = i * 255 / num_colors
-        hi = (i + 1) * 255 / num_colors
-        mask = (input_vals >= lo) & (input_vals < hi)
-        lut[mask] = output_vals[mask]
-    # Apply the LUT in one shot — works on any shape, any dtype(uint8).
-    np.take(lut, img, out=img)
+    # Only values in [i*255/n, (i+1)*255/n) are mapped; values >= last boundary
+    # are left untouched (identity).
+    lut = np.arange(256, dtype=np.uint8)
+    boundary = num_colors * 255.0 / num_colors
+    mapped = input_vals < boundary
+    lut[mapped] = output_vals[mapped]
+    # cv2.LUT is SIMD-optimized C++ — faster than np.take for image LUT ops.
+    cv2.LUT(img, lut, dst=img)
     return img
 
 
