@@ -14,7 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
 
-RUST_FILE = ROOT / "frontend" / "src-tauri" / "src" / "processing" / "types.rs"
+RUST_FILE = ROOT / "crates" / "processing" / "src" / "types.rs"
 TS_FILE = ROOT / "frontend" / "src" / "core" / "implementations" / "tauri" / "TauriProcessingService.ts"
 
 

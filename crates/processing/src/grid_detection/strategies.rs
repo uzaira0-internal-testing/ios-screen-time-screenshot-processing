@@ -267,7 +267,7 @@ pub fn cluster_positions(positions: &[i32], max_gap: i32) -> Vec<i32> {
 // Color validation — reject Pickups charts (cyan bars) vs daily (blue bars)
 // ---------------------------------------------------------------------------
 
-use crate::processing::image_utils::rgb_to_hsv;
+use crate::image_utils::rgb_to_hsv;
 
 /// HSV hue ranges (OpenCV convention: H 0-180)
 const BLUE_HUE_MIN: u8 = 100;

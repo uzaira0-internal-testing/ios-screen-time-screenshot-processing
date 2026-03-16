@@ -7,9 +7,9 @@
 use image::RgbImage;
 use log::{debug, info};
 
-use crate::processing::image_utils::{adjust_contrast_brightness, extract_line, get_pixel};
-use crate::processing::ocr::{run_tesseract, OcrWord};
-use crate::processing::types::{GridDetectionResult, ProcessingError};
+use crate::image_utils::{adjust_contrast_brightness, extract_line, get_pixel};
+use crate::ocr::{run_tesseract, OcrWord};
+use crate::types::{GridDetectionResult, ProcessingError};
 
 use super::calculate_roi;
 

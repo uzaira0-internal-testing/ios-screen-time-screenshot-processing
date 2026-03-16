@@ -237,8 +237,8 @@ pub fn is_daily_total_page(texts: &[String]) -> bool {
 use image::RgbImage;
 use log::info;
 
-use crate::processing::image_utils::adjust_contrast_brightness;
-use crate::processing::types::ProcessingError;
+use crate::image_utils::adjust_contrast_brightness;
+use crate::types::ProcessingError;
 
 /// OCR bounding box from Tesseract (word-level).
 /// Shared between ocr.rs and ocr_anchored.rs.

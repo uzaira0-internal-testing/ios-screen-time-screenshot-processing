@@ -56,14 +56,14 @@ fn main() {
 
         let (w, h) = img.dimensions();
         let mut work = img.clone();
-        ios_screen_time::processing::image_utils::convert_dark_mode(&mut work);
+        ios_screen_time_image_pipeline::image_utils::convert_dark_mode(&mut work);
 
-        let grid_result = ios_screen_time::processing::grid_detection::line_based::detect(&work);
+        let grid_result = ios_screen_time_image_pipeline::grid_detection::line_based::detect(&work);
 
         match grid_result {
             Ok(ref r) if r.success => {
                 let bounds = r.bounds.unwrap();
-                let row = ios_screen_time::processing::bar_extraction::slice_image(
+                let row = ios_screen_time_image_pipeline::bar_extraction::slice_image(
                     &work,
                     bounds.roi_x() as u32, bounds.roi_y() as u32,
                     bounds.width() as u32, bounds.height() as u32,
@@ -74,7 +74,7 @@ fn main() {
                     bounds.roi_x() as u32, bounds.roi_y() as u32,
                     bounds.width() as u32, bounds.height() as u32,
                 ).to_image();
-                let score = ios_screen_time::processing::bar_extraction::compute_bar_alignment_score(&roi, &row[..24]);
+                let score = ios_screen_time_image_pipeline::bar_extraction::compute_bar_alignment_score(&roi, &row[..24]);
 
                 let total: f64 = row[..24].iter().sum();
                 let elapsed = start.elapsed().as_millis() as u64;

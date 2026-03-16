@@ -63,7 +63,7 @@ class TestLookupTableConsistency:
                 assert f'"{res}"' in ts_content, f"TypeScript missing resolution {res}"
 
         # Check Rust (Tauri)
-        rs_file = ROOT / "frontend" / "src-tauri" / "src" / "processing" / "grid_detection" / "lookup.rs"
+        rs_file = ROOT / "crates" / "processing" / "src" / "grid_detection" / "lookup.rs"
         rs_content = rs_file.read_text()
         for res in canonical_keys:
             assert f'"{res}"' in rs_content, f"Rust missing resolution {res}"
@@ -73,7 +73,7 @@ class TestLookupTableConsistency:
         canonical = load_json("lookup_table")
 
         # Check Rust values
-        rs_file = ROOT / "frontend" / "src-tauri" / "src" / "processing" / "grid_detection" / "lookup.rs"
+        rs_file = ROOT / "crates" / "processing" / "src" / "grid_detection" / "lookup.rs"
         rs_content = rs_file.read_text()
 
         for res, entry in canonical.items():
@@ -91,14 +91,14 @@ class TestPageMarkerConsistency:
 
     def test_daily_markers_in_rust(self):
         canonical = load_json("page_markers")
-        rs_file = ROOT / "frontend" / "src-tauri" / "src" / "processing" / "ocr.rs"
+        rs_file = ROOT / "crates" / "processing" / "src" / "ocr.rs"
         rs_content = rs_file.read_text()
         for marker in canonical["daily_page_markers"]:
             assert f'"{marker}"' in rs_content, f"Rust missing daily marker: {marker}"
 
     def test_app_markers_in_rust(self):
         canonical = load_json("page_markers")
-        rs_file = ROOT / "frontend" / "src-tauri" / "src" / "processing" / "ocr.rs"
+        rs_file = ROOT / "crates" / "processing" / "src" / "ocr.rs"
         rs_content = rs_file.read_text()
         for marker in canonical["app_page_markers"]:
             assert f'"{marker}"' in rs_content, f"Rust missing app marker: {marker}"
@@ -125,14 +125,14 @@ class TestProcessingConstantsConsistency:
 
     def test_num_slices_in_rust(self):
         canonical = load_json("processing_constants")
-        rs_file = ROOT / "frontend" / "src-tauri" / "src" / "processing" / "bar_extraction.rs"
+        rs_file = ROOT / "crates" / "processing" / "src" / "bar_extraction.rs"
         rs_content = rs_file.read_text()
         assert f"NUM_SLICES: usize = {canonical['bar_extraction']['num_slices']}" in rs_content
 
     def test_darken_threshold_in_rust(self):
         canonical = load_json("processing_constants")
         threshold = canonical["darken_non_white"]["channel_sum_threshold"]
-        rs_file = ROOT / "frontend" / "src-tauri" / "src" / "processing" / "image_utils.rs"
+        rs_file = ROOT / "crates" / "processing" / "src" / "image_utils.rs"
         rs_content = rs_file.read_text()
         assert str(threshold) in rs_content, f"Rust darken threshold {threshold} not found"
 

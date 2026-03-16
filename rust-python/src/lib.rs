@@ -8,10 +8,10 @@
 //!     result = rs.process_image("/path/to/screenshot.png", "screen_time", "line_based")
 //!     print(result["hourly_values"])  # [0.0, 0.0, ..., 15.3, ...]
 
-mod processing;
+use ios_screen_time_image_pipeline as processing;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
+use pyo3::types::PyDict;
 use std::collections::HashMap;
 
 use processing::types::{DetectionMethod, ImageType};

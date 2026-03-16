@@ -29,7 +29,7 @@ if echo "$STAGED" | grep -qE "schemas\.py|routes/.*\.py"; then
 fi
 
 # 3. Tauri IPC contract: if Rust types or TS interface changed
-if echo "$STAGED" | grep -qE "processing/types\.rs|TauriProcessingService\.ts"; then
+if echo "$STAGED" | grep -qE "crates/processing/src/types\.rs|processing/types\.rs|TauriProcessingService\.ts"; then
     echo "[pre-commit] Checking Tauri IPC contract..."
     if ! python3 scripts/check-tauri-contract.py 2>/dev/null; then
         echo "BLOCKED: Tauri IPC contract drift detected."

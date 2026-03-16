@@ -75,11 +75,11 @@ fn generate_synthetic_screenshot() -> RgbImage {
 fn bench_grid_detection(c: &mut Criterion) {
     let img = load_test_image().expect("Need a test image");
     let mut work = img.clone();
-    ios_screen_time::processing::image_utils::convert_dark_mode(&mut work);
+    ios_screen_time_image_pipeline::image_utils::convert_dark_mode(&mut work);
 
     c.bench_function("grid_detect_line_based", |b| {
         b.iter(|| {
-            let _ = ios_screen_time::processing::grid_detection::line_based::detect(&work);
+            let _ = ios_screen_time_image_pipeline::grid_detection::line_based::detect(&work);
         })
     });
 }
@@ -87,7 +87,7 @@ fn bench_grid_detection(c: &mut Criterion) {
 fn bench_slice_image(c: &mut Criterion) {
     let img = load_test_image().expect("Need a test image");
     let mut work = img.clone();
-    ios_screen_time::processing::image_utils::convert_dark_mode(&mut work);
+    ios_screen_time_image_pipeline::image_utils::convert_dark_mode(&mut work);
 
     let roi_x = 73u32;
     let roi_y = 673u32;
@@ -96,7 +96,7 @@ fn bench_slice_image(c: &mut Criterion) {
 
     c.bench_function("slice_image_24h", |b| {
         b.iter(|| {
-            let _ = ios_screen_time::processing::bar_extraction::slice_image(
+            let _ = ios_screen_time_image_pipeline::bar_extraction::slice_image(
                 &work, roi_x, roi_y, roi_w, roi_h,
             );
         })
@@ -109,13 +109,13 @@ fn bench_full_pipeline(c: &mut Criterion) {
     c.bench_function("full_pipeline_no_ocr", |b| {
         b.iter(|| {
             let mut work = img.clone();
-            ios_screen_time::processing::image_utils::convert_dark_mode(&mut work);
+            ios_screen_time_image_pipeline::image_utils::convert_dark_mode(&mut work);
 
-            let grid_result = ios_screen_time::processing::grid_detection::line_based::detect(&work);
+            let grid_result = ios_screen_time_image_pipeline::grid_detection::line_based::detect(&work);
             if let Ok(ref r) = grid_result {
                 if r.success {
                     let bounds = r.bounds.unwrap();
-                    let _ = ios_screen_time::processing::bar_extraction::slice_image(
+                    let _ = ios_screen_time_image_pipeline::bar_extraction::slice_image(
                         &work,
                         bounds.roi_x() as u32,
                         bounds.roi_y() as u32,
@@ -134,21 +134,21 @@ fn bench_image_utils(c: &mut Criterion) {
     c.bench_function("darken_non_white", |b| {
         b.iter(|| {
             let mut work = img.clone();
-            ios_screen_time::processing::image_utils::darken_non_white(&mut work);
+            ios_screen_time_image_pipeline::image_utils::darken_non_white(&mut work);
         })
     });
 
     c.bench_function("reduce_color_count_2", |b| {
         b.iter(|| {
             let mut work = img.clone();
-            ios_screen_time::processing::image_utils::reduce_color_count(&mut work, 2);
+            ios_screen_time_image_pipeline::image_utils::reduce_color_count(&mut work, 2);
         })
     });
 
     c.bench_function("convert_dark_mode", |b| {
         b.iter(|| {
             let mut work = img.clone();
-            ios_screen_time::processing::image_utils::convert_dark_mode(&mut work);
+            ios_screen_time_image_pipeline::image_utils::convert_dark_mode(&mut work);
         })
     });
 }
@@ -156,12 +156,12 @@ fn bench_image_utils(c: &mut Criterion) {
 fn bench_extract_line(c: &mut Criterion) {
     let img = load_test_image().expect("Need a test image");
     let mut work = img.clone();
-    ios_screen_time::processing::image_utils::convert_dark_mode(&mut work);
+    ios_screen_time_image_pipeline::image_utils::convert_dark_mode(&mut work);
 
     // Bench a single extract_line call on a small region
     c.bench_function("extract_line_horiz", |b| {
         b.iter(|| {
-            ios_screen_time::processing::image_utils::extract_line(
+            ios_screen_time_image_pipeline::image_utils::extract_line(
                 &work, 50, 100, 650, 700, true,
             );
         })
@@ -169,7 +169,7 @@ fn bench_extract_line(c: &mut Criterion) {
 
     c.bench_function("extract_line_vert", |b| {
         b.iter(|| {
-            ios_screen_time::processing::image_utils::extract_line(
+            ios_screen_time_image_pipeline::image_utils::extract_line(
                 &work, 50, 100, 650, 700, false,
             );
         })
@@ -183,7 +183,7 @@ fn bench_get_pixel(c: &mut Criterion) {
 
     c.bench_function("get_pixel_small", |b| {
         b.iter(|| {
-            ios_screen_time::processing::image_utils::get_pixel(&sub, -2);
+            ios_screen_time_image_pipeline::image_utils::get_pixel(&sub, -2);
         })
     });
 
@@ -193,7 +193,7 @@ fn bench_get_pixel(c: &mut Criterion) {
 
     c.bench_function("get_pixel_chunk", |b| {
         b.iter(|| {
-            ios_screen_time::processing::image_utils::get_pixel(&chunk, 1);
+            ios_screen_time_image_pipeline::image_utils::get_pixel(&chunk, 1);
         })
     });
 }
@@ -207,7 +207,7 @@ fn bench_run_tesseract(c: &mut Criterion) {
     group.sample_size(10); // OCR is slow, reduce samples
     group.bench_function("run_tesseract_small", |b| {
         b.iter(|| {
-            let _ = ios_screen_time::processing::ocr::run_tesseract(&sub, "3");
+            let _ = ios_screen_time_image_pipeline::ocr::run_tesseract(&sub, "3");
         })
     });
     group.finish();

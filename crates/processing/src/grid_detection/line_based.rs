@@ -10,7 +10,7 @@ use super::strategies::{
     fast_luma, find_evenly_spaced_groups, find_horizontal_lines,
     validate_bar_colors, validate_vertical_lines,
 };
-use crate::processing::types::{GridBounds, GridDetectionResult, ProcessingError};
+use crate::types::{GridBounds, GridDetectionResult, ProcessingError};
 
 /// Gray value range for grid edge detection.
 const GRID_LINE_GRAY_MIN: u8 = 190;

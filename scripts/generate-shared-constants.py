@@ -4,7 +4,7 @@
 SINGLE SOURCE OF TRUTH enforcement. Reads shared JSON files and generates:
   - Python: src/screenshot_processor/core/generated_constants.py
   - TypeScript: frontend/src/core/generated/constants.ts
-  - Rust: frontend/src-tauri/src/processing/generated_constants.rs
+  - Rust: crates/processing/src/generated_constants.rs
 
 Usage:
     python scripts/generate-shared-constants.py          # generate all
@@ -22,7 +22,7 @@ SHARED_DIR = ROOT / "shared"
 # Output paths
 PY_OUT = ROOT / "src" / "screenshot_processor" / "core" / "generated_constants.py"
 TS_OUT = ROOT / "frontend" / "src" / "core" / "generated" / "constants.ts"
-RUST_OUT = ROOT / "frontend" / "src-tauri" / "src" / "processing" / "generated_constants.rs"
+RUST_OUT = ROOT / "crates" / "processing" / "src" / "generated_constants.rs"
 
 
 def load_shared():

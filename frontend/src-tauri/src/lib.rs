@@ -1,4 +1,4 @@
-pub mod processing;
+use ios_screen_time_image_pipeline as processing;
 
 use serde::Serialize;
 use std::fs;

@@ -11,7 +11,7 @@ pub mod lookup;
 pub mod ocr_anchored;
 pub mod strategies;
 
-use crate::processing::types::{DetectionMethod, GridBounds, GridDetectionResult, ProcessingError};
+use crate::types::{DetectionMethod, GridBounds, GridDetectionResult, ProcessingError};
 use image::RgbImage;
 
 /// Detect grid bounds using the specified method.
