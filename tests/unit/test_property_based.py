@@ -13,6 +13,22 @@ try:
     HAS_HYPOTHESIS = True
 except ImportError:
     HAS_HYPOTHESIS = False
+    # Provide chainable stubs so class bodies parse without NameError
+    class _Chainable:
+        """Returns itself for any attribute access or call, enabling .filter().map() chains."""
+        def __getattr__(self, name):
+            return _Chainable()
+        def __call__(self, *a, **kw):
+            return _Chainable()
+        def __or__(self, other):
+            return _Chainable()
+    st = _Chainable()
+    def given(*a, **kw):  # noqa: E303
+        return lambda f: f
+    def settings(**kw):  # noqa: E303
+        return lambda f: f
+    def assume(x):  # noqa: E303
+        return x
 
 try:
     import numpy as np
@@ -59,10 +75,13 @@ def _make_black_image(width: int, height: int):
 
 # Strategy: reasonable image dimensions (must be large enough for the 24-slice
 # algorithm which scales by 4x internally)
-reasonable_image_dims = st.tuples(
-    st.integers(min_value=48, max_value=800),  # width
-    st.integers(min_value=24, max_value=600),  # height
-)
+if HAS_HYPOTHESIS:
+    reasonable_image_dims = st.tuples(
+        st.integers(min_value=48, max_value=800),  # width
+        st.integers(min_value=24, max_value=600),  # height
+    )
+else:
+    reasonable_image_dims = None
 
 
 # ===========================================================================

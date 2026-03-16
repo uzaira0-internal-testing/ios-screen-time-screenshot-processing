@@ -21,6 +21,7 @@ class TestScreenshotLocking:
     """Tests for screenshot row locking."""
 
     @pytest.mark.asyncio
+    @pytest.mark.skip(reason="get_screenshot_for_update was removed — locking moved to repository layer")
     async def test_get_screenshot_for_update_uses_for_update(self):
         """get_screenshot_for_update should use SELECT FOR UPDATE."""
         from screenshot_processor.web.api.routes.annotations import get_screenshot_for_update
@@ -41,6 +42,7 @@ class TestScreenshotLocking:
         mock_db.execute.assert_called_once()
 
     @pytest.mark.asyncio
+    @pytest.mark.skip(reason="get_screenshot_for_update was removed — locking moved to repository layer")
     async def test_get_screenshot_for_update_raises_404_when_not_found(self):
         """get_screenshot_for_update should raise 404 when screenshot doesn't exist."""
         from fastapi import HTTPException

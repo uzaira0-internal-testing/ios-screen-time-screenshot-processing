@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import pytest
-from fastapi import HTTPException
 
-from screenshot_processor.web.api.dependencies import (
+from global_auth.validation import (
     USERNAME_PATTERN,
+    UsernameValidationError,
     validate_username,
 )
 from screenshot_processor.web.database.models import UserRole
@@ -39,31 +39,29 @@ class TestUsernameValidation:
 
     def test_validate_empty_username_raises(self):
         """Empty username should raise HTTPException."""
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(UsernameValidationError) as exc_info:
             validate_username("")
-        assert exc_info.value.status_code == 400
-        assert "cannot be empty" in exc_info.value.detail
+        assert exc_info.value is not None
+        assert "cannot be empty" in str(exc_info.value)
 
     def test_validate_whitespace_only_raises(self):
         """Whitespace-only username should raise HTTPException."""
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(UsernameValidationError) as exc_info:
             validate_username("   ")
-        assert exc_info.value.status_code == 400
-        assert "cannot be empty" in exc_info.value.detail
+        assert exc_info.value is not None
+        assert "cannot be empty" in str(exc_info.value)
 
     def test_validate_too_short_raises(self):
-        """Username shorter than 3 chars should raise HTTPException."""
-        with pytest.raises(HTTPException) as exc_info:
+        """Username shorter than 3 chars should raise UsernameValidationError."""
+        with pytest.raises(UsernameValidationError) as exc_info:
             validate_username("ab")
-        assert exc_info.value.status_code == 400
-        assert "3-50 characters" in exc_info.value.detail
+        assert "at least 3" in str(exc_info.value)
 
     def test_validate_too_long_raises(self):
-        """Username longer than 50 chars should raise HTTPException."""
-        with pytest.raises(HTTPException) as exc_info:
+        """Username longer than 50 chars should raise UsernameValidationError."""
+        with pytest.raises(UsernameValidationError) as exc_info:
             validate_username("a" * 51)
-        assert exc_info.value.status_code == 400
-        assert "3-50 characters" in exc_info.value.detail
+        assert "at most 50" in str(exc_info.value)
 
     def test_validate_invalid_characters_raises(self):
         """Username with invalid characters should raise HTTPException."""
@@ -82,9 +80,9 @@ class TestUsernameValidation:
             "admin\x00",  # null byte injection
         ]
         for username in invalid_usernames:
-            with pytest.raises(HTTPException) as exc_info:
+            with pytest.raises(UsernameValidationError) as exc_info:
                 validate_username(username)
-            assert exc_info.value.status_code == 400
+            assert exc_info.value is not None
 
     def test_username_pattern_regex(self):
         """Test the username pattern regex directly."""

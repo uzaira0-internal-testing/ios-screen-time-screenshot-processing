@@ -293,20 +293,17 @@ class TestProcessingPipeline:
         assert pipeline._parse_time_to_minutes("no time here") is None
 
     @patch("screenshot_processor.core.processing_pipeline.cv2.imread")
-    @patch("screenshot_processor.core.processing_pipeline.find_screenshot_title")
-    @patch("screenshot_processor.core.processing_pipeline.find_screenshot_total_usage")
+    @patch("screenshot_processor.core.processing_pipeline.find_title_and_total")
     def test_process_daily_screenshot_detection(
         self,
-        mock_find_total,
-        mock_find_title,
+        mock_find_all,
         mock_imread,
         pipeline,
     ):
         """Test that daily screenshots are detected and marked."""
         # Setup mocks
         mock_imread.return_value = np.ones((500, 400, 3), dtype=np.uint8) * 255
-        mock_find_title.return_value = ("Daily Total", None)
-        mock_find_total.return_value = ("", None)
+        mock_find_all.return_value = ("Daily Total", None, "", None)
 
         result = pipeline.process_single_image("/path/to/image.png")
 
@@ -315,19 +312,16 @@ class TestProcessingPipeline:
         assert ProcessingTag.DAILY_SCREENSHOT.value in result.metadata.tags
 
     @patch("screenshot_processor.core.processing_pipeline.cv2.imread")
-    @patch("screenshot_processor.core.processing_pipeline.find_screenshot_title")
-    @patch("screenshot_processor.core.processing_pipeline.find_screenshot_total_usage")
+    @patch("screenshot_processor.core.processing_pipeline.find_title_and_total")
     def test_process_no_total_detected(
         self,
-        mock_find_total,
-        mock_find_title,
+        mock_find_all,
         mock_imread,
         pipeline,
     ):
         """Test handling when no total is detected."""
         mock_imread.return_value = np.ones((500, 400, 3), dtype=np.uint8) * 255
-        mock_find_title.return_value = ("App Name", 100)
-        mock_find_total.return_value = ("", None)  # No total detected
+        mock_find_all.return_value = ("App Name", 100, "", None)  # No total detected
 
         result = pipeline.process_single_image("/path/to/image.png")
 
@@ -348,21 +342,18 @@ class TestProcessingPipeline:
         assert ProcessingTag.EXTRACTION_FAILED.value in result.metadata.tags
 
     @patch("screenshot_processor.core.processing_pipeline.cv2.imread")
-    @patch("screenshot_processor.core.processing_pipeline.find_screenshot_title")
-    @patch("screenshot_processor.core.processing_pipeline.find_screenshot_total_usage")
+    @patch("screenshot_processor.core.processing_pipeline.find_title_and_total")
     @patch("screenshot_processor.core.processing_pipeline.process_image")
     def test_process_exact_match(
         self,
         mock_process_image,
-        mock_find_total,
-        mock_find_title,
+        mock_find_all,
         mock_imread,
         pipeline,
     ):
         """Test handling exact match (OCR total == extracted total)."""
         mock_imread.return_value = np.ones((500, 400, 3), dtype=np.uint8) * 255
-        mock_find_title.return_value = ("App Name", 100)
-        mock_find_total.return_value = ("1h 0m", None)  # 60 minutes
+        mock_find_all.return_value = ("App Name", 100, "1h 0m", None)  # 60 minutes
         # process_image returns: (path, graph_path, row, title, total, total_img, coords)
         # Row with 24 values summing to 60
         row_data = [2.5] * 24 + [60.0]  # 24 * 2.5 = 60
@@ -384,21 +375,18 @@ class TestProcessingPipeline:
         assert ProcessingTag.AUTO_PROCESSED.value in result.metadata.tags
 
     @patch("screenshot_processor.core.processing_pipeline.cv2.imread")
-    @patch("screenshot_processor.core.processing_pipeline.find_screenshot_title")
-    @patch("screenshot_processor.core.processing_pipeline.find_screenshot_total_usage")
+    @patch("screenshot_processor.core.processing_pipeline.find_title_and_total")
     @patch("screenshot_processor.core.processing_pipeline.process_image")
     def test_process_close_match(
         self,
         mock_process_image,
-        mock_find_total,
-        mock_find_title,
+        mock_find_all,
         mock_imread,
         pipeline,
     ):
         """Test handling close match (small difference)."""
         mock_imread.return_value = np.ones((500, 400, 3), dtype=np.uint8) * 255
-        mock_find_title.return_value = ("App Name", 100)
-        mock_find_total.return_value = ("1h 0m", None)  # 60 minutes
+        mock_find_all.return_value = ("App Name", 100, "1h 0m", None)  # 60 minutes
         # Row with 24 values summing to 59 (1 minute difference = close match)
         row_data = [59.0 / 24] * 24 + [59.0]
         mock_process_image.return_value = (
@@ -420,21 +408,18 @@ class TestProcessingPipeline:
         assert ProcessingTag.NEEDS_VALIDATION.value in result.metadata.tags
 
     @patch("screenshot_processor.core.processing_pipeline.cv2.imread")
-    @patch("screenshot_processor.core.processing_pipeline.find_screenshot_title")
-    @patch("screenshot_processor.core.processing_pipeline.find_screenshot_total_usage")
+    @patch("screenshot_processor.core.processing_pipeline.find_title_and_total")
     @patch("screenshot_processor.core.processing_pipeline.process_image")
     def test_process_poor_match(
         self,
         mock_process_image,
-        mock_find_total,
-        mock_find_title,
+        mock_find_all,
         mock_imread,
         pipeline,
     ):
         """Test handling poor match (large difference)."""
         mock_imread.return_value = np.ones((500, 400, 3), dtype=np.uint8) * 255
-        mock_find_title.return_value = ("App Name", 100)
-        mock_find_total.return_value = ("1h 0m", None)  # 60 minutes
+        mock_find_all.return_value = ("App Name", 100, "1h 0m", None)  # 60 minutes
         # Row with 24 values summing to 48 (12 minutes difference = 20% = poor match)
         row_data = [48.0 / 24] * 24 + [48.0]
         mock_process_image.return_value = (
@@ -455,21 +440,18 @@ class TestProcessingPipeline:
         assert ProcessingTag.NEEDS_MANUAL.value in result.metadata.tags
 
     @patch("screenshot_processor.core.processing_pipeline.cv2.imread")
-    @patch("screenshot_processor.core.processing_pipeline.find_screenshot_title")
-    @patch("screenshot_processor.core.processing_pipeline.find_screenshot_total_usage")
+    @patch("screenshot_processor.core.processing_pipeline.find_title_and_total")
     @patch("screenshot_processor.core.processing_pipeline.process_image")
     def test_process_extraction_failure(
         self,
         mock_process_image,
-        mock_find_total,
-        mock_find_title,
+        mock_find_all,
         mock_imread,
         pipeline,
     ):
         """Test handling extraction failure."""
         mock_imread.return_value = np.ones((500, 400, 3), dtype=np.uint8) * 255
-        mock_find_title.return_value = ("App Name", 100)
-        mock_find_total.return_value = ("1h 0m", None)
+        mock_find_all.return_value = ("App Name", 100, "1h 0m", None)
         mock_process_image.side_effect = ValueError("Could not find graph anchors")
 
         result = pipeline.process_single_image("/path/to/image.png")
@@ -480,21 +462,18 @@ class TestProcessingPipeline:
         assert ProcessingTag.NEEDS_MANUAL.value in result.metadata.tags
 
     @patch("screenshot_processor.core.processing_pipeline.cv2.imread")
-    @patch("screenshot_processor.core.processing_pipeline.find_screenshot_title")
-    @patch("screenshot_processor.core.processing_pipeline.find_screenshot_total_usage")
+    @patch("screenshot_processor.core.processing_pipeline.find_title_and_total")
     @patch("screenshot_processor.core.processing_pipeline.process_image")
     def test_process_title_not_found(
         self,
         mock_process_image,
-        mock_find_total,
-        mock_find_title,
+        mock_find_all,
         mock_imread,
         pipeline,
     ):
         """Test handling when title is not found."""
         mock_imread.return_value = np.ones((500, 400, 3), dtype=np.uint8) * 255
-        mock_find_title.return_value = ("", None)  # No title
-        mock_find_total.return_value = ("1h 0m", None)
+        mock_find_all.return_value = ("", None, "1h 0m", None)  # No title, has total
         row_data = [2.5] * 24 + [60.0]
         mock_process_image.return_value = (
             "/path/to/image.png",
