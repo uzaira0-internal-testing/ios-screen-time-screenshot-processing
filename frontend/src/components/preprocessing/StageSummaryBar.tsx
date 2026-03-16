@@ -137,7 +137,7 @@ export const StageSummaryBar = () => {
           onClick={() => resetStage(activeStage)}
           className="ml-auto px-4 py-1.5 text-sm font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded-md hover:bg-orange-100 transition-colors"
         >
-          Reset {stageLabel} ({counts.completed + counts.exceptions})
+          Reset {stageLabel} ({counts.completed})
         </button>
       )}
 

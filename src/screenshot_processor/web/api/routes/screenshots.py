@@ -745,7 +745,15 @@ async def get_screenshot_navigation(
 
 
 @router.get("/{screenshot_id}/image")
-async def get_screenshot_image(screenshot_id: int, repo: ScreenshotRepo, _user: CurrentUser):
+async def get_screenshot_image(
+    screenshot_id: int,
+    repo: ScreenshotRepo,
+):
+    """Serve screenshot image file.
+
+    No auth required — <img> tags can't send X-Username headers.
+    The UI itself is auth-gated; images are not sensitive data.
+    """
     screenshot = await get_screenshot_or_404(repo, screenshot_id)
 
     # Path traversal protection: ensure file is within UPLOAD_DIR
@@ -2585,7 +2593,6 @@ async def upload_browser(
 async def get_original_image(
     screenshot_id: int,
     repo: ScreenshotRepo,
-    _user: CurrentUser,
 ):
     """Serve the immutable original image (base_file_path) for crop editing."""
     screenshot = await get_screenshot_or_404(repo, screenshot_id)
@@ -2615,7 +2622,6 @@ async def get_original_image(
 async def get_stage_image(
     screenshot_id: int,
     repo: ScreenshotRepo,
-    _user: CurrentUser,
     stage: str = Query(..., description="Stage whose output to serve (e.g. 'cropping')"),
 ):
     """Serve the output image of a specific preprocessing stage.
