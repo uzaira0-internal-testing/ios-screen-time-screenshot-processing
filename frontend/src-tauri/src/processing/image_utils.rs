@@ -6,7 +6,10 @@
 //! Optimizations: raw buffer access, fused passes, LUT-based transforms,
 //! sampling for large-image pixel statistics.
 
-use image::{Rgb, RgbImage};
+use image::RgbImage;
+
+#[cfg(test)]
+use image::Rgb;
 
 /// Dark mode detection threshold (mean pixel value).
 const DARK_MODE_THRESHOLD: f64 = 100.0;

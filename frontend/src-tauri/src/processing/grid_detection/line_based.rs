@@ -7,7 +7,8 @@ use image::RgbImage;
 
 use super::lookup;
 use super::strategies::{
-    fast_luma, find_evenly_spaced_groups, find_horizontal_lines, validate_vertical_lines,
+    fast_luma, find_evenly_spaced_groups, find_horizontal_lines,
+    validate_bar_colors, validate_vertical_lines,
 };
 use crate::processing::types::{GridBounds, GridDetectionResult, ProcessingError};
 
@@ -76,26 +77,35 @@ pub fn detect(img: &RgbImage) -> Result<GridDetectionResult, ProcessingError> {
         });
     }
 
-    // Try each candidate region
+    // Try each candidate region: vertical line validation + color validation
     let mut best_result: Option<(GridBounds, f64, Vec<i32>)> = None;
 
     for group in &groups {
         let y_start = group.y_start as u32;
         let y_end = group.y_end as u32;
 
+        // Step 3a: Validate vertical line pattern (daily = 3-5 lines)
         let (is_daily, confidence, _v_count, v_positions) =
             validate_vertical_lines(&img, x_start, width, y_start, y_end);
 
-        if is_daily {
-            if best_result.is_none() || confidence > best_result.as_ref().unwrap().1 {
-                let bounds = GridBounds::from_roi(
-                    x_start as i32,
-                    y_start as i32,
-                    width as i32,
-                    (y_end - y_start) as i32,
-                );
-                best_result = Some((bounds, confidence, v_positions));
-            }
+        if !is_daily {
+            continue;
+        }
+
+        // Step 3b: Color validation — reject pickups charts (cyan bars)
+        let (color_valid, _color_conf) = validate_bar_colors(&img, x_start, width, y_start, y_end);
+        if !color_valid {
+            continue;
+        }
+
+        if best_result.is_none() || confidence > best_result.as_ref().unwrap().1 {
+            let bounds = GridBounds::from_roi(
+                x_start as i32,
+                y_start as i32,
+                width as i32,
+                (y_end - y_start) as i32,
+            );
+            best_result = Some((bounds, confidence, v_positions));
         }
     }
 

@@ -35,6 +35,7 @@ pub struct LineGroup {
     pub num_lines: usize,
     pub mean_spacing: f64,
     pub max_deviation: f64,
+    pub height_score: f64,
     pub lines: Vec<i32>,
 }
 
@@ -106,7 +107,7 @@ pub fn find_evenly_spaced_groups(
                 continue;
             }
 
-            let _height_score = if let Some(expected) = expected_height {
+            let height_score = if let Some(expected) = expected_height {
                 let group_height = group.last().unwrap() - group.first().unwrap();
                 let error = (group_height - expected).abs() as f64;
                 (1.0 - error / expected as f64).max(0.5)
@@ -120,15 +121,18 @@ pub fn find_evenly_spaced_groups(
                 num_lines: group.len(),
                 mean_spacing,
                 max_deviation: max_dev,
+                height_score,
                 lines: group.to_vec(),
             });
         }
     }
 
-    // Sort: most lines first, then lowest spacing deviation
+    // Sort: most lines DESC, height_score DESC, max_deviation ASC
+    // (matches Python: key=lambda g: (-g["num_lines"], -g["height_score"], g["max_deviation"]))
     groups.sort_by(|a, b| {
         b.num_lines
             .cmp(&a.num_lines)
+            .then(b.height_score.partial_cmp(&a.height_score).unwrap())
             .then(a.max_deviation.partial_cmp(&b.max_deviation).unwrap())
     });
 
@@ -257,6 +261,80 @@ pub fn cluster_positions(positions: &[i32], max_gap: i32) -> Vec<i32> {
     clusters.push(mean);
 
     clusters
+}
+
+// ---------------------------------------------------------------------------
+// Color validation — reject Pickups charts (cyan bars) vs daily (blue bars)
+// ---------------------------------------------------------------------------
+
+use crate::processing::image_utils::rgb_to_hsv;
+
+/// HSV hue ranges (OpenCV convention: H 0-180)
+const BLUE_HUE_MIN: u8 = 100;
+const BLUE_HUE_MAX: u8 = 130;
+const CYAN_HUE_MIN: u8 = 80;
+const _CYAN_HUE_MAX: u8 = 100; // used as BLUE_HUE_MIN boundary in validate_bar_colors
+const COLOR_MIN_SATURATION: u8 = 50;
+const COLOR_MIN_VALUE: u8 = 50;
+const MIN_BLUE_RATIO: f64 = 0.5;
+
+/// Validate that a region contains blue bars (daily chart) not cyan (pickups).
+///
+/// Port of Python `ColorValidationStrategy.validate_region()`.
+/// Returns (is_daily, confidence).
+pub fn validate_bar_colors(
+    img: &RgbImage,
+    x_start: u32,
+    width: u32,
+    y_start: u32,
+    y_end: u32,
+) -> (bool, f64) {
+    let (img_w, img_h) = img.dimensions();
+    let raw = img.as_raw();
+    let stride = img_w as usize * 3;
+
+    let mut blue_count = 0u32;
+    let mut cyan_count = 0u32;
+
+    let x_end = (x_start + width).min(img_w);
+    let y_end = y_end.min(img_h);
+
+    for y in y_start..y_end {
+        let row_off = y as usize * stride;
+        for x in x_start..x_end {
+            let idx = row_off + x as usize * 3;
+            let (h, s, v) = rgb_to_hsv(raw[idx], raw[idx + 1], raw[idx + 2]);
+
+            // Only consider colored pixels
+            if s < COLOR_MIN_SATURATION || v < COLOR_MIN_VALUE {
+                continue;
+            }
+
+            if h >= BLUE_HUE_MIN && h <= BLUE_HUE_MAX {
+                blue_count += 1;
+            } else if h >= CYAN_HUE_MIN && h < BLUE_HUE_MIN {
+                cyan_count += 1;
+            }
+        }
+    }
+
+    let total = blue_count + cyan_count;
+
+    if total == 0 {
+        // No blue or cyan bars — might be empty chart or gray bars, allow it
+        return (true, 0.6);
+    }
+
+    let blue_ratio = blue_count as f64 / total as f64;
+    let is_daily = blue_ratio >= MIN_BLUE_RATIO;
+
+    let confidence = if is_daily {
+        (0.7 + (blue_ratio - MIN_BLUE_RATIO) * 0.6).min(0.99)
+    } else {
+        0.0
+    };
+
+    (is_daily, confidence)
 }
 
 #[cfg(test)]
