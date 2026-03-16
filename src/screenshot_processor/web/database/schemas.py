@@ -554,7 +554,7 @@ class PreprocessRequest(BaseModel):
 
     phi_pipeline_preset: str = Field(
         default="screen_time",
-        description="PHI detection pipeline preset: fast, balanced, hipaa_compliant, thorough",
+        description="PHI detection pipeline preset: fast, balanced, hipaa_compliant, thorough, screen_time",
     )
     phi_redaction_method: str = Field(
         default="redbox",
@@ -563,6 +563,14 @@ class PreprocessRequest(BaseModel):
     phi_detection_enabled: bool = Field(
         default=True,
         description="Whether to run PHI detection/redaction",
+    )
+    phi_ocr_engine: str = Field(
+        default="tesseract",
+        description="OCR engine for PHI text extraction: tesseract (default), rust (faster via leptess C API)",
+    )
+    phi_ner_detector: str = Field(
+        default="presidio",
+        description="NER detector: presidio (fast, 6ms), gliner (accurate, F1=0.98, 112ms)",
     )
     run_ocr_after: bool = Field(
         default=False,
@@ -581,6 +589,8 @@ class BatchPreprocessRequest(BaseModel):
     phi_pipeline_preset: str = Field(default="screen_time")
     phi_redaction_method: str = Field(default="redbox")
     phi_detection_enabled: bool = Field(default=True)
+    phi_ocr_engine: str = Field(default="tesseract")
+    phi_ner_detector: str = Field(default="presidio")
     run_ocr_after: bool = Field(default=False)
 
 
@@ -630,6 +640,8 @@ class PHIDetectionStageRequest(StagePreprocessRequest):
     """PHI detection stage with preset."""
 
     phi_pipeline_preset: str = Field(default="screen_time")
+    phi_ocr_engine: str = Field(default="tesseract", description="OCR engine: tesseract, rust")
+    phi_ner_detector: str = Field(default="presidio", description="NER detector: presidio, gliner")
     llm_endpoint: str | None = Field(default=None, description="LLM API endpoint for assisted detection")
     llm_model: str | None = Field(default=None, description="LLM model name (e.g. openai/gpt-oss-20b)")
     llm_api_key: str | None = Field(default=None, description="API key for the LLM endpoint")

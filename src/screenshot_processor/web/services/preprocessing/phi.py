@@ -34,6 +34,8 @@ def detect_phi(
     llm_endpoint: str | None = None,
     llm_model: str | None = None,
     llm_api_key: str | None = None,
+    ocr_engine: str = "tesseract",
+    ner_detector: str = "presidio",
 ) -> PHIDetectionResult:
     """Detect PHI regions in an image.
 
@@ -53,14 +55,18 @@ def detect_phi(
         }
 
         if preset == "screen_time":
-            # Custom pipeline for screen time: Presidio only (no regex).
-            # The default DEVICE_SERIAL regex ([A-Z0-9]{10,17}) matches
-            # any 10+ char word and produces massive false positives on
-            # UI text like "Entertainment", "Authentication", etc.
+            # Custom pipeline for screen time screenshots.
+            # OCR engine and NER detector are user-configurable.
+            builder = PHIPipelineBuilder().with_ocr(ocr_engine)
+
+            # Add the chosen NER detector
+            if ner_detector == "gliner":
+                builder = builder.add_gliner(threshold=0.3)
+            else:
+                builder = builder.add_presidio(score_threshold=0.4)
+
             builder = (
-                PHIPipelineBuilder()
-                .with_ocr("tesseract")
-                .add_presidio(score_threshold=0.4)
+                builder
                 .with_prompt("screen_time")
                 .union_aggregation()
                 .with_min_bbox_area(100)
@@ -83,6 +89,9 @@ def detect_phi(
         else:
             builder_fn = builders.get(preset, PHIPipelineBuilder.screen_time)
             builder = builder_fn()
+            # Override OCR engine if non-default
+            if ocr_engine != "tesseract":
+                builder = builder.with_ocr(ocr_engine)
 
         if llm_endpoint and llm_model:
             builder = builder.add_llm(model=llm_model, api_endpoint=llm_endpoint, api_key=llm_api_key)

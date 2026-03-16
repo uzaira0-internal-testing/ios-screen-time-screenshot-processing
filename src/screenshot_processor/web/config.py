@@ -141,11 +141,19 @@ class Settings(AuthSettingsMixin, BaseSettings):
     )
     PHI_PIPELINE_PRESET: str = Field(
         default="hipaa_compliant",
-        description="PHI detection pipeline preset: fast, balanced, hipaa_compliant, thorough",
+        description="PHI detection pipeline preset: fast, balanced, hipaa_compliant, thorough, screen_time",
     )
     PHI_REDACTION_METHOD: str = Field(
         default="redbox",
         description="PHI redaction method: redbox, blackbox, pixelate",
+    )
+    PHI_OCR_ENGINE: str = Field(
+        default="tesseract",
+        description="OCR engine for PHI detection: tesseract (default), rust (faster via leptess C API)",
+    )
+    PHI_NER_DETECTOR: str = Field(
+        default="presidio",
+        description="NER detector for PHI detection: presidio (fast, 6ms), gliner (accurate, F1=0.98, 112ms)",
     )
 
     @field_validator("UPLOAD_API_KEY")
