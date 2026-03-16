@@ -2057,9 +2057,13 @@ def _run_sync_stage_batch(stage: str, screenshot_ids: list[int], process_fn) -> 
     SyncSession = sessionmaker(bind=engine)
 
     CHUNK_SIZE = 100
-    for chunk_start in range(0, len(screenshot_ids), CHUNK_SIZE):
+    total_processed = 0
+    total_chunks = (len(screenshot_ids) + CHUNK_SIZE - 1) // CHUNK_SIZE
+
+    for chunk_idx, chunk_start in enumerate(range(0, len(screenshot_ids), CHUNK_SIZE)):
         chunk_ids = screenshot_ids[chunk_start : chunk_start + CHUNK_SIZE]
         sync_db = SyncSession()
+        chunk_count = 0
         try:
             screenshots = sync_db.query(Screenshot).filter(Screenshot.id.in_(chunk_ids)).all()
             for screenshot in screenshots:
@@ -2068,6 +2072,7 @@ def _run_sync_stage_batch(stage: str, screenshot_ids: list[int], process_fn) -> 
                     set_stage_running(screenshot, stage)
                     process_fn(screenshot, stage)
                     flag_modified(screenshot, "processing_metadata")
+                    chunk_count += 1
                 except Exception as e:
                     logger.warning(f"{stage} failed for {screenshot.id}: {e}")
                     try:
@@ -2076,13 +2081,19 @@ def _run_sync_stage_batch(stage: str, screenshot_ids: list[int], process_fn) -> 
                     except Exception:
                         pass
             sync_db.commit()
-        except Exception:
+            total_processed += chunk_count
+            logger.info(
+                f"{stage} chunk {chunk_idx + 1}/{total_chunks} committed",
+                extra={"chunk": chunk_idx + 1, "chunk_count": chunk_count, "total_so_far": total_processed},
+            )
+        except Exception as e:
             sync_db.rollback()
+            logger.error(f"{stage} chunk {chunk_idx + 1}/{total_chunks} FAILED: {e}")
         finally:
             sync_db.close()
 
     engine.dispose()
-    logger.info(f"{stage} batch completed", extra={"total": len(screenshot_ids)})
+    logger.info(f"{stage} batch completed", extra={"total_processed": total_processed, "total_requested": len(screenshot_ids)})
 
 
 @router.post("/preprocess-stage/device-detection", response_model=StagePreprocessResponse)
@@ -2169,12 +2180,31 @@ async def run_cropping_stage(
     def _process_crop(screenshot, stage):
         from pathlib import Path
 
+        import cv2
+        import numpy as np
+
         input_file = get_current_input_file(screenshot, stage)
         image_bytes = Path(input_file).read_bytes()
         device = detect_device(input_file)
         cropped_bytes, was_cropped, was_patched = crop_screenshot_if_ipad(image_bytes, device)
 
-        result_data = {"was_cropped": was_cropped, "was_patched": was_patched, "is_ipad": device.is_ipad}
+        result_data = {
+            "was_cropped": was_cropped,
+            "was_patched": was_patched,
+            "is_ipad": device.is_ipad,
+        }
+
+        # Store dimensions (required by CroppingTab UI)
+        if was_cropped and device:
+            result_data["original_dimensions"] = [device.width, device.height]
+            arr = np.frombuffer(cropped_bytes, np.uint8)
+            cropped_img = cv2.imdecode(arr, cv2.IMREAD_UNCHANGED)
+            if cropped_img is not None:
+                result_data["cropped_dimensions"] = [cropped_img.shape[1], cropped_img.shape[0]]
+        elif device and device.width > 0:
+            result_data["original_dimensions"] = [device.width, device.height]
+            result_data["cropped_dimensions"] = [device.width, device.height]
+
         output_file = None
         if was_cropped:
             version = get_next_version(screenshot, stage)
