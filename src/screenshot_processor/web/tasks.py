@@ -177,6 +177,8 @@ def preprocess_screenshot_task(
     phi_pipeline_preset: str | None = None,
     phi_redaction_method: str | None = None,
     phi_detection_enabled: bool | None = None,
+    phi_ocr_engine: str | None = None,
+    phi_ner_detector: str | None = None,
     run_ocr_after: bool = True,
 ) -> dict:
     """Preprocess a screenshot (device detection, cropping, PHI redaction) then optionally chain into OCR processing.
@@ -207,6 +209,10 @@ def preprocess_screenshot_task(
             overrides["phi_redaction_method"] = phi_redaction_method
         if phi_detection_enabled is not None:
             overrides["phi_detection_enabled"] = phi_detection_enabled
+        if phi_ocr_engine is not None:
+            overrides["phi_ocr_engine"] = phi_ocr_engine
+        if phi_ner_detector is not None:
+            overrides["phi_ner_detector"] = phi_ner_detector
 
         preprocess_result = preprocess_screenshot_sync(db, screenshot, **overrides)
 

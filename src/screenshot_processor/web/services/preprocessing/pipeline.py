@@ -41,6 +41,8 @@ def preprocess_screenshot_file(
     phi_detection_enabled: bool = True,
     phi_pipeline_preset: str = "hipaa_compliant",
     phi_redaction_method: str = "redbox",
+    phi_ocr_engine: str = "tesseract",
+    phi_ner_detector: str = "presidio",
 ) -> PreprocessingResult:
     """Run full preprocessing pipeline on a screenshot file. No DB operations.
 
@@ -99,7 +101,12 @@ def preprocess_screenshot_file(
     final_bytes = cropped_bytes
 
     if phi_detection_enabled:
-        detection_result = detect_phi(cropped_bytes, preset=phi_pipeline_preset)
+        detection_result = detect_phi(
+            cropped_bytes,
+            preset=phi_pipeline_preset,
+            ocr_engine=phi_ocr_engine,
+            ner_detector=phi_ner_detector,
+        )
         phi_detected = detection_result.phi_detected
         phi_count = detection_result.regions_count
 
@@ -131,6 +138,8 @@ def preprocess_screenshot_sync(
     phi_pipeline_preset: str | None = None,
     phi_redaction_method: str | None = None,
     phi_detection_enabled: bool | None = None,
+    phi_ocr_engine: str | None = None,
+    phi_ner_detector: str | None = None,
 ) -> dict:
     """Run preprocessing on a screenshot and update DB metadata.
 
@@ -164,6 +173,8 @@ def preprocess_screenshot_sync(
     )
     effective_phi_preset = phi_pipeline_preset or getattr(settings, "PHI_PIPELINE_PRESET", "hipaa_compliant")
     effective_phi_method = phi_redaction_method or getattr(settings, "PHI_REDACTION_METHOD", "redbox")
+    effective_phi_ocr = phi_ocr_engine or getattr(settings, "PHI_OCR_ENGINE", "tesseract")
+    effective_phi_ner = phi_ner_detector or getattr(settings, "PHI_NER_DETECTOR", "presidio")
 
     # Always preprocess from the original file, not a previously preprocessed version
     existing_preprocessing = (screenshot.processing_metadata or {}).get("preprocessing", {})
@@ -176,6 +187,8 @@ def preprocess_screenshot_sync(
         phi_detection_enabled=effective_phi_detection,
         phi_pipeline_preset=effective_phi_preset,
         phi_redaction_method=effective_phi_method,
+        phi_ocr_engine=effective_phi_ocr,
+        phi_ner_detector=effective_phi_ner,
     )
 
     # Build metadata dict

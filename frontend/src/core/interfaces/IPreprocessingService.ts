@@ -28,6 +28,8 @@ export interface RunStageOptions {
   screenshot_ids?: number[];
   phi_pipeline_preset?: string;
   phi_redaction_method?: string;
+  phi_ocr_engine?: string;
+  phi_ner_detector?: string;
   llm_endpoint?: string;
   llm_model?: string;
   llm_api_key?: string;

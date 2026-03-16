@@ -346,10 +346,15 @@ export function createPreprocessingStore(service: IPreprocessingService) {
         phi_pipeline_preset: phiPreset,
         phi_redaction_method: redactionMethod,
       };
-      if (llmEnabled && stage === "phi_detection") {
-        options.llm_endpoint = llmEndpoint;
-        options.llm_model = llmModel;
-        if (llmApiKey) options.llm_api_key = llmApiKey;
+      if (stage === "phi_detection") {
+        const settings = useSettingsStore.getState();
+        options.phi_ocr_engine = settings.phiOcrEngine;
+        options.phi_ner_detector = settings.phiNerDetector;
+        if (llmEnabled) {
+          options.llm_endpoint = llmEndpoint;
+          options.llm_model = llmModel;
+          if (llmApiKey) options.llm_api_key = llmApiKey;
+        }
       }
       if (stage === "ocr") {
         const settings = useSettingsStore.getState();

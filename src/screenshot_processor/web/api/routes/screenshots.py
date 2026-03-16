@@ -1848,6 +1848,8 @@ async def preprocess_screenshot(
             phi_pipeline_preset=preprocess_request.phi_pipeline_preset,
             phi_redaction_method=preprocess_request.phi_redaction_method,
             phi_detection_enabled=preprocess_request.phi_detection_enabled,
+            phi_ocr_engine=preprocess_request.phi_ocr_engine,
+            phi_ner_detector=preprocess_request.phi_ner_detector,
             run_ocr_after=preprocess_request.run_ocr_after,
         )
 
@@ -1896,6 +1898,8 @@ async def preprocess_screenshots_batch(
                 phi_pipeline_preset=batch_request.phi_pipeline_preset,
                 phi_redaction_method=batch_request.phi_redaction_method,
                 phi_detection_enabled=batch_request.phi_detection_enabled,
+                phi_ocr_engine=batch_request.phi_ocr_engine,
+                phi_ner_detector=batch_request.phi_ner_detector,
                 run_ocr_after=batch_request.run_ocr_after,
             )
             for sid in screenshot_ids
