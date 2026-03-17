@@ -15,6 +15,8 @@
 #   - http://labserver/ios-screen-time-screenshot-processing/api/v1  → Backend API
 # =============================================================================
 
+name: ios-screen-time
+
 services:
   # ---------------------------------------------------------------------------
   # Database Services

@@ -13,6 +13,8 @@
 # Access:
 #   - Application: http://localhost:9000
 
+name: ios-screen-time-wasm
+
 services:
   wasm-app:
     build:

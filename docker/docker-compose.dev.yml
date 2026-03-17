@@ -18,10 +18,12 @@
 #   Changes to src/* trigger automatic server restart
 #
 # PORTS (to avoid conflicts with other projects):
-#   PostgreSQL: 5435
-#   Redis: 6381
+#   PostgreSQL: 5436
+#   Redis: 6382
 #   Backend API: 8002
 #   Frontend: 5175
+
+name: ios-screen-time
 
 services:
   # ==========================================================================
@@ -61,7 +63,7 @@ services:
     image: redis:7-alpine
     container_name: ios-screen-time-screenshot-processing-redis-dev
     ports:
-      - "6381:6379"
+      - "6382:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
