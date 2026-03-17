@@ -479,6 +479,10 @@ export function createPreprocessingStore(service: IPreprocessingService) {
 
     for (let batchStart = 0; batchStart < uploadFiles.length; batchStart += BATCH_SIZE) {
       const batch = uploadFiles.slice(batchStart, batchStart + BATCH_SIZE);
+
+      // Show progress at the start of each batch so the bar moves immediately
+      set({ uploadProgress: { completed: batchStart, total: uploadFiles.length } });
+
       const formData = new FormData();
 
       const metadata = {

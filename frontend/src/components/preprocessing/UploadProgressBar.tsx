@@ -20,10 +20,15 @@ export const UploadProgressBar = ({ completed, total, errors }: UploadProgressBa
         <span className="font-medium text-slate-700 dark:text-slate-300">{pct}%</span>
       </div>
       <div className="w-full h-2.5 bg-slate-200 dark:bg-slate-600 rounded-full overflow-hidden">
-        <div
-          className="h-full bg-primary-500 rounded-full transition-all duration-300"
-          style={{ width: `${pct}%` }}
-        />
+        {pct === 0 ? (
+          // Indeterminate pulse while waiting for the first batch to respond
+          <div className="h-full bg-primary-400 rounded-full animate-pulse w-full opacity-60" />
+        ) : (
+          <div
+            className="h-full bg-primary-500 rounded-full transition-all duration-300"
+            style={{ width: `${pct}%` }}
+          />
+        )}
       </div>
       {errors.length > 0 && (
         <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-md">

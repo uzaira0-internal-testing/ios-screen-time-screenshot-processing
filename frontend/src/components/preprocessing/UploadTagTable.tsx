@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import type { UploadFileItem } from "@/store/preprocessingStore";
 
 interface UploadTagTableProps {
@@ -22,14 +23,23 @@ export const UploadTagTable = ({
   const thumbsGenerated = useRef(false);
   const [regexInput, setRegexInput] = useState("");
   const [regexError, setRegexError] = useState<string | null>(null);
+  const scrollParentRef = useRef<HTMLDivElement>(null);
 
-  // Generate thumbnails on mount
+  const ROW_HEIGHT = 52; // px — must match the rendered row height
+
+  const rowVirtualizer = useVirtualizer({
+    count: files.length,
+    getScrollElement: () => scrollParentRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 10,
+  });
+
+  // Generate thumbnails on mount (first 50 only)
   useEffect(() => {
     if (thumbsGenerated.current || files.length === 0) return;
     thumbsGenerated.current = true;
 
     const newThumbs: Record<number, string> = {};
-    // Only generate thumbnails for first 50 to avoid perf issues
     const limit = Math.min(files.length, 50);
     for (let i = 0; i < limit; i++) {
       newThumbs[i] = URL.createObjectURL(files[i]!.file);
@@ -142,65 +152,81 @@ export const UploadTagTable = ({
         )}
       </div>
 
-      {/* File table */}
-      <div className="overflow-x-auto max-h-96 overflow-y-auto border dark:border-slate-700 rounded-lg">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-white dark:bg-slate-800 border-b dark:border-slate-700">
-            <tr className="text-left text-slate-500 dark:text-slate-400">
-              <th className="px-3 py-2 w-12">Thumb</th>
-              <th className="px-3 py-2">Filename</th>
-              <th className="px-3 py-2 w-40">Participant ID</th>
-              <th className="px-3 py-2 w-36">Date</th>
-              <th className="px-3 py-2 w-12"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {files.map((item, i) => (
-              <tr key={i} className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                <td className="px-3 py-1.5">
-                  {thumbnails[i] ? (
-                    <img
-                      src={thumbnails[i]}
-                      alt=""
-                      className="w-8 h-11 object-cover rounded"
+      {/* File list — virtualized so large folders don't freeze the browser.
+          Uses CSS grid divs (not <table>) because position:absolute on <tr> breaks table layout. */}
+      <div className="border dark:border-slate-700 rounded-lg overflow-hidden text-sm">
+        {/* Sticky header row */}
+        <div
+          className="grid text-left text-xs font-medium text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800 border-b dark:border-slate-700 px-3 py-2"
+          style={{ gridTemplateColumns: "48px 1fr 160px 144px 40px" }}
+        >
+          <span>Thumb</span>
+          <span>Filename</span>
+          <span>Participant ID</span>
+          <span>Date</span>
+          <span />
+        </div>
+        {/* Virtualized scroll body */}
+        <div ref={scrollParentRef} className="overflow-y-auto" style={{ maxHeight: 384 }}>
+          <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
+            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+              const i = virtualRow.index;
+              const item = files[i]!;
+              return (
+                <div
+                  key={i}
+                  className="grid items-center border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 px-3"
+                  style={{
+                    gridTemplateColumns: "48px 1fr 160px 144px 40px",
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    height: `${ROW_HEIGHT}px`,
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                >
+                  <div className="py-1.5">
+                    {thumbnails[i] ? (
+                      <img src={thumbnails[i]} alt="" className="w-8 h-11 object-cover rounded" />
+                    ) : (
+                      <div className="w-8 h-11 bg-slate-200 dark:bg-slate-600 rounded" />
+                    )}
+                  </div>
+                  <div className="py-1.5 pr-2 text-xs text-slate-600 dark:text-slate-400 truncate min-w-0" title={item.original_filepath}>
+                    {item.filename}
+                  </div>
+                  <div className="py-1.5 pr-2">
+                    <input
+                      type="text"
+                      value={item.participant_id}
+                      onChange={(e) => updateItem(i, "participant_id", e.target.value)}
+                      className="w-full text-xs border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 rounded px-2 py-1"
                     />
-                  ) : (
-                    <div className="w-8 h-11 bg-slate-200 dark:bg-slate-600 rounded" />
-                  )}
-                </td>
-                <td className="px-3 py-1.5 text-xs text-slate-600 dark:text-slate-400 max-w-xs truncate" title={item.original_filepath}>
-                  {item.filename}
-                </td>
-                <td className="px-3 py-1.5">
-                  <input
-                    type="text"
-                    value={item.participant_id}
-                    onChange={(e) => updateItem(i, "participant_id", e.target.value)}
-                    className="w-full text-xs border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 rounded px-2 py-1"
-                  />
-                </td>
-                <td className="px-3 py-1.5">
-                  <input
-                    type="date"
-                    value={item.screenshot_date}
-                    onChange={(e) => updateItem(i, "screenshot_date", e.target.value)}
-                    className="w-full text-xs border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 rounded px-2 py-1"
-                  />
-                </td>
-                <td className="px-3 py-1.5">
-                  <button
-                    onClick={() => removeItem(i)}
-                    className="text-slate-400 hover:text-red-500 dark:hover:text-red-400 text-sm leading-none"
-                    title="Remove file"
-                    aria-label={`Remove ${item.filename}`}
-                  >
-                    &times;
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  </div>
+                  <div className="py-1.5 pr-2">
+                    <input
+                      type="date"
+                      value={item.screenshot_date}
+                      onChange={(e) => updateItem(i, "screenshot_date", e.target.value)}
+                      className="w-full text-xs border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 rounded px-2 py-1"
+                    />
+                  </div>
+                  <div className="py-1.5">
+                    <button
+                      onClick={() => removeItem(i)}
+                      className="text-slate-400 hover:text-red-500 dark:hover:text-red-400 text-sm leading-none"
+                      title="Remove file"
+                      aria-label={`Remove ${item.filename}`}
+                    >
+                      &times;
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );

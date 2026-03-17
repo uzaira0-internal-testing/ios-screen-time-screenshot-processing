@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -298,6 +299,27 @@ STAGE_FILE_SUFFIX = {
     "phi_redaction": "redact",
 }
 
+# Pattern that matches pipeline-generated output suffixes: _crop_v1.png, _redact_v2.jpg, etc.
+_PIPELINE_SUFFIX_RE = re.compile(r"_(crop|redact)_v\d+(\.[^.]+)$")
+
+
+def _resolve_original_path(path: str) -> str:
+    """Strip pipeline output suffixes to recover the original upload path.
+
+    If path ends with _crop_v{N}.ext or _redact_v{N}.ext and the candidate
+    original path exists on disk, return the original. Otherwise return path
+    unchanged.  This ensures device_detection and cropping always use the
+    file that was actually uploaded, never a previously-generated crop or
+    redaction output.
+    """
+    p = Path(path)
+    candidate_name = _PIPELINE_SUFFIX_RE.sub(r"\2", p.name)
+    if candidate_name != p.name:
+        candidate = p.parent / candidate_name
+        if candidate.exists():
+            return str(candidate)
+    return path
+
 
 def init_preprocessing_metadata(screenshot: Any) -> dict:
     """Initialize preprocessing metadata on a screenshot if not already present.
@@ -308,7 +330,10 @@ def init_preprocessing_metadata(screenshot: Any) -> dict:
     metadata = screenshot.processing_metadata or {}
     pp = metadata.setdefault("preprocessing", {})
     if "base_file_path" not in pp:
-        pp["base_file_path"] = screenshot.file_path
+        # Always resolve to the original upload — strip any pipeline-generated
+        # suffixes (_crop_v1, _redact_v1) in case file_path was updated by a
+        # previous pipeline run before metadata was cleared/re-initialized.
+        pp["base_file_path"] = _resolve_original_path(screenshot.file_path)
         pp["events"] = []
         pp["current_events"] = {}
         pp["stage_status"] = dict.fromkeys(STAGE_ORDER, "pending")
@@ -440,12 +465,19 @@ def update_file_path(screenshot: Any) -> None:
 
 
 def get_current_input_file(screenshot: Any, stage: str) -> str:
-    """Get the input file for a stage based on current events."""
+    """Get the input file for a stage based on current events.
+
+    device_detection and cropping ALWAYS receive the original uploaded image —
+    never a previously-generated crop or redaction output.  PHI/OCR stages
+    receive the latest crop output (if any), or the original as fallback.
+    """
     pp = screenshot.processing_metadata.get("preprocessing", {})
     base = pp.get("base_file_path", screenshot.file_path)
 
     if stage in ("device_detection", "cropping"):
-        return base
+        # Resolve the original upload path — strips _crop_v{N}/_redact_v{N}
+        # suffixes in case base_file_path was set incorrectly in a prior run.
+        return _resolve_original_path(base)
     if stage in ("phi_detection", "phi_redaction"):
         # Use latest crop output, or base if no crop
         crop_eid = pp.get("current_events", {}).get("cropping")
