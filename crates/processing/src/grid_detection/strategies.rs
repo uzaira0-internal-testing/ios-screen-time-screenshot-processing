@@ -43,11 +43,7 @@ pub struct LineGroup {
 ///
 /// Uses direct buffer access instead of get_pixel() and computes
 /// grayscale inline to avoid allocating a separate GrayImage.
-pub fn find_horizontal_lines(
-    img: &RgbImage,
-    x_start: u32,
-    x_end: u32,
-) -> Vec<i32> {
+pub fn find_horizontal_lines(img: &RgbImage, x_start: u32, x_end: u32) -> Vec<i32> {
     let (w, h) = img.dimensions();
     let region_w = x_end.saturating_sub(x_start);
     if region_w == 0 {
@@ -81,10 +77,7 @@ pub fn find_horizontal_lines(
 }
 
 /// Find groups of evenly-spaced horizontal lines.
-pub fn find_evenly_spaced_groups(
-    lines: &[i32],
-    expected_height: Option<i32>,
-) -> Vec<LineGroup> {
+pub fn find_evenly_spaced_groups(lines: &[i32], expected_height: Option<i32>) -> Vec<LineGroup> {
     let min_lines = 4usize;
     let max_lines = 8usize;
     let mut groups = Vec::new();
@@ -232,8 +225,8 @@ pub fn validate_vertical_lines(
         return (false, 0.0, v_count, v_positions);
     }
 
-    let confidence = (0.8 + (1.0 - spacing_error) * 0.1 + (1.0 - max_deviation / mean_spacing) * 0.1)
-        .min(0.99);
+    let confidence =
+        (0.8 + (1.0 - spacing_error) * 0.1 + (1.0 - max_deviation / mean_spacing) * 0.1).min(0.99);
 
     (true, confidence, v_count, v_positions)
 }

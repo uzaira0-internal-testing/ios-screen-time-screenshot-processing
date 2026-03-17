@@ -22,7 +22,7 @@ from .bar_extraction import slice_image
 from .config import OCRConfig
 from .exceptions import ImageProcessingError
 from .grid_anchors import find_grid_anchors_and_calculate_roi
-from .image_utils import adjust_contrast_brightness, convert_dark_mode, remove_all_but
+from .image_utils import adjust_contrast_brightness, convert_dark_mode, convert_dark_mode_for_ocr, is_dark_mode, remove_all_but
 from .ocr import find_title_and_total, get_text
 from .ocr_integration import adjust_anchor_offsets, perform_ocr, prepare_image_chunks
 from .roi import calculate_roi, calculate_roi_from_clicks
@@ -173,8 +173,11 @@ def process_image(
     Returns:
         Tuple of (filename, graph_filename, row, title, total, total_image_path, grid_coords)
     """
-    img = load_and_validate_image(filename)
-    return apply_processing(filename, img, is_battery, snap_to_grid, ocr_config, raw_img=img)
+    img_original = cv2.imread(str(filename))
+    if img_original is None:
+        raise ImageProcessingError("Failed to load image.")
+    img = convert_dark_mode(img_original.copy())
+    return apply_processing(filename, img, is_battery, snap_to_grid, ocr_config, raw_img=img, original_img=img_original)
 
 
 def apply_processing(
@@ -184,15 +187,18 @@ def apply_processing(
     snap_to_grid: Callable | None,
     ocr_config: OCRConfig | None = None,
     raw_img: np.ndarray | None = None,
+    original_img: np.ndarray | None = None,
 ) -> tuple[str, str, list, str, str, str | None, dict | None]:
     """Apply processing pipeline to a loaded image.
 
     Args:
         filename: Path to image file (for saving outputs)
-        img: Loaded image in BGR format
+        img: Loaded image in BGR format (dark-mode-converted)
         is_battery: Whether this is a battery screenshot
         snap_to_grid: Optional function to snap to grid lines
         ocr_config: Optional OCR configuration
+        raw_img: Dark-mode-converted image for bar extraction
+        original_img: Original image before dark mode conversion (for OCR fallback)
 
     Returns:
         Tuple of (filename, graph_filename, row, title, total, total_image_path, grid_coords)
@@ -204,6 +210,20 @@ def apply_processing(
     adjust_anchor_offsets(d_right, right_offset)
 
     roi_params = find_grid_anchors_and_calculate_roi(d_left, d_right, img, img, snap_to_grid, calculate_roi)
+
+    # Dark mode fallback: standard preprocessing destroys faint text contrast
+    # (contrast=3.0 clips both text and background to ~255). Use adaptive
+    # thresholding which preserves text for Tesseract anchor detection.
+    orig = original_img if original_img is not None else raw_img
+    if roi_params is None and orig is not None and is_dark_mode(orig):
+        logger.info("Standard anchor detection failed on dark mode image, retrying with adaptive threshold OCR")
+        img_ocr = convert_dark_mode_for_ocr(orig.copy())
+        img_ocr = adjust_contrast_brightness(img_ocr, contrast=2.0, brightness=-220)
+        ocr_left, ocr_right, ocr_right_offset = prepare_image_chunks(img_ocr)
+        d_left, d_right = perform_ocr(ocr_left, ocr_right, ocr_config)
+        adjust_anchor_offsets(d_right, ocr_right_offset)
+        roi_params = find_grid_anchors_and_calculate_roi(d_left, d_right, img, img, snap_to_grid, calculate_roi)
+
     if roi_params is None:
         raise ValueError("Couldn't find graph anchors!")
 

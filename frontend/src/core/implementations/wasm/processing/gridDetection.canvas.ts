@@ -34,6 +34,12 @@ import {
   imageDataToCanvas,
 } from "./canvasImageUtils";
 import { adjustContrastBrightness } from "./imageUtils.canvas";
+import {
+  bitwiseNot,
+  calculateMean,
+  cvtColorToGray,
+  createCanvasMat,
+} from "./canvasImageUtils";
 import { extractLine, LineExtractionMode } from "./barExtraction.canvas";
 
 const BUFFER = 25;
@@ -66,6 +72,7 @@ interface OCRData {
 export async function detectGrid(
   worker: TesseractWorker,
   imageMat: CanvasMat,
+  originalMat?: CanvasMat,
 ): Promise<GridCoordinates | null> {
   const adjustedImg = adjustContrastBrightness(imageMat, 2.0, -220);
 
@@ -82,7 +89,24 @@ export async function detectGrid(
     adjustedImg,
   );
 
-  return gridCoords;
+  if (gridCoords) return gridCoords;
+
+  // Dark mode fallback: standard preprocessing destroys faint text contrast.
+  // Use adaptive thresholding which preserves text for Tesseract.
+  const source = originalMat ?? imageMat;
+  const mean = calculateMean(source);
+  const avgBrightness = (mean[0] + mean[1] + mean[2]) / 3;
+  if (avgBrightness < 100) {
+    const ocrImg = convertDarkModeForOcr(source);
+    const ocrAdjusted = adjustContrastBrightness(ocrImg, 2.0, -220);
+    const { imgLeft: ocrLeft, imgRight: ocrRight, rightOffset: ocrOffset } = prepareImageChunks(ocrAdjusted);
+    const dLeftRetry = await performOCR(worker, ocrLeft);
+    const dRightRetry = await performOCR(worker, ocrRight);
+    adjustAnchorOffsets(dRightRetry, ocrOffset);
+    return findGridAnchorsAndCalculateROI(dLeftRetry, dRightRetry, adjustedImg);
+  }
+
+  return null;
 }
 
 /**
@@ -439,4 +463,58 @@ function calculateROI(
     width: roiWidth,
     height: roiHeight,
   };
+}
+
+/**
+ * Convert dark mode image using adaptive thresholding for OCR.
+ *
+ * The standard convertDarkMode uses contrast=3.0 which clips faint gray text
+ * (e.g., "12 AM", "60" labels) to near-white, destroying contrast for Tesseract.
+ * This uses adaptive thresholding to preserve text readability.
+ */
+function convertDarkModeForOcr(src: CanvasMat): CanvasMat {
+  const inverted = bitwiseNot(src);
+  const gray = cvtColorToGray(inverted);
+  const grayData = gray.imageData.data;
+  const { width, height } = gray;
+
+  const blockSize = 31;
+  const half = Math.floor(blockSize / 2);
+  const cOffset = 10;
+
+  // Build integral image for fast mean calculation
+  const integral = new Float64Array((width + 1) * (height + 1));
+  const iw = width + 1;
+  for (let y = 0; y < height; y++) {
+    let rowSum = 0;
+    for (let x = 0; x < width; x++) {
+      rowSum += grayData[(y * width + x) * 4]!;
+      integral[(y + 1) * iw + (x + 1)] = rowSum + integral[y * iw + (x + 1)]!;
+    }
+  }
+
+  // Apply adaptive threshold
+  const result = new ImageData(width, height);
+  const out = result.data;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const y0 = Math.max(0, y - half);
+      const y1 = Math.min(height, y + half + 1);
+      const x0 = Math.max(0, x - half);
+      const x1 = Math.min(width, x + half + 1);
+      const area = (y1 - y0) * (x1 - x0);
+      const sum = integral[y1 * iw + x1]! - integral[y0 * iw + x1]!
+        - integral[y1 * iw + x0]! + integral[y0 * iw + x0]!;
+      const meanVal = sum / area;
+      const threshold = meanVal - cOffset;
+      const val = grayData[(y * width + x) * 4]! > threshold ? 255 : 0;
+      const idx = (y * width + x) * 4;
+      out[idx] = val;
+      out[idx + 1] = val;
+      out[idx + 2] = val;
+      out[idx + 3] = 255;
+    }
+  }
+
+  return createCanvasMat(result);
 }

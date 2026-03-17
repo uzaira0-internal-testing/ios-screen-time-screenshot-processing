@@ -14,36 +14,115 @@ use image::Rgb;
 /// Dark mode detection threshold (mean pixel value).
 const DARK_MODE_THRESHOLD: f64 = 100.0;
 
+/// Check if an image is in dark mode based on average brightness.
+pub fn is_dark_mode(img: &RgbImage) -> bool {
+    image_mean_fast(img) < DARK_MODE_THRESHOLD
+}
+
 /// Detect and convert dark mode screenshots to light mode.
 ///
 /// If the mean pixel value is below threshold, inverts all pixels
 /// and applies contrast=3.0, brightness=10 in a SINGLE fused pass
 /// (invert + contrast/brightness via a combined LUT).
 pub fn convert_dark_mode(img: &mut RgbImage) -> bool {
-    let mean = image_mean_fast(img);
-    if mean < DARK_MODE_THRESHOLD {
-        // Build a fused LUT: invert(x) then apply contrast=3.0, brightness=10
-        // invert: x -> 255 - x
-        // contrast/brightness: x -> clamp(x * contrast + adjusted_brightness)
-        // adjusted_brightness = brightness + round(255 * (1 - contrast) / 2)
-        //                     = 10 + round(255 * (1 - 3.0) / 2) = 10 + (-255) = -245
-        // combined: x -> clamp((255 - x) * 3.0 + (-245))
-        let adjusted_brightness: f64 = 10.0 + (255.0_f64 * (1.0 - 3.0) / 2.0).round(); // -245
-        let mut lut = [0u8; 256];
-        for i in 0..256 {
-            let inverted = 255 - i;
-            let val = (inverted as f64 * 3.0 + adjusted_brightness).round();
-            lut[i as usize] = val.clamp(0.0, 255.0) as u8;
-        }
-        // Single pass: apply fused LUT to every byte
-        let raw = img.as_mut();
-        for byte in raw.iter_mut() {
-            *byte = lut[*byte as usize];
-        }
-        true
-    } else {
-        false
+    if !is_dark_mode(img) {
+        return false;
     }
+    // Build a fused LUT: invert(x) then apply contrast=3.0, brightness=10
+    // invert: x -> 255 - x
+    // contrast/brightness: x -> clamp(x * contrast + adjusted_brightness)
+    // adjusted_brightness = brightness + round(255 * (1 - contrast) / 2)
+    //                     = 10 + round(255 * (1 - 3.0) / 2) = 10 + (-255) = -245
+    // combined: x -> clamp((255 - x) * 3.0 + (-245))
+    let adjusted_brightness: f64 = 10.0 + (255.0_f64 * (1.0 - 3.0) / 2.0).round(); // -245
+    let mut lut = [0u8; 256];
+    for i in 0..256 {
+        let inverted = 255 - i;
+        let val = (inverted as f64 * 3.0 + adjusted_brightness).round();
+        lut[i as usize] = val.clamp(0.0, 255.0) as u8;
+    }
+    // Single pass: apply fused LUT to every byte
+    let raw = img.as_mut();
+    for byte in raw.iter_mut() {
+        *byte = lut[*byte as usize];
+    }
+    true
+}
+
+/// Convert dark mode image using adaptive thresholding optimized for OCR.
+///
+/// The standard convert_dark_mode uses contrast=3.0 which clips faint gray text
+/// (e.g., "12 AM", "60" labels) to near-white, destroying contrast for Tesseract.
+/// This function uses adaptive thresholding to preserve text readability.
+pub fn convert_dark_mode_for_ocr(img: &RgbImage) -> RgbImage {
+    if !is_dark_mode(img) {
+        return img.clone();
+    }
+
+    let (w, h) = img.dimensions();
+    let block_size: usize = 31;
+    let c_offset: i32 = 10;
+
+    // Step 1: Invert and convert to grayscale
+    let raw = img.as_raw();
+    let len = raw.len();
+    let mut gray = vec![0u8; (w * h) as usize];
+    let mut i = 0;
+    let mut pi = 0;
+    while i + 2 < len {
+        // Invert then average to grayscale
+        let r = 255 - raw[i] as u16;
+        let g = 255 - raw[i + 1] as u16;
+        let b = 255 - raw[i + 2] as u16;
+        gray[pi] = ((r + g + b) / 3) as u8;
+        pi += 1;
+        i += 3;
+    }
+
+    // Step 2: Adaptive Gaussian thresholding
+    // For each pixel, threshold = mean of block_size×block_size neighborhood - c_offset
+    let half = block_size / 2;
+    let w_usize = w as usize;
+    let h_usize = h as usize;
+
+    // Compute integral image for fast mean calculation
+    let mut integral = vec![0i64; (w_usize + 1) * (h_usize + 1)];
+    let iw = w_usize + 1;
+    for y in 0..h_usize {
+        let mut row_sum: i64 = 0;
+        for x in 0..w_usize {
+            row_sum += gray[y * w_usize + x] as i64;
+            integral[(y + 1) * iw + (x + 1)] = row_sum + integral[y * iw + (x + 1)];
+        }
+    }
+
+    // Apply threshold
+    let mut result = RgbImage::new(w, h);
+    let out_raw = result.as_mut();
+    for y in 0..h_usize {
+        for x in 0..w_usize {
+            let y0 = y.saturating_sub(half);
+            let y1 = (y + half + 1).min(h_usize);
+            let x0 = x.saturating_sub(half);
+            let x1 = (x + half + 1).min(w_usize);
+            let area = ((y1 - y0) * (x1 - x0)) as i64;
+            let sum = integral[y1 * iw + x1] - integral[y0 * iw + x1] - integral[y1 * iw + x0]
+                + integral[y0 * iw + x0];
+            let mean_val = sum / area;
+            let threshold = mean_val - c_offset as i64;
+            let val = if gray[y * w_usize + x] as i64 > threshold {
+                255u8
+            } else {
+                0u8
+            };
+            let idx = (y * w_usize + x) * 3;
+            out_raw[idx] = val;
+            out_raw[idx + 1] = val;
+            out_raw[idx + 2] = val;
+        }
+    }
+
+    result
 }
 
 /// Fast mean pixel value using raw buffer and sampling for large images.
@@ -111,9 +190,13 @@ pub fn remove_all_but(img: &mut RgbImage, color: [u8; 3], threshold: i32) {
         let dg = raw[i + 1] as i32 - cg;
         let db = raw[i + 2] as i32 - cb;
         if dr * dr + dg * dg + db * db <= threshold_sq {
-            raw[i] = 0; raw[i + 1] = 0; raw[i + 2] = 0;
+            raw[i] = 0;
+            raw[i + 1] = 0;
+            raw[i + 2] = 0;
         } else {
-            raw[i] = 255; raw[i + 1] = 255; raw[i + 2] = 255;
+            raw[i] = 255;
+            raw[i + 1] = 255;
+            raw[i + 2] = 255;
         }
         i += 3;
     }
@@ -130,7 +213,9 @@ pub fn darken_non_white(img: &mut RgbImage) {
         // Equivalent: R+G+B > 720
         let sum = raw[i] as u16 + raw[i + 1] as u16 + raw[i + 2] as u16;
         if sum <= 720 {
-            raw[i] = 0; raw[i + 1] = 0; raw[i + 2] = 0;
+            raw[i] = 0;
+            raw[i + 1] = 0;
+            raw[i + 2] = 0;
         }
         i += 3;
     }
@@ -156,7 +241,9 @@ pub fn darken_and_binarize(img: &mut RgbImage) {
         let sum = raw[i] as u16 + raw[i + 1] as u16 + raw[i + 2] as u16;
         if sum <= 720 {
             // darken: set to black
-            raw[i] = 0; raw[i + 1] = 0; raw[i + 2] = 0;
+            raw[i] = 0;
+            raw[i + 1] = 0;
+            raw[i + 2] = 0;
         } else {
             // keep white-ish, then quantize
             raw[i] = lut[raw[i] as usize];
@@ -174,7 +261,9 @@ pub fn darken_and_binarize(img: &mut RgbImage) {
 pub fn get_pixel(img: &RgbImage, arg: i32) -> Option<[u8; 3]> {
     let raw = img.as_raw();
     let len = raw.len();
-    if len < 6 { return None; } // need at least 2 pixels
+    if len < 6 {
+        return None;
+    } // need at least 2 pixels
 
     let pixel_count = len / 3;
     let step = if pixel_count > 10_000 { 16 } else { 1 };
@@ -186,20 +275,32 @@ pub fn get_pixel(img: &RgbImage, arg: i32) -> Option<[u8; 3]> {
         let color = [raw[i], raw[i + 1], raw[i + 2]];
         let mut found = false;
         for entry in table.iter_mut() {
-            if entry.0 == color { entry.1 += 1; found = true; break; }
+            if entry.0 == color {
+                entry.1 += 1;
+                found = true;
+                break;
+            }
         }
-        if !found { table.push((color, 1)); }
+        if !found {
+            table.push((color, 1));
+        }
         i += 3 * step;
     }
 
-    if table.len() <= 1 { return None; }
+    if table.len() <= 1 {
+        return None;
+    }
 
     // Find top-2 by count
     let mut top1 = ([0u8; 3], 0u32);
     let mut top2 = ([0u8; 3], 0u32);
     for &(color, count) in &table {
-        if count > top1.1 { top2 = top1; top1 = (color, count); }
-        else if count > top2.1 { top2 = (color, count); }
+        if count > top1.1 {
+            top2 = top1;
+            top1 = (color, count);
+        } else if count > top2.1 {
+            top2 = (color, count);
+        }
     }
 
     match arg {
@@ -210,7 +311,11 @@ pub fn get_pixel(img: &RgbImage, arg: i32) -> Option<[u8; 3]> {
             table.sort_by_key(|&(_, c)| c);
             let idx = if arg < 0 {
                 let abs_idx = (-arg) as usize;
-                if abs_idx > table.len() { 0 } else { table.len() - abs_idx }
+                if abs_idx > table.len() {
+                    0
+                } else {
+                    table.len() - abs_idx
+                }
             } else {
                 (arg as usize).min(table.len() - 1)
             };
@@ -232,14 +337,12 @@ pub fn is_close(p1: &[u8; 3], p2: &[u8; 3], thresh: i32) -> bool {
 ///
 /// Returns the first row (horizontal) or column (vertical) where the
 /// 2nd-most-common pixel dominates. Uses raw buffer access.
-pub fn extract_line(
-    img: &RgbImage,
-    x0: u32, x1: u32, y0: u32, y1: u32,
-    horizontal: bool,
-) -> u32 {
+pub fn extract_line(img: &RgbImage, x0: u32, x1: u32, y0: u32, y1: u32, horizontal: bool) -> u32 {
     let w = x1.saturating_sub(x0);
     let h = y1.saturating_sub(y0);
-    if w == 0 || h == 0 { return 0; }
+    if w == 0 || h == 0 {
+        return 0;
+    }
 
     let mut sub = image::imageops::crop_imm(img, x0, y0, w, h).to_image();
     reduce_color_count(&mut sub, 2);
@@ -265,9 +368,13 @@ pub fn extract_line(
                 let dist = (raw[idx] as i32 - pr).abs()
                     + (raw[idx + 1] as i32 - pg).abs()
                     + (raw[idx + 2] as i32 - pb).abs();
-                if dist <= 3 { count += 1; }
+                if dist <= 3 {
+                    count += 1;
+                }
             }
-            if count > sw / 2 { return y; }
+            if count > sw / 2 {
+                return y;
+            }
         }
     } else {
         for x in 0..sw {
@@ -277,9 +384,13 @@ pub fn extract_line(
                 let dist = (raw[idx] as i32 - pr).abs()
                     + (raw[idx + 1] as i32 - pg).abs()
                     + (raw[idx + 2] as i32 - pb).abs();
-                if dist <= 3 { count += 1; }
+                if dist <= 3 {
+                    count += 1;
+                }
             }
-            if count > sh / 4 { return x; }
+            if count > sh / 4 {
+                return x;
+            }
         }
     }
     0
@@ -295,13 +406,22 @@ pub fn rgb_to_hsv(r: u8, g: u8, b: u8) -> (u8, u8, u8) {
     let min = rf.min(gf).min(bf);
     let diff = max - min;
 
-    let h = if diff == 0.0 { 0.0 }
-    else if max == rf { 60.0 * (((gf - bf) / diff) % 6.0) }
-    else if max == gf { 60.0 * ((bf - rf) / diff + 2.0) }
-    else { 60.0 * ((rf - gf) / diff + 4.0) };
+    let h = if diff == 0.0 {
+        0.0
+    } else if max == rf {
+        60.0 * (((gf - bf) / diff) % 6.0)
+    } else if max == gf {
+        60.0 * ((bf - rf) / diff + 2.0)
+    } else {
+        60.0 * ((rf - gf) / diff + 4.0)
+    };
     let h = if h < 0.0 { h + 360.0 } else { h };
     let h = (h / 2.0) as u8;
-    let s = if max == 0.0 { 0.0 } else { (diff / max) * 255.0 };
+    let s = if max == 0.0 {
+        0.0
+    } else {
+        (diff / max) * 255.0
+    };
     let v = max * 255.0;
     (h, s as u8, v as u8)
 }
@@ -388,7 +508,7 @@ mod tests {
         let mut img = RgbImage::new(3, 1);
         img.put_pixel(0, 0, Rgb([255, 255, 255])); // white → keep + quantize
         img.put_pixel(1, 0, Rgb([100, 100, 100])); // gray → darken to black
-        img.put_pixel(2, 0, Rgb([0, 0, 0]));       // black → stays black
+        img.put_pixel(2, 0, Rgb([0, 0, 0])); // black → stays black
         darken_and_binarize(&mut img);
         assert_eq!(img.get_pixel(0, 0), &Rgb([255, 255, 255]));
         assert_eq!(img.get_pixel(1, 0), &Rgb([0, 0, 0]));

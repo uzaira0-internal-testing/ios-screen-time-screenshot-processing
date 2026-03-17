@@ -13,9 +13,7 @@ use super::bar_extraction::{compute_bar_alignment_score, slice_image};
 use super::grid_detection;
 use super::image_utils::{convert_dark_mode, remove_all_but};
 use super::ocr;
-use super::types::{
-    DetectionMethod, GridBounds, ImageType, ProcessingError, ProcessingResult,
-};
+use super::types::{DetectionMethod, GridBounds, ImageType, ProcessingError, ProcessingResult};
 
 /// Load an image from disk and convert to RGB.
 fn load_image(path: &str) -> Result<RgbImage, ProcessingError> {
@@ -77,16 +75,21 @@ pub fn process_image(
     detection_method: DetectionMethod,
 ) -> Result<ProcessingResult, ProcessingError> {
     let start = Instant::now();
-    let img = load_and_prepare(path)?;
+    let original_img = load_image(path)?;
+    let mut img = original_img.clone();
+    convert_dark_mode(&mut img);
 
-    // Detect grid bounds (image is already dark-mode converted)
-    let grid_result = grid_detection::detect_grid(&img, detection_method)?;
+    // Detect grid bounds (pass original for dark mode OCR fallback)
+    let grid_result =
+        grid_detection::detect_grid_with_original(&img, detection_method, Some(&original_img))?;
 
     let bounds = match (grid_result.success, grid_result.bounds) {
         (true, Some(b)) => b,
         _ => {
             return Err(ProcessingError::GridDetection(
-                grid_result.error.unwrap_or_else(|| "Grid detection failed".to_string()),
+                grid_result
+                    .error
+                    .unwrap_or_else(|| "Grid detection failed".to_string()),
             ));
         }
     };
@@ -109,7 +112,11 @@ pub fn process_image(
         hourly_values,
         total,
         title: if title.is_empty() { None } else { Some(title) },
-        total_text: if total_text.is_empty() { None } else { Some(total_text) },
+        total_text: if total_text.is_empty() {
+            None
+        } else {
+            Some(total_text)
+        },
         grid_bounds: Some(bounds),
         alignment_score,
         detection_method: grid_result.method,
@@ -137,7 +144,11 @@ pub fn process_image_with_grid(
         hourly_values,
         total,
         title: if title.is_empty() { None } else { Some(title) },
-        total_text: if total_text.is_empty() { None } else { Some(total_text) },
+        total_text: if total_text.is_empty() {
+            None
+        } else {
+            Some(total_text)
+        },
         grid_bounds: Some(bounds),
         alignment_score,
         detection_method: "manual".to_string(),

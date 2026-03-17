@@ -12,16 +12,37 @@ logger = logging.getLogger(__name__)
 DEBUG_ENABLED = False
 
 
-def convert_dark_mode(img: np.ndarray) -> np.ndarray:
+def is_dark_mode(img: np.ndarray) -> bool:
+    """Check if an image is in dark mode based on average brightness."""
     dark_mode_threshold = 100
-    # cv2.mean() is SIMD C++ — ~3x faster than np.mean() on images
     channel_means = cv2.mean(img)
     avg = sum(channel_means[:3]) / 3.0 if len(img.shape) == 3 else channel_means[0]
-    if avg < dark_mode_threshold:
+    return avg < dark_mode_threshold
+
+
+def convert_dark_mode(img: np.ndarray) -> np.ndarray:
+    if is_dark_mode(img):
         cv2.bitwise_not(img, dst=img)
         img = adjust_contrast_brightness(img, 3.0, 10)
 
     return img
+
+
+def convert_dark_mode_for_ocr(img: np.ndarray) -> np.ndarray:
+    """Convert dark mode image using adaptive thresholding optimized for OCR.
+
+    The standard convert_dark_mode uses contrast=3.0 which clips faint gray text
+    (e.g., "12 AM", "60" labels) to near-white, destroying contrast for Tesseract.
+    This function uses adaptive thresholding to preserve text readability.
+    """
+    if not is_dark_mode(img):
+        return img
+
+    inverted = cv2.bitwise_not(img)
+    gray = cv2.cvtColor(inverted, cv2.COLOR_BGR2GRAY)
+    thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 10)
+    # Convert back to 3-channel for compatibility with downstream code
+    return cv2.cvtColor(thresh, cv2.COLOR_GRAY2BGR)
 
 
 def adjust_contrast_brightness(img: np.ndarray, contrast: float = 1.0, brightness: int = 0) -> np.ndarray:

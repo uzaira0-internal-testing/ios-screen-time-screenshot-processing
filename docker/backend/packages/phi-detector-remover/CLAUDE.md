@@ -5,12 +5,14 @@
 Modular PHI (Protected Health Information) detection and removal package for iOS screenshots. Supports multiple detection strategies with configurable pipelines optimized for research data processing.
 
 **Key Features:**
-- OCR text extraction with Tesseract
-- Multiple detector types: Presidio NER, regex patterns, LLM-based
+- OCR text extraction with Tesseract, Hunyuan LVM, or Rust PyO3 (leptess) engines
+- Multiple detector types: Presidio NER, regex patterns, LLM-based, GliNER NER, Vision/LVM
+- Detector and OCR engine registries for extensibility
 - Batched LLM API calls for efficiency
 - OCR caching for repeated processing
 - Red box redaction (HIPAA-visible)
 - Polars DataFrame integration for Dagster pipelines
+- Benchmarking subsystem for evaluating detector accuracy
 
 ## Quick Start
 
@@ -252,24 +254,42 @@ Methods:
 
 ```
 phi_detector_remover/
-├── __init__.py              # Public API exports
+├── __init__.py              # Public API exports (70+ symbols)
 ├── dagster.py               # High-level batch API for pipelines
 ├── core/
 │   ├── models.py            # PHIRegion, BoundingBox, OCRResult
 │   ├── config.py            # Configuration dataclasses
+│   ├── detector.py          # Main PHIDetector orchestrator class
+│   ├── patterns.py          # PHI regex pattern definitions
 │   ├── prompts.py           # LLM prompt templates
+│   ├── protocols.py         # Protocol/interface definitions
 │   ├── remover.py           # Image redaction
 │   ├── batch.py             # BatchProcessor class
+│   ├── ocr.py               # OCR facade/wrapper
 │   ├── ocr/
-│   │   └── tesseract.py     # Tesseract OCR engine
+│   │   ├── tesseract.py     # Tesseract OCR engine
+│   │   ├── hunyuan.py       # Hunyuan LVM OCR engine
+│   │   ├── rust_engine.py   # Rust PyO3 OCR engine (leptess)
+│   │   └── registry.py      # OCR engine discovery/registry
 │   ├── detectors/
 │   │   ├── presidio.py      # Presidio NER
 │   │   ├── regex.py         # Regex patterns
-│   │   └── llm.py           # LLM text detector
+│   │   ├── llm.py           # LLM text detector
+│   │   ├── gliner.py        # GliNER NER entity extraction
+│   │   ├── vision.py        # Vision/LVM detectors
+│   │   └── registry.py      # Detector discovery/registry
+│   ├── benchmark/           # Benchmarking subsystem
+│   │   ├── dataset.py       # Benchmark dataset management
+│   │   ├── metrics.py       # Evaluation metrics
+│   │   └── runner.py        # Benchmark runner
 │   └── pipeline/
 │       ├── builder.py       # PHIPipelineBuilder
 │       ├── executor.py      # PHIPipeline
 │       └── aggregator.py    # Result aggregation
+├── web/                     # FastAPI service (optional)
+│   ├── main.py, routes.py, schemas.py
+└── client/                  # HTTP client (optional)
+    └── client.py
 ```
 
 ## Dependencies
@@ -279,6 +299,11 @@ phi_detector_remover/
 - `opencv-python`, `Pillow`
 - `polars`, `httpx`
 - `presidio-analyzer`, `presidio-anonymizer`
+
+**Optional:**
+- `gliner` - GliNER NER detector
+- Rust PyO3 `leptess` module - high-performance OCR engine
+- Hunyuan LVM endpoint - vision-based OCR
 
 **System Requirements:**
 - Tesseract OCR must be installed separately:

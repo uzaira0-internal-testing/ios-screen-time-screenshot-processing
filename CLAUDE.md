@@ -72,7 +72,7 @@ python -X importtime -c "import screenshot_processor" 2> import.log
 cd frontend
 
 bun install                           # Install dependencies
-bun run dev                           # Start dev server (http://localhost:5175)
+bun run dev                           # Start dev server (http://localhost:5173)
 bun run build                         # Production build (runs tsc first)
 bun run type-check                    # TypeScript checking only
 
@@ -142,7 +142,8 @@ docker/
 ├── nginx/
 │   ├── nginx.conf              # Production nginx with API proxy, security headers
 │   └── nginx.wasm.conf         # WASM-only nginx (no backend proxy)
-├── docker-compose.yml          # Production stack (PostgreSQL, Redis, API, Celery, Nginx)
+├── docker-compose.yml          # Production stack with Traefik integration
+├── docker-compose.prod.yml     # Production Docker Compose (standalone)
 ├── docker-compose.dev.yml      # Development stack with hot reloading
 └── docker-compose.wasm.yml     # WASM-only stack (frontend only)
 ```
@@ -326,7 +327,7 @@ UPLOAD_API_KEY=<api-key>              # For programmatic uploads
 
 # Optional
 DEBUG=False
-CORS_ORIGINS=http://localhost:3000,http://localhost:5175
+CORS_ORIGINS=http://localhost:3000,http://localhost:5173
 RATE_LIMIT_DEFAULT=100/minute
 CONSENSUS_DISAGREEMENT_THRESHOLD_MINUTES=0  # 0 = flag any difference
 
@@ -492,14 +493,16 @@ This project has Claude Code automations configured in `.claude/`, `.mcp.json`, 
 
 | Hook | Event | What it does |
 |------|-------|--------------|
+| **Auto-format TypeScript** | PostToolUse (Edit/Write) | Runs `npx eslint --fix` on any edited `.ts`/`.tsx` files under `frontend/src` |
 | **Auto-format Python** | PostToolUse (Edit/Write) | Runs `ruff format` and `ruff check --fix` on any edited `.py` files |
+| **Schema change reminders** | PostToolUse (Edit/Write) | Reminds to regenerate types when `schemas.py`, shared constants, or Rust/TS contracts change |
 | **Block .env edits** | PreToolUse (Edit/Write) | Prevents accidental edits to `.env` files containing secrets. Edit `.env.example` instead and tell user to update `.env` manually. |
+| **Block generated file edits** | PreToolUse (Edit/Write) | Prevents edits to `generated_constants` files. Edit `shared/*.json` and run generator instead. |
 
 ### Skills (`.claude/skills/`)
 
 | Skill | Invocation | Purpose |
 |-------|------------|---------|
-| `/generate-api-types` | User-only | Regenerate frontend TypeScript types from backend OpenAPI spec. Run after any Pydantic schema or API route changes. |
 | `/backup-restore` | User-only | Database backup and restore operations. Lists, creates, and restores PostgreSQL backups. |
 | `/setup-dual-mode` | User-only | Scaffold DI container, interfaces, mode detection, bootstrap, and React hooks for dual-mode architecture. |
 | `/setup-tauri` | User-only | Add Tauri v2 to an existing React frontend with plugins, capabilities, CSP, and build config. |
@@ -521,4 +524,3 @@ This project has Claude Code automations configured in `.claude/`, `.mcp.json`, 
 | Agent | When to use |
 |-------|-------------|
 | **security-reviewer** | After modifying upload endpoints, PHI handling, auth middleware, or any code processing user input. Checks for HIPAA compliance, injection risks, and data exposure. |
-| **api-contract-verifier** | After modifying Pydantic schemas or API routes. Detects type drift between backend schemas and frontend TypeScript types. Recommends running `/generate-api-types` if stale. |

@@ -7,7 +7,9 @@
 use image::RgbImage;
 use log::{debug, info};
 
-use crate::image_utils::{adjust_contrast_brightness, extract_line, get_pixel};
+use crate::image_utils::{
+    adjust_contrast_brightness, convert_dark_mode_for_ocr, extract_line, get_pixel, is_dark_mode,
+};
 use crate::ocr::{run_tesseract, OcrWord};
 use crate::types::{GridDetectionResult, ProcessingError};
 
@@ -182,22 +184,18 @@ fn find_right_anchor(ocr_boxes: &[OcrWord], img: &RgbImage) -> Option<(i32, i32)
     None
 }
 
-/// Detect grid using OCR text anchors ("12 AM" and "60").
+/// Try to find grid anchors from OCR boxes on a processed image.
 ///
-/// IMPORTANT: Caller must have already applied `convert_dark_mode()`.
-pub fn detect(img: &RgbImage) -> Result<GridDetectionResult, ProcessingError> {
-    // Apply contrast/brightness for OCR readability
-    let img_processed = adjust_contrast_brightness(img, 2.0, -220);
+/// Returns Some(GridDetectionResult) on success, None if anchors not found.
+fn try_find_anchors(
+    img_processed: &RgbImage,
+) -> Result<Option<GridDetectionResult>, ProcessingError> {
     let (w, h) = img_processed.dimensions();
+    let (img_left, img_right, right_offset) = prepare_image_chunks(img_processed);
 
-    // Split image into left/right chunks for OCR
-    let (img_left, img_right, right_offset) = prepare_image_chunks(&img_processed);
-
-    // Run OCR on both chunks
     let left_boxes = run_tesseract(&img_left, "12")?;
     let mut right_boxes = run_tesseract(&img_right, "12")?;
 
-    // Adjust right-side x coordinates by the offset
     for b in &mut right_boxes {
         b.x += right_offset as i32;
     }
@@ -208,10 +206,9 @@ pub fn detect(img: &RgbImage) -> Result<GridDetectionResult, ProcessingError> {
         right_boxes.len()
     );
 
-    // Try to find anchors with retry logic (skip N detections)
     for skip in 0..4 {
-        let left = find_left_anchor(&left_boxes, &img_processed, skip);
-        let right = find_right_anchor(&right_boxes, &img_processed);
+        let left = find_left_anchor(&left_boxes, img_processed, skip);
+        let right = find_right_anchor(&right_boxes, img_processed);
 
         if let (Some((ll_x, ll_y)), Some((ur_x, ur_y))) = (left, right) {
             let roi_width = ur_x - ll_x;
@@ -226,19 +223,57 @@ pub fn detect(img: &RgbImage) -> Result<GridDetectionResult, ProcessingError> {
                         bounds.width(),
                         bounds.height()
                     );
-                    return Ok(GridDetectionResult {
+                    return Ok(Some(GridDetectionResult {
                         success: true,
                         bounds: Some(bounds),
                         confidence: 1.0,
                         method: "ocr_anchored".to_string(),
                         error: None,
-                    });
+                    }));
                 }
                 Err(e) => {
                     debug!("OCR anchor attempt skip={skip} failed: {e}");
                     continue;
                 }
             }
+        }
+    }
+
+    Ok(None)
+}
+
+/// Detect grid using OCR text anchors ("12 AM" and "60").
+///
+/// IMPORTANT: Caller must have already applied `convert_dark_mode()`.
+/// Pass `original_img` (before dark mode conversion) to enable adaptive
+/// threshold fallback for dark mode screenshots.
+pub fn detect(img: &RgbImage) -> Result<GridDetectionResult, ProcessingError> {
+    detect_with_original(img, None)
+}
+
+/// Detect grid using OCR text anchors, with optional original image for dark mode fallback.
+pub fn detect_with_original(
+    img: &RgbImage,
+    original_img: Option<&RgbImage>,
+) -> Result<GridDetectionResult, ProcessingError> {
+    // Standard path: contrast/brightness for OCR readability
+    let img_processed = adjust_contrast_brightness(img, 2.0, -220);
+
+    if let Some(result) = try_find_anchors(&img_processed)? {
+        return Ok(result);
+    }
+
+    // Dark mode fallback: standard preprocessing destroys faint text contrast
+    // (contrast=3.0 clips both text and background to ~255). Use adaptive
+    // thresholding which preserves text for Tesseract anchor detection.
+    let orig = original_img.unwrap_or(img);
+    if is_dark_mode(orig) {
+        info!("Standard anchor detection failed on dark mode image, retrying with adaptive threshold OCR");
+        let img_ocr = convert_dark_mode_for_ocr(orig);
+        let img_ocr_processed = adjust_contrast_brightness(&img_ocr, 2.0, -220);
+
+        if let Some(result) = try_find_anchors(&img_ocr_processed)? {
+            return Ok(result);
         }
     }
 

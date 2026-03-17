@@ -7,8 +7,8 @@ use image::RgbImage;
 
 use super::lookup;
 use super::strategies::{
-    fast_luma, find_evenly_spaced_groups, find_horizontal_lines,
-    validate_bar_colors, validate_vertical_lines,
+    fast_luma, find_evenly_spaced_groups, find_horizontal_lines, validate_bar_colors,
+    validate_vertical_lines,
 };
 use crate::types::{GridBounds, GridDetectionResult, ProcessingError};
 
@@ -139,11 +139,7 @@ pub fn detect(img: &RgbImage) -> Result<GridDetectionResult, ProcessingError> {
 }
 
 /// Refine x boundaries by detecting actual grid edges.
-fn refine_x_boundaries(
-    img: &RgbImage,
-    bounds: &GridBounds,
-    v_positions: &[i32],
-) -> GridBounds {
+fn refine_x_boundaries(img: &RgbImage, bounds: &GridBounds, v_positions: &[i32]) -> GridBounds {
     let (w, _h) = img.dimensions();
 
     let search_margin = 50i32;
@@ -154,7 +150,8 @@ fn refine_x_boundaries(
     let y_end = bounds.lower_right_y as u32;
 
     // Find vertical grid lines at edges
-    if let Some((left, right)) = find_grid_edges(img, search_x_start, search_x_end, y_start, y_end) {
+    if let Some((left, right)) = find_grid_edges(img, search_x_start, search_x_end, y_start, y_end)
+    {
         return GridBounds::new(left, bounds.upper_left_y, right, bounds.lower_right_y);
     }
 
@@ -164,13 +161,19 @@ fn refine_x_boundaries(
         let mean_spacing = spacings.iter().sum::<i32>() as f64 / spacings.len() as f64;
 
         let left_edge = (v_positions[0] as f64 - mean_spacing) as i32 + bounds.upper_left_x;
-        let right_edge = (*v_positions.last().unwrap() as f64 + mean_spacing) as i32 + bounds.upper_left_x;
+        let right_edge =
+            (*v_positions.last().unwrap() as f64 + mean_spacing) as i32 + bounds.upper_left_x;
 
         let left_edge = left_edge.max(0);
         let right_edge = (right_edge as u32).min(w) as i32;
 
         if right_edge > left_edge {
-            return GridBounds::new(left_edge, bounds.upper_left_y, right_edge, bounds.lower_right_y);
+            return GridBounds::new(
+                left_edge,
+                bounds.upper_left_y,
+                right_edge,
+                bounds.lower_right_y,
+            );
         }
     }
 

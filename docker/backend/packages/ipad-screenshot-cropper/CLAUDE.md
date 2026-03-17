@@ -14,8 +14,8 @@ This package provides focused functionality for detecting iPad device types and 
 
 1. **Device Detection** (`device_profiles.py`)
    - Detects iPad models from image dimensions
-   - Supports: iPad Pro 12.9", iPad Pro 11", iPad Air, iPad Mini, iPad Standard
-   - Dimension-based matching with configurable tolerance
+   - Supports: iPad 9th Gen, iPad 10th Gen, iPad mini 5th/6th Gen, iPad Air 3rd Gen, iPad Pro 11", iPad Pro 12.9"
+   - Dimension-based matching with configurable tolerance (±10px)
 
 2. **Geometric Cropping** (`cropper.py`)
    - Crops screenshots to specified dimensions
@@ -31,6 +31,13 @@ This package provides focused functionality for detecting iPad device types and 
    - Dimension configurations for cropping
    - Processing parameters
    - Asset file paths
+
+5. **Callbacks** (`callbacks.py`)
+   - Cancellation checks, logging, and progress callbacks
+   - Used by cropper for interruptible processing
+
+6. **Exceptions** (`exceptions.py`)
+   - Exception hierarchy: CropperError, ConfigurationError, ImageProcessingError, DeviceDetectionError, AssetNotFoundError, CancellationError
 
 ### Service Components
 
@@ -288,15 +295,17 @@ uv pip install "ipad-screenshot-cropper[full]"
 
 ## Device Profiles
 
-Currently supported iPad models (all use same screenshot dimensions):
+Supported iPad models with per-device crop dimensions (all use crop_x=640 except iPad Pro 12.9" which uses crop_x=790):
 
-| Model | Uncropped Size | Cropped Size | Notes |
-|-------|---------------|--------------|-------|
-| iPad Pro 12.9" | 1620x2160 | 990x2160 | All generations |
-| iPad Pro 11" | 1620x2160 | 990x2160 | |
-| iPad Air | 1620x2160 | 990x2160 | |
-| iPad Mini | 1620x2160 | 990x2160 | |
-| iPad Standard | 1620x2160 | 990x2160 | |
+| Model | Uncropped Size | Cropped Size | crop_x |
+|-------|---------------|--------------|--------|
+| iPad 9th Gen | 1620x2160 | 980x2160 | 640 |
+| iPad 10th Gen | 1640x2360 | 1000x2360 | 640 |
+| iPad mini 5th Gen | 1536x2048 | 896x2048 | 640 |
+| iPad mini 6th Gen | 1488x2266 | 848x2266 | 640 |
+| iPad Pro 11" | 1668x2388 | 1028x2388 | 640 |
+| iPad Pro 11" (alt) | 1668x2224 | 1028x2224 | 640 |
+| iPad Pro 12.9" | 2048x2732 | 1258x2732 | 790 |
 
 Dimension tolerance: ±10 pixels
 
@@ -306,20 +315,20 @@ Dimension tolerance: ±10 pixels
 
 Determines if an image should be cropped based on:
 
-1. **Already cropped** (990x2160) → Skip
-2. **Landscape orientation** (2160x1620) → Skip
-3. **Too small** (< 990x2000) → Skip
-4. **Wrong aspect ratio** (not ~1.33) → Skip
-5. **Valid iPad screenshot** (1620x2160) → Process
+1. **Already cropped** (matches any cropped output dimensions) → Skip
+2. **Landscape orientation** (rotated known profile) → Skip
+3. **Too small** (< 848x2000) → Skip
+4. **Wrong aspect ratio** (not ~1.45 ±0.2) → Skip
+5. **Valid iPad screenshot** (matches known uncropped profile) → Process
 
 ### Cropping Process
 
 1. **Load image** from file, bytes, or numpy array
-2. **Detect device** from dimensions (if not specified)
-3. **Patch image** if height < 2160 pixels
+2. **Detect device** from dimensions (if not specified) — matches against all 7 supported profiles
+3. **Patch image** if height is shorter than expected (partially-cropped screenshots)
    - Adds bottom patch for short screenshots
    - Uses bundled patch images
-4. **Crop to region** (x=630, y=0, width=1620, height=2160)
+4. **Crop to region** using device-specific crop_x/crop_width (e.g., crop_x=640 for most, 790 for iPad Pro 12.9")
 5. **Return result** with metadata
 
 ## Integration with PHI Detector Remover
@@ -343,18 +352,15 @@ cv2.imwrite("final.png", phi_removed)
 
 ## Configuration
 
-### Default Crop Dimensions
-- X offset: 630
+### Default Crop Dimensions (per-device)
+- X offset: 640 (most models) or 790 (iPad Pro 12.9")
 - Y offset: 0
-- Width: 1620
-- Height: 2160
+- Width/Height: varies per device profile (see Device Profiles table above)
 
 ### Dimension Rules
-- Uncropped: 1620x2160
-- Cropped: 990x2160
 - Tolerance: ±10 pixels
-- Min size: 990x2000
-- Target aspect ratio: 1.333 ±0.1
+- Min size: 848x2000
+- Target aspect ratio: 1.45 ±0.2
 
 ### Assets
 - Bottom patch: `bottom_patch_image.png`

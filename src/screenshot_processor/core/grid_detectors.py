@@ -13,7 +13,7 @@ import logging
 import numpy as np
 
 from .config import get_hybrid_ocr_config
-from .image_utils import convert_dark_mode
+from .image_utils import convert_dark_mode, convert_dark_mode_for_ocr, is_dark_mode
 from .interfaces import (
     GridBounds,
     GridDetectionMethod,
@@ -72,6 +72,19 @@ class OCRAnchoredGridDetector(IGridDetector):
             roi_params = find_grid_anchors_and_calculate_roi(
                 d_left, d_right, img, img_copy, snap_to_grid=None, calculate_roi_func=calculate_roi
             )
+
+            # Dark mode fallback: standard preprocessing destroys faint text contrast.
+            # Use adaptive thresholding which preserves text for Tesseract.
+            if roi_params is None and is_dark_mode(image):
+                logger.info("OCR anchor detection failed on dark mode image, retrying with adaptive threshold")
+                img_ocr = convert_dark_mode_for_ocr(image.copy())
+                img_ocr = adjust_contrast_brightness(img_ocr, contrast=2.0, brightness=-220)
+                ocr_left, ocr_right, ocr_right_offset = prepare_image_chunks(img_ocr)
+                d_left_retry, d_right_retry = perform_ocr(ocr_left, ocr_right, ocr_config)
+                adjust_anchor_offsets(d_right_retry, ocr_right_offset)
+                roi_params = find_grid_anchors_and_calculate_roi(
+                    d_left_retry, d_right_retry, img, img_copy, snap_to_grid=None, calculate_roi_func=calculate_roi
+                )
 
             if roi_params is None:
                 return GridDetectionResult(

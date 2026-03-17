@@ -19,9 +19,18 @@ pub fn detect_grid(
     img: &RgbImage,
     method: DetectionMethod,
 ) -> Result<GridDetectionResult, ProcessingError> {
+    detect_grid_with_original(img, method, None)
+}
+
+/// Detect grid bounds, with optional original image for dark mode OCR fallback.
+pub fn detect_grid_with_original(
+    img: &RgbImage,
+    method: DetectionMethod,
+    original_img: Option<&RgbImage>,
+) -> Result<GridDetectionResult, ProcessingError> {
     match method {
         DetectionMethod::LineBased => line_based::detect(img),
-        DetectionMethod::OcrAnchored => ocr_anchored::detect(img),
+        DetectionMethod::OcrAnchored => ocr_anchored::detect_with_original(img, original_img),
         DetectionMethod::Manual => Err(ProcessingError::GridDetection(
             "Manual detection requires user-provided coordinates".to_string(),
         )),
