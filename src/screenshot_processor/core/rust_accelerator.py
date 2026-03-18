@@ -121,6 +121,40 @@ def process_image(
     }
 
 
+def extract_hourly_data(
+    image_path: str,
+    upper_left: tuple[int, int],
+    lower_right: tuple[int, int],
+    image_type: str = "screen_time",
+) -> list[float]:
+    """Extract only hourly bar values from known grid bounds. No OCR — fast path.
+
+    Returns:
+        list of 24 floats (minutes per hour)
+    """
+    if _check_rust():
+        try:
+            result = _rs.extract_hourly_data(
+                image_path,
+                [int(upper_left[0]), int(upper_left[1])],
+                [int(lower_right[0]), int(lower_right[1])],
+                image_type,
+            )
+            return list(result)
+        except Exception as e:
+            logger.debug("Rust extract_hourly_data failed, falling back: %s", e)
+
+    # Python fallback
+    from .image_processor import extract_hourly_data_only
+
+    is_battery = image_type == "battery"
+    try:
+        row = extract_hourly_data_only(image_path, upper_left, lower_right, is_battery)
+    except Exception:
+        row = None
+    return list(row[:24]) if row is not None else [0.0] * 24
+
+
 def process_image_with_grid(
     image_path: str,
     upper_left: tuple[int, int],

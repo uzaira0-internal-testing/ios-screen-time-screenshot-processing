@@ -42,3 +42,35 @@ def test_process_image_with_grid_fallback_on_missing_rust(monkeypatch):
     )
     assert "hourly_values" in result
     assert len(result["hourly_values"]) == 24
+
+
+def test_extract_hourly_data_returns_24_floats():
+    """extract_hourly_data returns exactly 24 float values."""
+    from screenshot_processor.core.rust_accelerator import extract_hourly_data
+
+    if not FIXTURE_IMAGE.exists():
+        pytest.skip("Fixture image not found")
+
+    values = extract_hourly_data(
+        str(FIXTURE_IMAGE),
+        upper_left=(100, 300),
+        lower_right=(1000, 800),
+    )
+
+    assert isinstance(values, list)
+    assert len(values) == 24
+    assert all(isinstance(v, float) for v in values)
+
+
+def test_extract_hourly_data_fallback(monkeypatch):
+    """Falls back to Python when Rust unavailable."""
+    import screenshot_processor.core.rust_accelerator as ra
+    monkeypatch.setattr(ra, "_RUST_AVAILABLE", False)
+    monkeypatch.setattr(ra, "_rs", None)
+
+    if not FIXTURE_IMAGE.exists():
+        pytest.skip("Fixture image not found")
+
+    from screenshot_processor.core.rust_accelerator import extract_hourly_data
+    values = extract_hourly_data(str(FIXTURE_IMAGE), upper_left=(100, 300), lower_right=(1000, 800))
+    assert len(values) == 24
