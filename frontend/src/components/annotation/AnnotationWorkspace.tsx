@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, Link } from "react-router";
 import { useAnnotation } from "@/hooks/useAnnotationWithDI";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -97,6 +97,7 @@ export const AnnotationWorkspace = ({
   const [phiEditorOpen, setPHIEditorOpen] = useState(false);
   const [cropEditorOpen, setCropEditorOpen] = useState(false);
   const [skipMenuOpen, setSkipMenuOpen] = useState(false);
+  const skipMenuRef = useRef<HTMLDivElement>(null);
   const [consensus, setConsensus] = useState<Consensus | null>(null);
   const consensusService = useConsensusService();
 
@@ -112,6 +113,18 @@ export const AnnotationWorkspace = ({
       .catch(() => { if (!cancelled) setConsensus(null); });
     return () => { cancelled = true; };
   }, [screenshot?.id, screenshot?.verified_by_usernames?.length, consensusService]);
+
+  // Close skip dropdown when clicking outside
+  useEffect(() => {
+    if (!skipMenuOpen) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (skipMenuRef.current && !skipMenuRef.current.contains(e.target as Node)) {
+        setSkipMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [skipMenuOpen]);
 
   // Check if THIS USER has verified the screenshot (read-only mode for them)
   // Use username-based check as it's more reliable than userId which can get stale
@@ -785,7 +798,7 @@ export const AnnotationWorkspace = ({
               )}
 
               {/* Skip Button with reasons dropdown */}
-              <div className="relative">
+              <div className="relative" ref={skipMenuRef}>
                 <div className="flex">
                   <button
                     onClick={() => skip()}
