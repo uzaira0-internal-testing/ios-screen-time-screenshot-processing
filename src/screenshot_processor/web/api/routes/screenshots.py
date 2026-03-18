@@ -813,6 +813,7 @@ async def recalculate_ocr_total(
         if not Path(file_path).exists():
             return RecalculateOcrResponse(
                 success=False,
+                screenshot_id=screenshot_id,
                 extracted_total=None,
                 message=f"Image file not found at {file_path}",
             )
@@ -822,6 +823,7 @@ async def recalculate_ocr_total(
         if img is None:
             return RecalculateOcrResponse(
                 success=False,
+                screenshot_id=screenshot_id,
                 extracted_total=None,
                 message="Could not read image file",
             )
@@ -843,12 +845,14 @@ async def recalculate_ocr_total(
             )
             return RecalculateOcrResponse(
                 success=True,
+                screenshot_id=screenshot_id,
                 extracted_total=total.strip(),
                 message="OCR total recalculated successfully",
             )
         else:
             return RecalculateOcrResponse(
                 success=False,
+                screenshot_id=screenshot_id,
                 extracted_total=None,
                 message="No total found in image",
             )

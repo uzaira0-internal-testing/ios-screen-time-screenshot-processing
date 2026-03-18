@@ -57,8 +57,6 @@ export interface ProcessingSlice {
   processingProgress: ProcessingProgress | null;
   isTesseractInitialized: boolean;
   isInitializingTesseract: boolean;
-  /** Maximum pixels to shift grid for optimization (0=disabled, default=10) */
-  maxShift: number;
 
   reprocessWithGrid: (coords: GridCoordinates) => Promise<void>;
   reprocessWithLineBased: () => Promise<void>;
@@ -68,7 +66,6 @@ export interface ProcessingSlice {
   clearProcessingProgress: () => void;
   setTesseractInitialized: (initialized: boolean) => void;
   setInitializingTesseract: (initializing: boolean) => void;
-  setMaxShift: (value: number) => void;
 }
 
 // ============================================================================

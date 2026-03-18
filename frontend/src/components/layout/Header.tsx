@@ -25,10 +25,10 @@ export const Header = () => {
   const isAnnotatePage = location.pathname === "/annotate";
 
   const navLinks = [
-    { to: "/", label: "Home" },
     // Server mode: separate upload page. WASM mode: loading is on Home page.
     ...(!config.isLocalMode && features.preprocessing ? [{ to: "/upload", label: "Upload" }] : []),
     ...(features.preprocessing ? [{ to: "/preprocessing", label: "Preprocessing" }] : []),
+    { to: "/", label: "Groups" },
     { to: "/annotate", label: "Annotate" },
     ...(!config.isLocalMode ? [{ to: "/consensus", label: "Consensus" }] : []),
     { to: "/settings", label: "Settings" },

@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { usePreprocessingStore } from "@/hooks/usePreprocessingWithDI";
 import type { UploadFileItem } from "@/store/preprocessingStore";
 import { UploadDropZone } from "./UploadDropZone";
@@ -29,8 +29,17 @@ export const BrowserUpload = () => {
     [uploadFiles, setUploadFiles],
   );
 
-  // Step 1: Drop zone (no files yet)
-  if (uploadFiles.length === 0 && !isUploading) {
+  const groups = usePreprocessingStore((s) => s.groups);
+  const groupIds = useMemo(() => groups.map((g) => g.id), [groups]);
+  const setPageMode = usePreprocessingStore((s) => s.setPageMode);
+  const resetUploadResult = usePreprocessingStore((s) => s.resetUploadResult);
+
+  const clearUpload = () => {
+    resetUploadResult();
+  };
+
+  // Step 1: Drop zone (no files yet, no completed upload)
+  if (uploadFiles.length === 0 && !isUploading && !uploadProgress) {
     return (
       <div className="space-y-4">
         <UploadDropZone onFilesSelected={setUploadFiles} />
@@ -38,7 +47,7 @@ export const BrowserUpload = () => {
     );
   }
 
-  // Step 3: Uploading
+  // Step 3: Uploading in progress
   if (isUploading && uploadProgress) {
     return (
       <div className="space-y-4">
@@ -51,21 +60,47 @@ export const BrowserUpload = () => {
     );
   }
 
-  // Upload done with errors
-  if (!isUploading && uploadErrors.length > 0 && uploadFiles.length === 0) {
+  // Step 4: Upload finished — show persistent result until user acts
+  if (!isUploading && uploadFiles.length === 0 && uploadProgress) {
+    const succeeded = uploadProgress.completed;
+    const failed = uploadErrors.length;
+    const allOk = failed === 0;
     return (
       <div className="space-y-4">
+        {/* Result banner */}
+        <div className={`p-4 rounded-lg border ${allOk ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700" : "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700"}`}>
+          <p className={`text-sm font-medium ${allOk ? "text-green-800 dark:text-green-300" : "text-yellow-800 dark:text-yellow-300"}`}>
+            {allOk
+              ? `${succeeded} screenshot${succeeded !== 1 ? "s" : ""} uploaded successfully`
+              : `${succeeded} uploaded, ${failed} failed`}
+          </p>
+          {failed > 0 && (
+            <ul className="mt-2 text-xs text-yellow-700 dark:text-yellow-400 space-y-0.5 max-h-32 overflow-y-auto">
+              {uploadErrors.map((err, i) => <li key={i}>{err}</li>)}
+            </ul>
+          )}
+        </div>
+        {/* Progress bar showing final state */}
         <UploadProgressBar
-          completed={uploadProgress?.completed ?? 0}
-          total={uploadProgress?.total ?? 0}
-          errors={uploadErrors}
+          completed={uploadProgress.completed}
+          total={uploadProgress.total}
+          errors={[]}
         />
-        <button
-          onClick={() => setUploadFiles([])}
-          className="px-4 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-600 dark:text-slate-200"
-        >
-          Upload More
-        </button>
+        {/* Actions */}
+        <div className="flex gap-3">
+          <button
+            onClick={clearUpload}
+            className="px-4 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700 dark:text-slate-200"
+          >
+            Upload More
+          </button>
+          <button
+            onClick={() => setPageMode("pipeline")}
+            className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
+          >
+            View in Pipeline →
+          </button>
+        </div>
       </div>
     );
   }
@@ -77,6 +112,7 @@ export const BrowserUpload = () => {
         files={uploadFiles}
         groupId={uploadGroupId}
         imageType={uploadImageType}
+        groupOptions={groupIds}
         onFilesChange={setUploadFiles}
         onGroupIdChange={setUploadGroupId}
         onImageTypeChange={setUploadImageType}

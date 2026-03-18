@@ -40,6 +40,7 @@ export const HomePage = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
   const [loadProgress, setLoadProgress] = useState({ current: 0, total: 0 });
+  const [pendingConfirmGroup, setPendingConfirmGroup] = useState<string | null>(null);
   const [imageType, setImageType] = useState<ImageType>("screen_time");
   const [groupName, setGroupName] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
@@ -180,16 +181,19 @@ export const HomePage = () => {
     }
   }, [loadGroups, loadVerificationTiers]);
 
+  const doNavigateToAnnotate = (groupId: string, processingStatus?: string) => {
+    const params = new URLSearchParams();
+    params.set("group", groupId);
+    if (processingStatus) params.set("processing_status", processingStatus);
+    navigate(`/annotate?${params.toString()}`);
+  };
+
   const handleGroupClick = (groupId: string, processingStatus?: string) => {
-    if (isAuthenticated) {
-      const params = new URLSearchParams();
-      params.set("group", groupId);
-      if (processingStatus) {
-        params.set("processing_status", processingStatus);
-      }
-      navigate(`/annotate?${params.toString()}`);
+    if (!isAuthenticated) { navigate("/login"); return; }
+    if (processingStatus === "pending") {
+      setPendingConfirmGroup(groupId);
     } else {
-      navigate("/login");
+      doNavigateToAnnotate(groupId, processingStatus);
     }
   };
 
@@ -498,31 +502,27 @@ export const HomePage = () => {
                           text: "text-slate-600 dark:text-slate-400",
                         },
                       ] as const
-                    ).map(({ status, label, bg, hoverBg, text }) => (
-                      <div
-                        key={status}
-                        onClick={() => handleGroupClick(group.id, status)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ")
-                            handleGroupClick(group.id, status);
-                        }}
-                        className={`${bg} rounded p-2 cursor-pointer ${hoverBg} transition-colors focus-ring`}
-                        data-testid={`status-${status}`}
-                      >
-                        <div className={`text-lg font-bold ${text}`}>
-                          {
-                            group[
-                              `processing_${status}` as keyof Group
-                            ] as number
-                          }
+                    ).map(({ status, label, bg, hoverBg, text }) => {
+                      const count = group[`processing_${status}` as keyof Group] as number;
+                      const disabled = count === 0;
+                      return (
+                        <div
+                          key={status}
+                          onClick={disabled ? undefined : () => handleGroupClick(group.id, status)}
+                          role={disabled ? undefined : "button"}
+                          tabIndex={disabled ? undefined : 0}
+                          onKeyDown={disabled ? undefined : (e) => {
+                            if (e.key === "Enter" || e.key === " ")
+                              handleGroupClick(group.id, status);
+                          }}
+                          className={`${bg} rounded p-2 transition-colors ${disabled ? "opacity-40 cursor-default" : `cursor-pointer ${hoverBg} focus-ring`}`}
+                          data-testid={`status-${status}`}
+                        >
+                          <div className={`text-lg font-bold ${text}`}>{count}</div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
                         </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400">
-                          {label}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   {/* Progress bar */}
                   {group.screenshot_count > 0 && (
@@ -648,6 +648,44 @@ export const HomePage = () => {
           </div>
         )}
       </div>
+
+      {/* Pending screenshots warning modal */}
+      <Modal
+        open={!!pendingConfirmGroup}
+        onOpenChange={(open) => { if (!open) setPendingConfirmGroup(null); }}
+        title="Screenshots Not Preprocessed"
+        size="sm"
+      >
+        <div className="flex items-start gap-3 mb-4">
+          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+            <svg className="w-5 h-5 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              These screenshots are <strong>pending preprocessing</strong>. Cropping, PHI detection (optional), and OCR have not run yet, so annotations may be inaccurate or incomplete.
+            </p>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
+              It is recommended to run preprocessing first before annotating.
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={() => { setPendingConfirmGroup(null); navigate("/preprocessing"); }}
+            className="flex-1 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
+          >
+            Go to Preprocessing
+          </button>
+          <button
+            onClick={() => { const g = pendingConfirmGroup; setPendingConfirmGroup(null); doNavigateToAnnotate(g!, "pending"); }}
+            className="flex-1 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700"
+          >
+            Continue Anyway
+          </button>
+        </div>
+      </Modal>
 
       {/* Delete confirmation modal */}
       {(config.isLocalMode || (features.admin && isAdmin)) && (

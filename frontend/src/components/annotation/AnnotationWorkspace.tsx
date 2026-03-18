@@ -21,6 +21,7 @@ import { TotalsDisplay } from "./TotalsDisplay";
 import { AlignmentWarning } from "./AlignmentWarning";
 import type { ProcessingStatus } from "@/types";
 import type { FilterStatus } from "@/constants/processingStatus";
+import type { VerificationFilterType } from "@/store/slices/types";
 import { PreprocessingSummary } from "./PreprocessingSummary";
 import { useScreenshotImage } from "@/hooks/useScreenshotImage";
 import { PHIRegionEditor } from "@/components/preprocessing/PHIRegionEditor";
@@ -78,15 +79,18 @@ export const AnnotationWorkspace = ({
     recalculateOcrTotal,
     reprocessWithLineBased,
     reprocessWithOcrAnchored,
-    maxShift,
-    setMaxShift,
   } = useAnnotation(groupId, processingStatus);
 
   const [imageRefreshKey, setImageRefreshKey] = useState(0);
   const imageUrl = useScreenshotImage(screenshot?.id || 0, imageRefreshKey);
 
   const [notes, setNotes] = useState("");
-  const [displayMode, setDisplayMode] = useState<GraphDisplayMode>("overlay");
+  const [displayMode, setDisplayMode] = useState<GraphDisplayMode>(() => {
+    try {
+      const v = localStorage.getItem("annotate-display-mode");
+      return v === "separate" || v === "overlay" ? v : "overlay";
+    } catch { return "overlay"; }
+  });
   const [isRecalculatingOcr, setIsRecalculatingOcr] = useState(false);
   const [reprocessingMethod, setReprocessingMethod] =
     useState<ProcessingMethod | null>(null);
@@ -153,6 +157,25 @@ export const AnnotationWorkspace = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId, processingStatus, initialScreenshotId]);
   // Note: loadById, loadNext, loadScreenshotList are stable Zustand store functions
+
+  // Restore verificationFilter from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("annotate-verification-filter");
+      const valid: VerificationFilterType[] = ["all", "verified_by_me", "not_verified_by_me", "verified_by_others"];
+      if (saved && (valid as string[]).includes(saved)) {
+        setVerificationFilter(saved as VerificationFilterType);
+      }
+    } catch { /* ignore */ }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Persist displayMode and verificationFilter
+  useEffect(() => {
+    try { localStorage.setItem("annotate-display-mode", displayMode); } catch { /* ignore */ }
+  }, [displayMode]);
+  useEffect(() => {
+    try { localStorage.setItem("annotate-verification-filter", verificationFilter); } catch { /* ignore */ }
+  }, [verificationFilter]);
 
   // Update URL when screenshot changes
   useEffect(() => {
@@ -626,44 +649,6 @@ export const AnnotationWorkspace = ({
             {/* Reprocessing Buttons */}
             <CollapsibleSection title="Reprocess Grid" storageKey="annotation-reprocess" defaultOpen={false}>
               <div className={isVerifiedByMe ? "opacity-50" : ""}>
-              {/* Grid Optimization Spinner - centered */}
-              <div className="flex flex-col items-center mb-2">
-                <div
-                  className="text-xs text-slate-400 dark:text-slate-500 mb-1 text-center cursor-help"
-                  title="Shifts grid boundaries by ±N pixels to match bar total with OCR total. Higher = slower but more likely to find exact match."
-                >
-                  Grid Optimization Shift Range
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setMaxShift(Math.max(0, maxShift - 1))}
-                    disabled={isVerifiedByMe || maxShift <= 0}
-                    className="w-6 h-6 flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:text-slate-300 dark:hover:bg-slate-600 rounded disabled:opacity-30 disabled:cursor-not-allowed"
-                    title="Decrease optimization range"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-                  <div
-                    className="flex items-center border dark:border-slate-600 rounded px-2 py-1 bg-white dark:bg-slate-700 cursor-help"
-                    title="Max pixels to shift grid boundaries in each direction"
-                  >
-                    <span className="text-xs font-mono w-8 text-center">±{maxShift}</span>
-                  </div>
-                  <button
-                    onClick={() => setMaxShift(Math.min(10, maxShift + 1))}
-                    disabled={isVerifiedByMe || maxShift >= 10}
-                    className="w-6 h-6 flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:text-slate-300 dark:hover:bg-slate-600 rounded disabled:opacity-30 disabled:cursor-not-allowed"
-                    title="Increase optimization range"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                    </svg>
-                  </button>
-                  <span className="text-xs text-slate-400 ml-1">px</span>
-                </div>
-              </div>
               <div className="flex gap-1">
                 <button
                   onClick={() => handleReprocess("ocr_anchored")}

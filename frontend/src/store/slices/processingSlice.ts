@@ -8,6 +8,7 @@ import type {
 } from "@/core";
 import type { AnnotationState, ProcessingSlice, UIAnnotation } from "./types";
 import { isVerifiedByCurrentUser, extractGridCoords, extractErrorMessage } from "./helpers";
+import { useSettingsStore } from "@/store/settingsStore";
 
 /**
  * Error thrown when user tries to reprocess a verified screenshot.
@@ -82,7 +83,6 @@ export const createProcessingSlice = (
   processingProgress: null,
   isTesseractInitialized: false,
   isInitializingTesseract: false,
-  maxShift: 5, // Default: try ±5 pixels
 
   // Actions
   reprocessWithGrid: async (coords: GridCoordinates) => {
@@ -151,7 +151,7 @@ export const createProcessingSlice = (
 
     set({ isLoading: true, error: null, processingProgress: null });
     try {
-      const { maxShift } = get();
+      const maxShift = useSettingsStore.getState().maxShift;
       const result = await screenshotService.reprocessWithMethod(
         currentScreenshot.id,
         "line_based",
@@ -188,7 +188,7 @@ export const createProcessingSlice = (
 
     set({ isLoading: true, error: null, processingProgress: null });
     try {
-      const { maxShift } = get();
+      const maxShift = useSettingsStore.getState().maxShift;
       const result = await screenshotService.reprocessWithMethod(
         currentScreenshot.id,
         "ocr_anchored",
@@ -234,7 +234,7 @@ export const createProcessingSlice = (
     } catch (error: unknown) {
       const message = extractErrorMessage(error, "Failed to recalculate OCR total");
       set({ error: message });
-      return null;
+      throw error;
     }
   },
 
@@ -254,9 +254,4 @@ export const createProcessingSlice = (
     set({ isInitializingTesseract: initializing });
   },
 
-  setMaxShift: (value: number) => {
-    // Clamp to valid range (0-10)
-    const clamped = Math.max(0, Math.min(10, value));
-    set({ maxShift: clamped });
-  },
 });

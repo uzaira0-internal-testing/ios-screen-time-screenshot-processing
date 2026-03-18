@@ -31,7 +31,20 @@ function loadFromStorage(): ProcessingSettings {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULTS;
     const parsed = JSON.parse(raw);
-    return { ...DEFAULTS, ...parsed };
+    const merged = { ...DEFAULTS, ...parsed };
+    // Sanitize fields that could be corrupted to invalid types
+    const shift = Number(merged.maxShift);
+    merged.maxShift = Number.isFinite(shift) ? Math.max(0, Math.min(10, shift)) : DEFAULTS.maxShift;
+    if (!["line_based", "ocr_anchored"].includes(merged.gridDetectionMethod)) {
+      merged.gridDetectionMethod = DEFAULTS.gridDetectionMethod;
+    }
+    if (!["presidio", "gliner"].includes(merged.phiNerDetector)) {
+      merged.phiNerDetector = DEFAULTS.phiNerDetector;
+    }
+    if (!["redbox", "blackbox", "pixelate"].includes(merged.phiRedactionMethod)) {
+      merged.phiRedactionMethod = DEFAULTS.phiRedactionMethod;
+    }
+    return merged;
   } catch {
     return DEFAULTS;
   }

@@ -105,7 +105,6 @@ export const useAnnotation = (groupId?: string, processingStatus?: ProcessingSta
     hasPrev,
     screenshotList,
     verificationFilter,
-    maxShift,
   } = store(
     useShallow((state) => ({
       currentScreenshot: state.currentScreenshot,
@@ -126,7 +125,6 @@ export const useAnnotation = (groupId?: string, processingStatus?: ProcessingSta
       hasPrev: state.hasPrev,
       screenshotList: state.screenshotList,
       verificationFilter: state.verificationFilter,
-      maxShift: state.maxShift,
     })),
   );
 
@@ -156,7 +154,6 @@ export const useAnnotation = (groupId?: string, processingStatus?: ProcessingSta
   const verifyCurrentScreenshot = store((s) => s.verifyCurrentScreenshot);
   const unverifyCurrentScreenshot = store((s) => s.unverifyCurrentScreenshot);
   const recalculateOcrTotal = store((s) => s.recalculateOcrTotal);
-  const setMaxShift = store((s) => s.setMaxShift);
 
   const isSubmittingRef = useRef(false);
   const handleSubmit = useCallback(
@@ -326,8 +323,5 @@ export const useAnnotation = (groupId?: string, processingStatus?: ProcessingSta
     unverifyCurrentScreenshot,
     // OCR recalculation
     recalculateOcrTotal,
-    // Grid optimization
-    maxShift,
-    setMaxShift,
   };
 };

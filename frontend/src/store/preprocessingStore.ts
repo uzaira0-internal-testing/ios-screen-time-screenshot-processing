@@ -136,6 +136,7 @@ interface PreprocessingState {
   setUploadImageType: (type: "battery" | "screen_time") => void;
   setUploadGroupId: (groupId: string) => void;
   startBrowserUpload: () => Promise<void>;
+  resetUploadResult: () => void;
 
   // Queue review actions
   enterQueue: (screenshotIds: number[], startIndex?: number) => void;
@@ -243,9 +244,14 @@ export function createPreprocessingStore(service: IPreprocessingService) {
       const data = await service.getGroups();
       if (data && data.length > 0) {
         set({ groups: data });
-        if (!get().selectedGroupId) {
+        const { selectedGroupId } = get();
+        const stillExists = data.some((g) => g.id === selectedGroupId);
+        if (!selectedGroupId || !stillExists) {
           get().setSelectedGroupId(data[0]!.id);
         }
+      } else {
+        // All groups deleted — clear selection and data
+        set({ groups: [], selectedGroupId: "", screenshots: [], summary: null });
       }
     } catch (err) {
       console.error("Failed to load groups:", err);
@@ -312,20 +318,26 @@ export function createPreprocessingStore(service: IPreprocessingService) {
       if (data) {
         set({ summary: data });
 
-        // Auto-detect running tasks and start polling if not already polling
-        const activeStage = get().activeStage;
-        const stageSummary = data[activeStage];
+        // Auto-detect running tasks across ALL stages and reconnect polling.
+        // Must check all stages, not just activeStage — after a page refresh
+        // the store resets to activeStage="device_detection" even if a different
+        // stage (e.g. phi_detection) is actively running on Celery workers.
         const alreadyPolling = get()._pollInterval !== null;
-        if (stageSummary && stageSummary.running > 0 && !alreadyPolling) {
-          set({
-            isRunningStage: true,
-            stageProgress: { completed: 0, total: stageSummary.running },
-            _pollCount: 0,
-            _queuedCount: stageSummary.running,
-            _completedBaseline: stageSummary.completed,
-            _pollStage: activeStage,
-          });
-          get().startPolling();
+        if (!alreadyPolling) {
+          const runningStage = STAGES.find((s) => (data[s]?.running ?? 0) > 0);
+          if (runningStage) {
+            const runningSummary = data[runningStage]!;
+            set({
+              isRunningStage: true,
+              activeStage: runningStage,
+              stageProgress: { completed: 0, total: runningSummary.running },
+              _pollCount: 0,
+              _queuedCount: runningSummary.running,
+              _completedBaseline: runningSummary.completed,
+              _pollStage: runningStage,
+            });
+            get().startPolling();
+          }
         }
       }
     } catch (err) {
@@ -465,6 +477,7 @@ export function createPreprocessingStore(service: IPreprocessingService) {
   // Upload actions
   setUploadFiles: (files) => set({ uploadFiles: files }),
   setUploadImageType: (type) => set({ uploadImageType: type }),
+  resetUploadResult: () => set({ uploadFiles: [], uploadProgress: null, uploadErrors: [] }),
   setUploadGroupId: (groupId) => set({ uploadGroupId: groupId }),
 
   startBrowserUpload: async () => {
@@ -518,12 +531,17 @@ export function createPreprocessingStore(service: IPreprocessingService) {
       set({ uploadProgress: { completed: totalCompleted, total: uploadFiles.length } });
     }
 
-    set({ isUploading: false, uploadErrors: errors });
+    // Keep uploadProgress visible so the completion screen persists.
+    // uploadFiles cleared so the tag table doesn't reappear.
+    set({
+      isUploading: false,
+      uploadErrors: errors,
+      uploadFiles: [],
+      uploadProgress: { completed: totalCompleted, total: uploadFiles.length },
+    });
 
     if (errors.length === 0) {
       toast.success(`Uploaded ${totalCompleted} screenshot(s)`);
-      // Clear upload state and switch to pipeline mode to show uploaded screenshots
-      set({ uploadFiles: [], uploadProgress: null, pageMode: "pipeline" });
     } else {
       toast.error(`Upload completed with ${errors.length} error(s)`);
     }
