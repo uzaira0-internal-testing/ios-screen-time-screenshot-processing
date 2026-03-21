@@ -419,7 +419,7 @@ function OCRReviewPanel({
   const result = event?.result as Record<string, unknown> | undefined;
   const imageUrl = useScreenshotImageUrl(screenshot.id, "getImageUrl", undefined, refreshKey);
   const status = result?.processing_status as string | undefined;
-  const issues = (result?.issues as string[]) ?? [];
+  const issues = (result?.issues as Array<string | { issue_type?: string; severity?: string; description?: string; message?: string }>) ?? [];
 
   return (
     <div className="flex-1 flex overflow-hidden bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 min-h-0">
@@ -484,7 +484,7 @@ function OCRReviewPanel({
                   <ul className="mt-1 space-y-1">
                     {issues.map((issue, i) => (
                       <li key={i} className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded px-2 py-1">
-                        {issue}
+                        {typeof issue === "string" ? issue : (issue.description || issue.message || issue.issue_type || JSON.stringify(issue))}
                       </li>
                     ))}
                   </ul>

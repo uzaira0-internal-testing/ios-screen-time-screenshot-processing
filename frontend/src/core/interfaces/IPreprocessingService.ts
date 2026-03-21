@@ -46,6 +46,7 @@ export interface RunStageResult {
   queued_count: number;
   message: string;
   screenshot_ids?: number[];
+  task_ids?: string[];
 }
 
 export interface IPreprocessingService {

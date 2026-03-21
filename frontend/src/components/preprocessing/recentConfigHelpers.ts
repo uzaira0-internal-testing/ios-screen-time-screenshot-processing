@@ -108,6 +108,8 @@ export function getRecentPHIConfigs(
 
     for (const ev of events) {
       if (ev.stage !== "phi_detection") continue;
+      // Only include manually saved region configs, not auto-detected results
+      if (ev.source !== "manual") continue;
       const result = ev.result as Record<string, unknown> | undefined;
       const regions = result?.regions as PHIRegion[] | undefined;
       if (!regions || regions.length === 0) continue;

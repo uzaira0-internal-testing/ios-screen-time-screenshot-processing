@@ -8,6 +8,7 @@ import type {
   PreprocessingEventLog,
 } from "@/types";
 import type { IPreprocessingService, RunStageOptions } from "@/core/interfaces/IPreprocessingService";
+import { api } from "@/services/apiClient";
 import { config } from "@/config";
 import { useSettingsStore } from "@/store/settingsStore";
 import toast from "react-hot-toast";
@@ -82,6 +83,7 @@ interface PreprocessingState {
   _completedBaseline: number;
   _abortController: AbortController | null;
   _pollStage: Stage;
+  _pendingTaskIds: string[];
 
   // Upload state (Phase 2)
   uploadFiles: UploadFileItem[];
@@ -192,6 +194,7 @@ export function createPreprocessingStore(service: IPreprocessingService) {
   _completedBaseline: 0,
   _abortController: null,
   _pollStage: "device_detection",
+  _pendingTaskIds: [],
 
   // Upload state
   uploadFiles: [],
@@ -389,6 +392,12 @@ export function createPreprocessingStore(service: IPreprocessingService) {
         options.abortSignal = abortController.signal;
       }
       const result = await service.runStage(stage, options);
+      if (stage === "phi_detection") {
+        console.log("[phi_detection] dispatch result:", result);
+      }
+      if (result?.task_ids?.length) {
+        set({ _pendingTaskIds: result.task_ids });
+      }
       if (result && result.queued_count > 0) {
         toast.success(result.message);
 
@@ -430,10 +439,30 @@ export function createPreprocessingStore(service: IPreprocessingService) {
     // Force-terminate any in-flight processing workers (WASM mode)
     if (service.forceStop) service.forceStop();
     get().stopPolling();
-    set({ isRunningStage: false, stageProgress: null, _abortController: null });
-    toast.success("Stage stopped");
-    get().loadScreenshots();
-    get().loadSummary();
+
+    const { _pollStage, _pendingTaskIds, selectedGroupId } = get();
+    set({ isRunningStage: false, stageProgress: null, _abortController: null, _pendingTaskIds: [] });
+
+    // Server mode: cancel phi_detection — always call even if task IDs are empty,
+    // so the backend can mark pending/running screenshots as invalidated by group_id.
+    if (!config.isLocalMode && _pollStage === "phi_detection") {
+      toast.loading("Cancelling PHI detection...", { id: "phi-cancel" });
+      api.preprocessing.cancelPhiDetection(_pendingTaskIds, selectedGroupId || undefined)
+        .then((res) => {
+          toast.success(res?.message ?? "PHI detection cancelled", { id: "phi-cancel" });
+          get().loadScreenshots();
+          get().loadSummary();
+        })
+        .catch((err) => {
+          toast.error(`Failed to cancel: ${err}`, { id: "phi-cancel" });
+          get().loadScreenshots();
+          get().loadSummary();
+        });
+    } else {
+      toast.success("Stage stopped");
+      get().loadScreenshots();
+      get().loadSummary();
+    }
   },
 
   resetStage: async (stage) => {
@@ -710,6 +739,28 @@ export function createPreprocessingStore(service: IPreprocessingService) {
       if ((result.regions_count as number) > 10) return true;
     } else if (stage === "phi_redaction") {
       if (result.phi_detected && !result.redacted) return true;
+    } else if (stage === "ocr") {
+      if (result.processing_status === "failed") return true;
+      if (result.has_blocking_issues) return true;
+      // Low alignment score
+      const align = screenshot.alignment_score as number | null;
+      if (typeof align === "number" && align < 0.8) return true;
+      // Bar total vs OCR total mismatch
+      const hourly = screenshot.extracted_hourly_data as Record<string, number> | null;
+      const ocrTotal = result.extracted_total as string | null;
+      if (hourly && ocrTotal) {
+        let barTotal = 0;
+        for (let i = 0; i < 24; i++) {
+          const v = hourly[String(i)];
+          if (typeof v === "number") barTotal += v;
+        }
+        let ocrMinutes = 0;
+        const hm = ocrTotal.match(/(\d+)\s*h/);
+        const mm = ocrTotal.match(/(\d+)\s*m/);
+        if (hm) ocrMinutes += parseInt(hm[1]!, 10) * 60;
+        if (mm) ocrMinutes += parseInt(mm[1]!, 10);
+        if (ocrMinutes > 0 && Math.abs(barTotal - ocrMinutes) > Math.max(ocrMinutes * 0.1, 5)) return true;
+      }
     }
     return false;
   },

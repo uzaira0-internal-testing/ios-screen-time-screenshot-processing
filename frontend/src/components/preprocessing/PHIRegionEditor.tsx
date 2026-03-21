@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { usePreprocessingPipelineService } from "@/core";
 import toast from "react-hot-toast";
 import type { PHIRegion } from "@/core/interfaces/IPreprocessingService";
+import { api } from "@/services/apiClient";
 export type { PHIRegion };
 
 export interface RecentPHIConfig {
@@ -23,25 +24,8 @@ interface PHIRegionEditorProps {
 type Tool = "draw" | "delete";
 
 const LABELS = [
-  // Presidio entity types
   "PERSON",
-  "DATE_TIME",
-  "PHONE_NUMBER",
-  "EMAIL_ADDRESS",
-  "LOCATION",
-  "CREDIT_CARD",
-  "URL",
-  "IP_ADDRESS",
-  "US_SSN",
-  "US_DRIVER_LICENSE",
-  "US_PASSPORT",
-  // Custom pattern types
-  "DEVICE_SERIAL",
-  "MRN",
-  "STUDY_ID",
-  "AGE",
-  "ZIP_CODE",
-  // Generic
+  "IPAD_OWNER",
   "OTHER",
   "UNKNOWN",
 ];
@@ -67,6 +51,7 @@ export const PHIRegionEditor = ({
   const [drawCurrent, setDrawCurrent] = useState<{ x: number; y: number } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isRedacting, setIsRedacting] = useState(false);
+  const [whitelistingIndex, setWhitelistingIndex] = useState<number | null>(null);
   const [redactionMethod, setRedactionMethod] = useState(() => {
     try { return localStorage.getItem("phi-recent-redaction-method") || "redbox"; } catch { return "redbox"; }
   });
@@ -151,7 +136,8 @@ export const PHIRegionEditor = ({
     }
   }, [isOpen, inline]);
 
-  // Load image and regions on open (inline mode is always "open")
+  // Load image and regions on open (inline mode is always "open").
+  // Keep showing previous screenshot's data until new data arrives to prevent flicker.
   useEffect(() => {
     if (!isOpen && !inline) return;
     let cancelled = false;
@@ -161,27 +147,31 @@ export const PHIRegionEditor = ({
     // network requests in inline mode where isOpen doesn't toggle)
     if (loadedScreenshotRef.current === screenshotId) return;
 
-    setImage(null);
-    setRegions([]);
+    // Don't clear image/regions here — keep showing previous screenshot
+    // until new data arrives. Only clear error states.
     setImageError(false);
     setRegionsLoadError(false);
-    loadedScreenshotRef.current = screenshotId;
 
-    // Revoke previous blob URL if any
-    if (blobUrlRef.current?.startsWith("blob:")) {
-      URL.revokeObjectURL(blobUrlRef.current);
-      blobUrlRef.current = undefined;
-    }
+    const prevBlobUrl = blobUrlRef.current;
+    const loadingForId = screenshotId;
+    loadedScreenshotRef.current = screenshotId;
 
     // Load the cropped image (not the redacted one)
     preprocessingService.getStageImageUrl(screenshotId, "cropping").then((imageUrl) => {
       if (cancelled) return;
+      // Revoke previous blob URL now that new one is ready
+      if (prevBlobUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(prevBlobUrl);
+      }
       blobUrlRef.current = imageUrl;
       const img = new Image();
-      img.onload = () => { if (!cancelled) setImage(img); };
+      img.onload = () => {
+        if (!cancelled) setImage(img);
+      };
       img.onerror = () => {
         if (!cancelled) {
           console.error(`[PHIRegionEditor] Failed to load image for screenshot ${screenshotId}`);
+          setImage(null);
           setImageError(true);
         }
       };
@@ -189,16 +179,18 @@ export const PHIRegionEditor = ({
     }).catch((err) => {
       if (!cancelled) {
         console.error(`[PHIRegionEditor] Failed to get image URL for screenshot ${screenshotId}:`, err);
+        setImage(null);
         setImageError(true);
       }
     });
 
-    // Load existing regions
+    // Load existing regions — swap in atomically when ready
     preprocessingService.getPHIRegions(screenshotId).then((data: { regions: PHIRegion[] }) => {
       if (!cancelled) setRegions(data.regions || []);
     }).catch((err) => {
       if (!cancelled) {
         console.error(`[PHIRegionEditor] Failed to load PHI regions for screenshot ${screenshotId}:`, err);
+        setRegions([]);
         setRegionsLoadError(true);
       }
     });
@@ -207,7 +199,7 @@ export const PHIRegionEditor = ({
       cancelled = true;
       // Reset so a re-run of this effect (e.g. React strict mode remount)
       // doesn't skip the fetch due to the early-return guard above.
-      if (loadedScreenshotRef.current === screenshotId) {
+      if (loadedScreenshotRef.current === loadingForId) {
         loadedScreenshotRef.current = null;
       }
     };
@@ -387,12 +379,48 @@ export const PHIRegionEditor = ({
     else if (selectedIndex !== null && selectedIndex > index) setSelectedIndex(selectedIndex - 1);
   };
 
+  const handleWhitelist = async (index: number) => {
+    const region = regions[index];
+    const text = region?.text?.trim();
+    if (!text) {
+      toast.error("No text to whitelist for this region");
+      return;
+    }
+    setWhitelistingIndex(index);
+    try {
+      await api.preprocessing.addToPhiWhitelist(text);
+      // Remove this region and re-apply redaction with remaining regions
+      const remaining = regions.filter((_, i) => i !== index);
+      setRegions(remaining);
+      setSelectedIndex(null);
+      await preprocessingService.savePHIRegions(screenshotId, { regions: remaining, preset: "manual" });
+      onRegionsSaved();
+      try {
+        await preprocessingService.applyRedaction(screenshotId, { regions: remaining, redaction_method: redactionMethod });
+        onRedactionApplied();
+      } catch { /* redaction not applicable yet */ }
+      toast.success(`"${text}" whitelisted & redaction updated`);
+    } catch (err) {
+      toast.error(`Failed to whitelist: ${err}`);
+    } finally {
+      setWhitelistingIndex(null);
+    }
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
       await preprocessingService.savePHIRegions(screenshotId, { regions, preset: "manual" });
-      toast.success(`Saved ${regions.length} PHI region(s)`);
       onRegionsSaved();
+      // Auto re-apply redaction so the redacted image reflects current regions
+      try {
+        await preprocessingService.applyRedaction(screenshotId, { regions, redaction_method: redactionMethod });
+        onRedactionApplied();
+        toast.success(`Saved ${regions.length} region(s) & updated redaction`);
+      } catch {
+        // Redaction may not be applicable (e.g., no cropped image yet)
+        toast.success(`Saved ${regions.length} PHI region(s)`);
+      }
     } catch (err) {
       toast.error(`Save failed: ${err}`);
     } finally {
@@ -437,8 +465,13 @@ export const PHIRegionEditor = ({
     setIsSaving(true);
     try {
       await preprocessingService.savePHIRegions(screenshotId, { regions, preset: "manual" });
-      toast.success(`Saved ${regions.length} PHI region(s)`);
       onRegionsSaved();
+      // Auto re-apply redaction
+      try {
+        await preprocessingService.applyRedaction(screenshotId, { regions, redaction_method: redactionMethod });
+        onRedactionApplied();
+      } catch { /* redaction not applicable yet */ }
+      toast.success(`Saved ${regions.length} region(s) & updated redaction`);
       onSaveAndNext?.();
     } catch (err) {
       toast.error(`Save failed: ${err}`);
@@ -581,40 +614,60 @@ export const PHIRegionEditor = ({
           {regions.map((region, i) => (
             <div
               key={i}
-              className={`flex items-center gap-2 p-2 rounded text-xs cursor-pointer ${
+              className={`flex flex-col gap-1 p-2 rounded text-xs cursor-pointer ${
                 i === selectedIndex ? "bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-700" : "hover:bg-slate-50 dark:hover:bg-slate-700 border border-transparent"
               }`}
               onClick={() => setSelectedIndex(i)}
             >
-              <span className="font-mono text-slate-400 w-4">{i + 1}</span>
-              <span className="text-slate-500">
-                {region.x},{region.y} {region.w}x{region.h}
-              </span>
-              <select
-                value={region.label}
-                onChange={(e) => updateRegion(i, { label: e.target.value })}
-                className="text-xs border dark:border-slate-600 rounded px-1 py-0.5 flex-1 dark:bg-slate-700 dark:text-slate-200"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {(!LABELS.includes(region.label) ? [region.label, ...LABELS] : LABELS).map((l) => (
-                  <option key={l} value={l}>{l}</option>
-                ))}
-              </select>
-              <span
-                className={`px-1.5 py-0.5 rounded text-[10px] ${
-                  region.source === "manual" ? "bg-primary-100 text-primary-600" : "bg-red-100 text-red-600"
-                }`}
-              >
-                {region.source === "manual" ? "M" : "A"}
-              </span>
-              <button
-                onClick={(e) => { e.stopPropagation(); deleteRegion(i); }}
-                className="text-slate-400 hover:text-red-500 leading-none"
-                title="Delete region"
-                aria-label={`Delete region ${i + 1}`}
-              >
-                &times;
-              </button>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-slate-400 w-4">{i + 1}</span>
+                <span className="text-slate-500">
+                  {region.x},{region.y} {region.w}x{region.h}
+                </span>
+                <select
+                  value={region.label}
+                  onChange={(e) => updateRegion(i, { label: e.target.value })}
+                  className="text-xs border dark:border-slate-600 rounded px-1 py-0.5 flex-1 dark:bg-slate-700 dark:text-slate-200"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {(!LABELS.includes(region.label) ? [region.label, ...LABELS] : LABELS).map((l) => (
+                    <option key={l} value={l}>{l}</option>
+                  ))}
+                </select>
+                <span
+                  className={`px-1.5 py-0.5 rounded text-[10px] ${
+                    region.source === "manual" ? "bg-primary-100 text-primary-600" : "bg-red-100 text-red-600"
+                  }`}
+                >
+                  {region.source === "manual" ? "M" : "A"}
+                </span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); deleteRegion(i); }}
+                  className="text-slate-400 hover:text-red-500 leading-none"
+                  title="Delete region"
+                  aria-label={`Delete region ${i + 1}`}
+                >
+                  &times;
+                </button>
+              </div>
+              {region.text && (
+                <div className="flex items-center gap-1 pl-6">
+                  <span
+                    className="italic text-slate-500 dark:text-slate-400 truncate flex-1"
+                    title={region.text}
+                  >
+                    "{region.text}"
+                  </span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleWhitelist(i); }}
+                    disabled={whitelistingIndex === i}
+                    className="px-1.5 py-0.5 text-[10px] rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-800/40 disabled:opacity-50 shrink-0"
+                    title={`Whitelist "${region.text}" — never flag this text again`}
+                  >
+                    {whitelistingIndex === i ? "..." : "Whitelist"}
+                  </button>
+                </div>
+              )}
             </div>
           ))}
           {regionsLoadError && (

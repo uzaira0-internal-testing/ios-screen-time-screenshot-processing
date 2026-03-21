@@ -191,8 +191,6 @@ export const PreprocessingPage = () => {
   const activeStage = usePreprocessingStore((s) => s.activeStage);
   const setActiveStage = usePreprocessingStore((s) => s.setActiveStage);
   const eventLog = usePreprocessingStore((s) => s.eventLog);
-  const phiPreset = usePreprocessingStore((s) => s.phiPreset);
-  const setPhiPreset = usePreprocessingStore((s) => s.setPhiPreset);
   const redactionMethod = usePreprocessingStore((s) => s.redactionMethod);
   const setRedactionMethod = usePreprocessingStore((s) => s.setRedactionMethod);
   const llmEnabled = usePreprocessingStore((s) => s.llmEnabled);

@@ -522,8 +522,8 @@ export const api = {
             phi_pipeline_preset: options.phi_pipeline_preset ?? "screen_time",
             phi_redaction_method: options.phi_redaction_method ?? "redbox",
             phi_detection_enabled: options.phi_detection_enabled ?? true,
-            phi_ocr_engine: options.phi_ocr_engine ?? "leptess",
-            phi_ner_detector: options.phi_ner_detector ?? "presidio",
+            phi_ocr_engine: (options.phi_ocr_engine ?? "leptess") as "pytesseract" | "leptess",
+            phi_ner_detector: (options.phi_ner_detector ?? "presidio") as "presidio" | "gliner",
             run_ocr_after: options.run_ocr_after ?? false,
           },
         },
@@ -552,8 +552,8 @@ export const api = {
               request.phi_pipeline_preset ?? "screen_time",
             phi_redaction_method: request.phi_redaction_method ?? "redbox",
             phi_detection_enabled: request.phi_detection_enabled ?? true,
-            phi_ocr_engine: request.phi_ocr_engine ?? "leptess",
-            phi_ner_detector: request.phi_ner_detector ?? "presidio",
+            phi_ocr_engine: (request.phi_ocr_engine ?? "leptess") as "pytesseract" | "leptess",
+            phi_ner_detector: (request.phi_ner_detector ?? "presidio") as "presidio" | "gliner",
             run_ocr_after: request.run_ocr_after ?? false,
           },
         },
@@ -614,6 +614,19 @@ export const api = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       }, "Failed to queue stage");
+      return response.json();
+    },
+
+    async cancelPhiDetection(taskIds: string[], groupId?: string) {
+      const response = await authFetch(
+        "/api/v1/screenshots/preprocess-stage/phi-detection/cancel",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ task_ids: taskIds, group_id: groupId ?? null }),
+        },
+        "Failed to cancel PHI detection",
+      );
       return response.json();
     },
 
@@ -727,6 +740,41 @@ export const api = {
           body: JSON.stringify(body),
         },
         "Failed to apply redaction",
+      );
+      return response.json();
+    },
+
+    async getPhiWhitelist(): Promise<{ whitelist: string[] }> {
+      const response = await authFetch(
+        "/api/v1/screenshots/phi-text-whitelist",
+        undefined,
+        "Failed to get PHI whitelist",
+      );
+      return response.json();
+    },
+
+    async addToPhiWhitelist(text: string): Promise<{ whitelist: string[] }> {
+      const response = await authFetch(
+        "/api/v1/screenshots/phi-text-whitelist",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        },
+        "Failed to add to PHI whitelist",
+      );
+      return response.json();
+    },
+
+    async removeFromPhiWhitelist(text: string): Promise<{ whitelist: string[] }> {
+      const response = await authFetch(
+        "/api/v1/screenshots/phi-text-whitelist",
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        },
+        "Failed to remove from PHI whitelist",
       );
       return response.json();
     },
