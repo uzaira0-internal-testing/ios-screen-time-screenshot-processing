@@ -28,6 +28,16 @@ def convert_dark_mode(img: np.ndarray) -> np.ndarray:
     return img
 
 
+def simple_grayscale(image: np.ndarray) -> np.ndarray:
+    """Convert BGR/RGB image to grayscale using simple (R+G+B)/3 average.
+
+    Matches the Rust implementation's grayscale conversion exactly.
+    """
+    if len(image.shape) == 2:
+        return image
+    return (image[..., :3].astype(np.uint16).sum(axis=2) // 3).astype(np.uint8)
+
+
 def convert_dark_mode_for_ocr(img: np.ndarray) -> np.ndarray:
     """Convert dark mode image using adaptive thresholding optimized for OCR.
 
@@ -39,8 +49,8 @@ def convert_dark_mode_for_ocr(img: np.ndarray) -> np.ndarray:
         return img
 
     inverted = cv2.bitwise_not(img)
-    gray = cv2.cvtColor(inverted, cv2.COLOR_BGR2GRAY)
-    thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 10)
+    gray = simple_grayscale(inverted)
+    thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 31, 10)
     # Convert back to 3-channel for compatibility with downstream code
     return cv2.cvtColor(thresh, cv2.COLOR_GRAY2BGR)
 

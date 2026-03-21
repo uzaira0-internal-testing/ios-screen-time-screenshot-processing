@@ -114,8 +114,6 @@ def is_daily_total_page(ocr_dict: dict) -> bool:
         PageMarkerWord.RATING,
         PageMarkerWord.LIMIT,
         PageMarkerWord.AGE,
-        PageMarkerWord.DAILY,
-        PageMarkerWord.AVERAGE,
     ]
 
     daily_count = 0

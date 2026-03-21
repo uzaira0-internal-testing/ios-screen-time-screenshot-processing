@@ -35,33 +35,21 @@ logger = logging.getLogger(__name__)
 
 # ─── Rust fast-path helpers ──────────────────────────────────────────────────
 
-_DAILY_TOTAL_PHRASES = ("all activity", "daily total", "total activity")
-
-
-def _is_daily_total_title(title: str | None) -> bool:
-    if not title:
-        return False
-    return any(p in title.lower() for p in _DAILY_TOTAL_PHRASES)
-
 
 def _hourly_list_to_dict(hourly: list) -> dict:
     """Convert [v0, v1, ...] → {"0": v0, "1": v1, ...} as stored in DB."""
-    return {str(i): float(v) for i, v in enumerate(hourly)}
+    return {str(i): round(float(v)) for i, v in enumerate(hourly)}
 
 
-def _try_rust_process_screenshot(
+def _try_rust_process_with_grid(
     file_path: str,
     image_type: str,
-    grid_coords: dict | None,
-    processing_method: str | None,
+    grid_coords: dict,
     existing_title: str | None,
     existing_total: str | None,
 ) -> dict | None:
     """
-    Attempt to process a screenshot using Rust wrappers from rust_accelerator.
-
-    Uses the public wrapper functions (never _rs directly) so thread safety
-    and fallback logic are handled in one place.
+    Extract bar data for a known manual grid using Rust.
 
     Returns the result dict on success, or None to trigger Python fallback.
     """
@@ -71,81 +59,31 @@ def _try_rust_process_screenshot(
         return None
 
     try:
-        if grid_coords:
-            # Manual bounds: fast bar-extraction path via process_image_with_grid
-            rust_result = rust_accelerator.process_image_with_grid(
-                file_path,
-                upper_left=(grid_coords["upper_left_x"], grid_coords["upper_left_y"]),
-                lower_right=(grid_coords["lower_right_x"], grid_coords["lower_right_y"]),
-                image_type=image_type,
-            )
-            # process_image_with_grid returns hourly_values, total, alignment_score
-            # (title/total_text stripped by PyO3 wrapper — use existing values)
-            hourly = _hourly_list_to_dict(rust_result["hourly_values"])
-            return {
-                "success": True,
-                "processing_status": "completed",
-                "extracted_hourly_data": hourly,
-                "extracted_title": existing_title,
-                "extracted_total": existing_total,
-                "grid_coords": grid_coords,
-                "processing_method": "manual",
-                "grid_detection_confidence": None,
-                "alignment_score": rust_result.get("alignment_score"),
-                "title_y_position": None,
-                "is_daily_total": False,
-                "has_blocking_issues": False,
-                "issues": [],
-            }
-        else:
-            # Full pipeline: grid detection + bar extraction + OCR
-            method = processing_method or "line_based"
-            rust_result = rust_accelerator.process_image(file_path, image_type, method)
-            title = rust_result.get("title") or existing_title
-            total = rust_result.get("total_text") or existing_total
-
-            if _is_daily_total_title(title):
-                return {
-                    "success": True,
-                    "processing_status": "skipped",
-                    "extracted_hourly_data": None,
-                    "extracted_title": title,
-                    "extracted_total": total,
-                    "grid_coords": None,
-                    "processing_method": method,
-                    "grid_detection_confidence": None,
-                    "alignment_score": None,
-                    "title_y_position": None,
-                    "is_daily_total": True,
-                    "has_blocking_issues": False,
-                    "issues": [],
-                }
-
-            grid_bounds = rust_result.get("grid_bounds")  # dict or absent
-            hourly_list = rust_result["hourly_values"]
-            has_grid = grid_bounds is not None and any(hourly_list)
-            hourly = _hourly_list_to_dict(hourly_list)
-            return {
-                "success": True,
-                "processing_status": "completed" if has_grid else "failed",
-                "extracted_hourly_data": hourly if has_grid else None,
-                "extracted_title": title,
-                "extracted_total": total,
-                "grid_coords": grid_bounds,
-                "processing_method": rust_result.get("detection_method", method),
-                "grid_detection_confidence": None,
-                "alignment_score": rust_result.get("alignment_score"),
-                "title_y_position": None,
-                "is_daily_total": False,
-                "has_blocking_issues": not has_grid,
-                "issues": [] if has_grid else [
-                    {"issue_type": "GridDetection", "severity": "blocking",
-                     "description": "Rust pipeline: no grid detected"},
-                ],
-            }
-
+        rust_result = rust_accelerator.process_image_with_grid(
+            file_path,
+            upper_left=(grid_coords["upper_left_x"], grid_coords["upper_left_y"]),
+            lower_right=(grid_coords["lower_right_x"], grid_coords["lower_right_y"]),
+            image_type=image_type,
+        )
+        hourly_vals = rust_result.get("hourly_values")
+        hourly = _hourly_list_to_dict(hourly_vals) if hourly_vals is not None else None
+        return {
+            "success": True,
+            "processing_status": "completed",
+            "extracted_hourly_data": hourly,
+            "extracted_title": existing_title,
+            "extracted_total": existing_total,
+            "grid_coords": grid_coords,
+            "processing_method": "manual",
+            "grid_detection_confidence": None,
+            "alignment_score": rust_result.get("alignment_score"),
+            "title_y_position": rust_result.get("title_y_position"),
+            "is_daily_total": rust_result.get("is_daily_total", False),
+            "has_blocking_issues": rust_result.get("has_blocking_issues", False),
+            "issues": rust_result.get("issues", []),
+        }
     except Exception as e:
-        logger.debug("Rust fast path failed, falling back to Python: %s", e)
+        logger.warning("Rust manual-grid fast path failed, falling back to Python: %s", e)
         return None
 
 
@@ -157,7 +95,7 @@ def process_screenshot_file(
     existing_title: str | None = None,
     existing_total: str | None = None,
     use_fallback: bool = True,
-    max_shift: int = 0,
+    max_shift: int = 5,
 ) -> dict:
     """
     Process a screenshot file. Core sync function - no database operations.
@@ -178,36 +116,92 @@ def process_screenshot_file(
     Returns:
         dict with processing results
     """
-    # ── Rust fast-path (disabled when boundary optimizer is active) ───────────
-    if max_shift == 0:
-        rust_result = _try_rust_process_screenshot(
-            file_path, image_type, grid_coords, processing_method,
-            existing_title, existing_total,
+    # ── Early exit for known daily total pages ────────────────────────────────
+    # If we already identified this as a daily total page, skip immediately.
+    # Re-running OCR would risk overwriting the correct finding with a wrong one.
+    if existing_title == "Daily Total" and not grid_coords:
+        return {
+            "success": True,
+            "processing_status": "skipped",
+            "extracted_title": "Daily Total",
+            "extracted_total": existing_total,
+            "extracted_hourly_data": None,
+            "grid_coords": None,
+            "processing_method": processing_method or "line_based",
+            "grid_detection_confidence": None,
+            "alignment_score": None,
+            "title_y_position": None,
+            "is_daily_total": True,
+            "has_blocking_issues": False,
+            "issues": [],
+        }
+
+    # ── Rust fast-path ────────────────────────────────────────────────────────
+    from ...core import rust_accelerator
+
+    if grid_coords:
+        # Manual grid coords: skip detection, extract bars only.
+        rust_result = _try_rust_process_with_grid(
+            file_path, image_type, grid_coords, existing_title, existing_total
         )
         if rust_result is not None:
-            # Mirror Python's use_fallback: if line_based found no grid, try ocr_anchored
-            if (
-                use_fallback
-                and not grid_coords
-                and rust_result["processing_status"] == "failed"
-                and not rust_result.get("grid_coords")
-            ):
-                rust_fallback = _try_rust_process_screenshot(
-                    file_path, image_type, None, "ocr_anchored",
-                    existing_title, existing_total,
-                )
-                if rust_fallback is not None:
-                    return rust_fallback
+            logger.info("Rust fast path succeeded (manual grid)", extra={"file_path": file_path})
+            return rust_result
+    else:
+        # No manual grid: use the Rust optimizer pipeline (process_image_optimized).
+        method = processing_method or "line_based"
+        rust_result = rust_accelerator.process_image_optimized(file_path, image_type, method, max_shift)
+
+        # Note: Rust process_image_optimized handles line_based→ocr_anchored
+        # fallback internally, so no Python-level retry is needed.
+
+        if rust_result is not None:
+            # process_image_optimized returns "grid_bounds" dict; alias to "grid_coords".
+            if "grid_bounds" in rust_result and isinstance(rust_result.get("grid_bounds"), dict):
+                rust_result = {**rust_result, "grid_coords": rust_result["grid_bounds"]}
+
+            # Rust already determined is_daily_total via is_daily_total_page().
+            if rust_result.get("is_daily_total"):
+                return {
+                    "success": True,
+                    "processing_status": "skipped",
+                    "extracted_title": rust_result.get("title") or existing_title,
+                    "extracted_total": rust_result.get("total_text") or existing_total,
+                    "grid_coords": None,
+                    "processing_method": rust_result.get("detection_method") or method,
+                    "grid_detection_confidence": rust_result.get("grid_detection_confidence"),
+                    "alignment_score": rust_result.get("alignment_score"),
+                    "title_y_position": rust_result.get("title_y_position"),
+                    "is_daily_total": True,
+                    "has_blocking_issues": rust_result.get("has_blocking_issues", False),
+                    "issues": rust_result.get("issues", []),
+                }
+
+            grid_coords = rust_result.get("grid_coords")
+            hourly_vals = rust_result.get("hourly_values")
+            processing_time = rust_result.get("processing_time_ms", 0)
             logger.info(
                 "Rust fast path succeeded",
-                extra={
-                    "file_path": file_path,
-                    "processing_time_ms": rust_result.get("processing_time_ms", 0),
-                    "used_grid_coords": grid_coords is not None,
-                },
+                extra={"file_path": file_path, "processing_time_ms": processing_time},
             )
-            return rust_result
-        logger.debug("Rust fast path unavailable, using Python", extra={"file_path": file_path})
+            return {
+                "success": True,
+                "processing_status": "completed" if grid_coords else "failed",
+                "processing_method": rust_result.get("detection_method") or method,
+                "extracted_title": rust_result.get("title") or existing_title,
+                "extracted_total": rust_result.get("total_text") or existing_total,
+                "extracted_hourly_data": _hourly_list_to_dict(hourly_vals[:24]) if hourly_vals is not None else None,
+                "grid_coords": grid_coords,
+                "grid_detection_confidence": rust_result.get("grid_detection_confidence"),
+                "alignment_score": rust_result.get("alignment_score"),
+                "title_y_position": rust_result.get("title_y_position"),
+                "is_daily_total": False,
+                "has_blocking_issues": rust_result.get("has_blocking_issues", False),
+                "issues": rust_result.get("issues", []),
+                "processing_time_ms": processing_time,
+            }
+
+    logger.debug("Rust fast path unavailable, using Python", extra={"file_path": file_path})
     # ── Python path (existing code begins here, unchanged) ───────────────────
 
     global ScreenshotProcessingService
@@ -299,13 +293,18 @@ def update_screenshot_from_result(screenshot: Screenshot, result: dict) -> None:
         screenshot.processing_method = ProcessingMethod(method_str)
     screenshot.grid_detection_confidence = result.get("grid_detection_confidence")
 
-    # Grid coordinates
-    if result.get("grid_coords"):
-        coords = result["grid_coords"]
+    # Grid coordinates — always overwrite (clear old manual coords on re-detection)
+    coords = result.get("grid_coords")
+    if coords:
         screenshot.grid_upper_left_x = coords.get("upper_left_x")
         screenshot.grid_upper_left_y = coords.get("upper_left_y")
         screenshot.grid_lower_right_x = coords.get("lower_right_x")
         screenshot.grid_lower_right_y = coords.get("lower_right_y")
+    else:
+        screenshot.grid_upper_left_x = None
+        screenshot.grid_upper_left_y = None
+        screenshot.grid_lower_right_x = None
+        screenshot.grid_lower_right_y = None
 
     # Daily total = skip annotation
     if result["processing_status"] == "skipped":

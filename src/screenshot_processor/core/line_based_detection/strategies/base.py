@@ -8,6 +8,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
+from ...image_utils import simple_grayscale
 from ..protocol import GridBounds, GridDetectionResult
 
 
@@ -67,7 +68,7 @@ class BaseGridStrategy(ABC):
         """Convert BGR image to grayscale."""
         if len(image.shape) == 2:
             return image
-        return np.dot(image[..., :3], [0.114, 0.587, 0.299]).astype(np.uint8)
+        return simple_grayscale(image)
 
     @staticmethod
     def _cluster_positions(positions: list[int], max_gap: int = 5) -> list[int]:

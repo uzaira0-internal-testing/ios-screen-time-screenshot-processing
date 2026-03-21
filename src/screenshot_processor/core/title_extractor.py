@@ -43,8 +43,16 @@ class OCRTitleExtractor(ITitleExtractor):
         Returns:
             TitleTotalResult with extracted values
         """
+        # If we already know it's a daily total page, skip OCR and return immediately.
+        if existing_title == "Daily Total":
+            return TitleTotalResult(
+                title="Daily Total",
+                total=existing_total if existing_total and existing_total != "N/A" else None,
+                is_daily_total=True,
+            )
+
         # Check if we have valid existing data
-        has_valid_title = existing_title is not None and existing_title != "" and existing_title != "Daily Total"
+        has_valid_title = existing_title is not None and existing_title != ""
         has_valid_total = existing_total is not None and existing_total != "" and existing_total != "N/A"
 
         # Initialize result with existing values

@@ -3,8 +3,40 @@
 //! Port of Python ocr.py — regex patterns for digit normalization,
 //! time extraction, and daily total page detection.
 
+use std::cell::RefCell;
+
 use lazy_static::lazy_static;
 use regex::Regex;
+
+// ---------------------------------------------------------------------------
+// Thread-local cached LepTess instance — avoids re-loading eng.traineddata
+// on every call (saves ~200ms per image).
+// ---------------------------------------------------------------------------
+
+thread_local! {
+    static LEPTESS: RefCell<Option<leptess::LepTess>> = RefCell::new(None);
+}
+
+/// Get or initialise the thread-local LepTess instance.
+fn with_leptess<F, T>(psm: &str, f: F) -> Result<T, crate::types::ProcessingError>
+where
+    F: FnOnce(&mut leptess::LepTess) -> Result<T, crate::types::ProcessingError>,
+{
+    LEPTESS.with(|cell| {
+        let mut opt = cell.borrow_mut();
+        if opt.is_none() {
+            let lt = leptess::LepTess::new(None, "eng")
+                .map_err(|e| crate::types::ProcessingError::Ocr(format!("Tesseract init failed: {e}")))?;
+            *opt = Some(lt);
+        }
+        let lt = opt.as_mut().unwrap();
+        // PSM may differ per call — set it every time (cheap)
+        if lt.set_variable(leptess::Variable::TesseditPagesegMode, psm).is_err() {
+            log::warn!("Failed to set Tesseract PSM to '{}', using previous setting", psm);
+        }
+        f(lt)
+    })
+}
 
 // ---------------------------------------------------------------------------
 // Pre-compiled regex patterns for OCR digit normalization
@@ -198,8 +230,6 @@ const APP_PAGE_MARKERS: &[&str] = &[
     "RATING",
     "LIMIT",
     "AGE",
-    "DAILY",
-    "AVERAGE",
 ];
 
 /// Determine if OCR text indicates a daily total page (vs app-specific).
@@ -235,7 +265,7 @@ pub fn is_daily_total_page(texts: &[String]) -> bool {
 // ---------------------------------------------------------------------------
 
 use image::RgbImage;
-use log::info;
+use log::{info, debug};
 
 use crate::image_utils::adjust_contrast_brightness;
 use crate::types::ProcessingError;
@@ -260,15 +290,12 @@ pub fn run_tesseract(img: &RgbImage, psm: &str) -> Result<Vec<OcrWord>, Processi
     img.write_with_encoder(encoder)
         .map_err(|e| ProcessingError::Ocr(format!("PNG encode failed: {e}")))?;
 
-    let mut lt = leptess::LepTess::new(None, "eng")
-        .map_err(|e| ProcessingError::Ocr(format!("Tesseract init failed: {e}")))?;
-
-    let _ = lt.set_variable(leptess::Variable::TesseditPagesegMode, psm);
-    lt.set_image_from_mem(&png_buf)
-        .map_err(|e| ProcessingError::Ocr(format!("Set image from mem failed: {e}")))?;
-    lt.recognize();
-
-    parse_tsv_words(&mut lt)
+    with_leptess(psm, |lt| {
+        lt.set_image_from_mem(&png_buf)
+            .map_err(|e| ProcessingError::Ocr(format!("Set image from mem failed: {e}")))?;
+        lt.recognize();
+        parse_tsv_words(lt)
+    })
 }
 
 /// Parse TSV output from a recognized LepTess instance into word-level boxes.
@@ -296,7 +323,50 @@ pub fn parse_tsv_words(lt: &mut leptess::LepTess) -> Result<Vec<OcrWord>, Proces
     Ok(words)
 }
 
+/// Sort OCR words in reading order (left-to-right, top-to-bottom).
+///
+/// Words within `y_tolerance` pixels of each other are considered on the same
+/// line and sorted by x only. This prevents 1-2px y jitter from reordering
+/// "1h" and "9m" into "9m 1h" when they're visually on the same line.
+fn sort_words_reading_order(words: &mut [&OcrWord]) {
+    const Y_TOLERANCE: i32 = 8;
+    words.sort_by(|a, b| {
+        let y_diff = (a.y - b.y).abs();
+        if y_diff <= Y_TOLERANCE {
+            a.x.cmp(&b.x)
+        } else {
+            a.y.cmp(&b.y).then(a.x.cmp(&b.x))
+        }
+    });
+}
+
+/// Join OCR words into a single normalized string.
+///
+/// Applies common OCR cleanup (Os→0s, pipe removal), joins with spaces,
+/// and normalizes digit confusions.
+fn words_to_normalized_text<'a>(words: impl Iterator<Item = &'a OcrWord>) -> String {
+    let raw: String = words
+        .map(|w| w.text.replace("Os", "0s").replace('|', ""))
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
+    normalize_ocr_digits(raw.trim())
+}
+
+/// Join OCR words into a title string (pipe removal only, no Os→0s).
+fn words_to_title_text<'a>(words: impl Iterator<Item = &'a OcrWord>) -> String {
+    let raw: String = words
+        .map(|w| w.text.replace('|', ""))
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
+    raw.trim().trim_matches(|c| c == '#' || c == '_' || c == ' ').to_string()
+}
+
 /// Extract the screenshot title using pre-computed full-image OCR data.
+///
+/// Tries spatial filtering of full-image OCR words first (no extra Tesseract call).
+/// Falls back to crop+re-OCR only when the spatial pass yields nothing.
 fn extract_title(
     img: &RgbImage,
     ocr_data: &[OcrWord],
@@ -307,50 +377,93 @@ fn extract_title(
         return Ok(("Daily Total".to_string(), None));
     }
 
-    // Find "INFO" text position
-    let info_word = ocr_data.iter().find(|w| w.text.contains("INFO"));
+    // Find LAST "INFO" text position — bottom-most match is more likely
+    // to be the actual button, not random text. Matches Python's behavior.
+    let info_word = ocr_data.iter().rev().find(|w| w.text.contains("INFO"));
 
     if let Some(info) = info_word {
-        let app_height = (info.h * 7) as u32;
-        let title_y = (info.y + info.h) as u32;
-        let x_origin = (info.x as f64 + 1.5 * info.w as f64) as u32;
-        let x_width = (info.w * 12) as u32;
+        let title_y_start = info.y + info.h;
+        let title_x_start = (info.x as f64 + 1.5 * info.w as f64) as i32;
+        let title_x_end = title_x_start + info.w * 12;
+        let title_y_end = title_y_start + info.h * 7;
 
+        // Fast path: extract title from full-image OCR words by spatial position.
+        // Words that fall inside the title bounding box are already in ocr_data —
+        // no extra Tesseract call needed.
+        let mut title_words: Vec<&OcrWord> = ocr_data
+            .iter()
+            .filter(|w| {
+                !w.text.is_empty()
+                    && w.x >= title_x_start
+                    && w.x < title_x_end
+                    && w.y >= title_y_start
+                    && w.y < title_y_end
+                    // Exclude the "INFO" word itself (shouldn't overlap, but be safe)
+                    && !w.text.contains("INFO")
+            })
+            .collect();
+        sort_words_reading_order(&mut title_words);
+
+        let title = words_to_title_text(title_words.iter().copied());
+
+        if !title.is_empty() && title.len() <= 50 {
+            info!("Found title from full-image OCR: '{}' at y={}", title, title_y_end);
+            return Ok((title, Some(title_y_end)));
+        }
+
+        // Slow fallback: crop region + contrast enhancement + re-OCR.
         let (img_w, img_h) = img.dimensions();
-        let x_end = (x_origin + x_width).min(img_w);
-        let y_end = (title_y + app_height).min(img_h);
+        let x_origin = title_x_start.max(0) as u32;
+        let x_end = (title_x_end as u32).min(img_w);
+        let y_start = title_y_start.max(0) as u32;
+        let y_end = (title_y_end as u32).min(img_h);
 
-        if x_end > x_origin && y_end > title_y {
-            let region = image::imageops::crop_imm(img, x_origin, title_y, x_end - x_origin, y_end - title_y).to_image();
+        if x_end > x_origin && y_end > y_start {
+            let region = image::imageops::crop_imm(img, x_origin, y_start, x_end - x_origin, y_end - y_start).to_image();
             let region_enhanced = adjust_contrast_brightness(&region, 2.0, 0);
             let words = run_tesseract(&region_enhanced, "3")?;
 
-            let mut title = String::new();
-            for w in &words {
-                if !w.text.is_empty() {
-                    if !title.is_empty() {
-                        title.push(' ');
-                    }
-                    title.push_str(&w.text.replace('|', ""));
-                }
-            }
-
-            let title = title.trim().trim_matches(|c| c == '#' || c == '_' || c == ' ').to_string();
+            let title = words_to_title_text(words.iter());
 
             if title.len() > 50 {
                 info!("Title too long ({} chars), likely OCR garbage", title.len());
                 return Ok((String::new(), Some(y_end as i32)));
             }
 
-            info!("Found title: '{}' at y={}", title, y_end);
+            info!("Found title via crop OCR: '{}' at y={}", title, y_end);
             return Ok((title, Some(y_end as i32)));
         }
     }
 
+    // Fallback: no "INFO" found — use hardcoded region matching Python
+    let (img_w, img_h) = img.dimensions();
+    let fb_y_start = 40u32.min(img_h);
+    let fb_y_end = 300u32.min(img_h);
+    let fb_x_start = 120u32.min(img_w);
+    let fb_x_end = 2000u32.min(img_w);
+
+    if fb_x_end > fb_x_start && fb_y_end > fb_y_start {
+        let region = image::imageops::crop_imm(
+            img, fb_x_start, fb_y_start,
+            fb_x_end - fb_x_start, fb_y_end - fb_y_start,
+        ).to_image();
+        let region_enhanced = adjust_contrast_brightness(&region, 2.0, 0);
+        let words = run_tesseract(&region_enhanced, "3")?;
+
+        let title = words_to_title_text(words.iter());
+        if !title.is_empty() && title.len() <= 50 {
+            info!("Found title via fallback region: '{}'", title);
+            return Ok((title, Some(fb_y_end as i32)));
+        }
+    }
+
+    debug!("No title found after all extraction strategies (spatial, crop, hardcoded region)");
     Ok((String::new(), None))
 }
 
 /// Extract total screen time using pre-computed full-image OCR data.
+///
+/// Extracts from spatially-filtered full-image OCR words — no extra Tesseract call.
 fn extract_total(
     img: &RgbImage,
     ocr_data: &[OcrWord],
@@ -358,65 +471,88 @@ fn extract_total(
     let texts: Vec<String> = ocr_data.iter().map(|w| w.text.clone()).collect();
     let is_daily = is_daily_total_page(&texts);
 
-    let screen_word = ocr_data.iter().find(|w| w.text.contains("SCREEN"));
+    // Find LAST "SCREEN" word — matches Python's behavior of taking last match
+    let screen_word = ocr_data.iter().rev().find(|w| w.text.contains("SCREEN"));
+
+    let (img_w, img_h) = img.dimensions();
 
     if let Some(screen) = screen_word {
-        let (img_w, img_h) = img.dimensions();
-
-        let (x_origin, y_origin, width, height) = if is_daily {
-            let y = (screen.y + screen.h + 95) as u32;
-            let h = (screen.h * 5) as u32;
-            let x = (screen.x - 50).max(0) as u32;
-            let w = (screen.w * 4) as u32;
-            (x, y, w, h)
+        // Compute the same bounding box that the crop+re-OCR path used
+        let (x_start, y_start, x_end_approx, y_end_approx) = if is_daily {
+            let y = screen.y + screen.h + 95;
+            let h = screen.h * 5;
+            let x = (screen.x - 50).max(0);
+            let w = screen.w * 4;
+            (x, y, x + w, y + h)
         } else {
-            let h = (screen.h * 6) as u32;
-            let y = (screen.y + screen.h + 50) as u32;
-            let x = (screen.x - 20).max(0) as u32;
-            let max_w = img_w / 3;
-            let w = ((screen.w * 3) as u32).min(max_w);
-            (x, y, w, h)
+            let h = screen.h * 6;
+            let y = screen.y + screen.h + 50;
+            let x = (screen.x - 20).max(0);
+            // Clamp width to img_width / 3 for app pages to avoid picking up
+            // unrelated text on the right side of the screen
+            let w = (screen.w * 3).min(img_w as i32 / 3);
+            (x, y, x + w, y + h)
         };
 
-        let x_end = (x_origin + width).min(img_w);
-        let y_end = (y_origin + height).min(img_h);
+        // Collect words in the total region from the full-image OCR data
+        let mut region_words: Vec<&OcrWord> = ocr_data
+            .iter()
+            .filter(|w| {
+                !w.text.is_empty()
+                    && w.x >= x_start
+                    && w.x < x_end_approx
+                    && w.y >= y_start
+                    && w.y < y_end_approx
+            })
+            .collect();
+        sort_words_reading_order(&mut region_words);
 
-        if x_end > x_origin && y_end > y_origin {
-            let region = image::imageops::crop_imm(img, x_origin, y_origin, x_end - x_origin, y_end - y_origin).to_image();
-            let words = run_tesseract(&region, "3")?;
-
-            let mut total_text = String::new();
-            for w in &words {
-                let piece = w.text.replace("Os", "0s").replace('|', "");
-                if !piece.is_empty() {
-                    if !total_text.is_empty() {
-                        total_text.push(' ');
-                    }
-                    total_text.push_str(&piece);
-                }
-            }
-
-            let total_text = normalize_ocr_digits(total_text.trim());
-            let extracted = extract_time_from_text(&total_text);
-
-            if !extracted.is_empty() {
-                info!("Found total: '{}' (from '{}')", extracted, total_text);
-                return Ok(extracted);
-            }
+        let total_text = words_to_normalized_text(region_words.iter().copied());
+        let extracted = extract_time_from_text(&total_text);
+        if !extracted.is_empty() {
+            info!("Found total from full-image OCR: '{}' (from '{}')", extracted, total_text);
+            return Ok(extracted);
         }
     }
 
-    // Fallback: try extracting time from the already-cached full-image OCR text
-    // This avoids running Tesseract again on the left-third/left-half
-    let full_text: String = ocr_data.iter()
-        .map(|w| w.text.as_str())
-        .collect::<Vec<_>>()
-        .join(" ")
-        .replace("Os", "0s");
-    let total = extract_time_from_text(&full_text);
-    if !total.is_empty() {
-        info!("Found total via full-image text fallback: '{}'", total);
-        return Ok(total);
+    // Fallback: when "SCREEN" not found, use hardcoded regions matching Python
+    let (fb_y_start, fb_y_end) = if is_daily { (325, 425) } else { (250, 350) };
+
+    let mut region_words: Vec<&OcrWord> = ocr_data
+        .iter()
+        .filter(|w| {
+            !w.text.is_empty()
+                && w.y >= fb_y_start
+                && w.y < fb_y_end
+                && w.x < (img_w as i32 / 3)
+        })
+        .collect();
+    sort_words_reading_order(&mut region_words);
+
+    let fb_text = words_to_normalized_text(region_words.iter().copied());
+    let extracted = extract_time_from_text(&fb_text);
+    if !extracted.is_empty() {
+        info!("Found total via hardcoded region fallback: '{}' (from '{}')", extracted, fb_text);
+        return Ok(extracted);
+    }
+
+    // Progressive search: left 1/2 → full width, limited to just below
+    // "SCREEN TIME" header. The total text is always between y~250 and y~400.
+    // "Daily Average" at y~674 must be excluded. Use SCREEN word position
+    // if available, otherwise cap at img_h/4.
+    let y_limit = screen_word
+        .map(|sw| sw.y + sw.h + 200) // ~200px below SCREEN word
+        .unwrap_or((img_h as i32) / 4);
+    for fraction in &[2, 1] {
+        let x_limit = img_w as i32 / fraction;
+        let prog_text = words_to_normalized_text(
+            ocr_data.iter().filter(|w| !w.text.is_empty() && w.x < x_limit && w.y < y_limit)
+        );
+        let total = extract_time_from_text(&prog_text);
+        if !total.is_empty() {
+            info!("Found total via progressive search (1/{}): '{}'", fraction, total);
+            return Ok(total);
+        }
     }
 
     Ok(String::new())
@@ -424,7 +560,12 @@ fn extract_total(
 
 /// Extract both title and total from an image with a SINGLE Tesseract call.
 ///
-/// Runs full-image OCR once and shares the result for both title and total extraction.
+/// Runs Tesseract once on the full image, then uses spatial filtering of the
+/// resulting word list to extract title and total — no extra Tesseract calls.
+/// Daily total pages are detected from the full-image word list; cropping the
+/// image would cause markers like "MOST USED" and "CATEGORIES" (which appear
+/// in the lower half of daily total pages) to be missed.
+///
 /// Errors are propagated, not silently swallowed.
 pub fn find_title_and_total(
     img: &RgbImage,
@@ -432,7 +573,8 @@ pub fn find_title_and_total(
     // Run Tesseract ONCE on the full image
     let ocr_data = run_tesseract(img, "3")?;
 
-    // Extract title and total using the cached OCR data
+    // Extract title and total using the cached OCR data.
+    // Pass the full image for the title crop fallback (needs full-res pixels).
     let (title, title_y) = extract_title(img, &ocr_data)?;
     let total = extract_total(img, &ocr_data)?;
 

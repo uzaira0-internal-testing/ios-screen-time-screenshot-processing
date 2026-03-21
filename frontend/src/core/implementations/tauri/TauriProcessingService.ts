@@ -19,7 +19,7 @@ import type { HourlyData, GridCoordinates, ImageType } from "@/types";
 
 /** Result shape returned by the Rust `process_screenshot` command. */
 interface RustProcessingResult {
-  hourly_values: number[];
+  hourly_values: number[] | null;
   total: number;
   title: string | null;
   total_text: string | null;
@@ -29,9 +29,14 @@ interface RustProcessingResult {
     lower_right_x: number;
     lower_right_y: number;
   } | null;
-  alignment_score: number;
+  alignment_score: number | null;
   detection_method: string;
   processing_time_ms: number;
+  is_daily_total: boolean;
+  issues: string[];
+  has_blocking_issues: boolean;
+  grid_detection_confidence: number | null;
+  title_y_position: number | null;
 }
 
 /**
@@ -138,7 +143,7 @@ export class TauriProcessingService implements IProcessingService {
     onProgress?.({ stage: "complete", progress: 1.0, message: "Done" });
 
     const base = {
-      hourlyData: toHourlyData(result.hourly_values),
+      hourlyData: toHourlyData(result.hourly_values ?? []),
       title: result.title,
       total: result.total_text,
       alignmentScore: result.alignment_score,

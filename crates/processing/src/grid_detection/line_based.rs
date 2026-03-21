@@ -225,7 +225,20 @@ fn find_grid_edges(
         return None;
     }
 
-    Some((*clusters.first().unwrap(), *clusters.last().unwrap()))
+    // Pick the cluster closest to x_start as the left edge,
+    // and the cluster closest to x_end as the right edge.
+    // Using first/last would pick up gray UI elements at the extreme
+    // edges of the search window as false grid boundaries.
+    let x_start_i = x_start as i32;
+    let x_end_i = x_end as i32;
+    let left = *clusters.iter().min_by_key(|&&c| (c - x_start_i).abs()).unwrap();
+    let right = *clusters.iter().min_by_key(|&&c| (c - x_end_i).abs()).unwrap();
+
+    if right <= left {
+        return None;
+    }
+
+    Some((left, right))
 }
 
 #[cfg(test)]

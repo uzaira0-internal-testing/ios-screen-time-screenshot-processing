@@ -14,6 +14,62 @@ const MAX_Y: f64 = 60.0;
 /// Pixels to exclude at the bottom of the ROI (grid line buffer).
 const LOWER_GRID_BUFFER: usize = 2;
 
+/// Fast bar total extraction without 4x upscale — for the boundary optimizer.
+///
+/// Returns sum of 24 hourly values in minutes. Skips the 4x scale-up since
+/// the optimizer only needs approximate totals for comparison, not sub-pixel
+/// precision. ~16x faster than `slice_image`.
+pub fn slice_image_fast_total(
+    img: &RgbImage,
+    roi_x: u32,
+    roi_y: u32,
+    roi_width: u32,
+    roi_height: u32,
+) -> f64 {
+    let (img_w, img_h) = img.dimensions();
+    let roi_x = roi_x.min(img_w);
+    let roi_y = roi_y.min(img_h);
+    let roi_width = roi_width.min(img_w.saturating_sub(roi_x));
+    let roi_height = roi_height.min(img_h.saturating_sub(roi_y));
+
+    if roi_width < NUM_SLICES as u32 || roi_height < 2 {
+        return 0.0;
+    }
+
+    let mut roi = image::imageops::crop_imm(img, roi_x, roi_y, roi_width, roi_height).to_image();
+    darken_and_binarize(&mut roi);
+
+    let h = roi_height as usize;
+    let rw = roi_width as usize;
+    let slice_width = rw / NUM_SLICES;
+    let reset_limit = h.saturating_sub(LOWER_GRID_BUFFER).max(1);
+
+    let raw = roi.as_raw();
+    let stride = rw * 3;
+    let mut total = 0.0f64;
+
+    for s in 0..NUM_SLICES {
+        let mid_col = (s * slice_width + slice_width / 2).min(rw - 1);
+        let mut start_after: usize = 0;
+        for y in (0..reset_limit).rev() {
+            let idx = y * stride + mid_col * 3;
+            if raw[idx] >= 253 && raw[idx + 1] >= 253 && raw[idx + 2] >= 253 {
+                start_after = y + 1;
+                break;
+            }
+        }
+        let mut counter = 0u32;
+        for y in start_after..h {
+            let idx = y * stride + mid_col * 3;
+            if raw[idx] as u16 + raw[idx + 1] as u16 + raw[idx + 2] as u16 == 0 {
+                counter += 1;
+            }
+        }
+        total += MAX_Y * counter as f64 / h as f64;
+    }
+    total
+}
+
 /// Extract hourly usage values from the bar graph region.
 ///
 /// Returns a Vec of 25 elements: 24 hourly values + total.
@@ -38,23 +94,37 @@ pub fn slice_image(
         return vec![0.0; NUM_SLICES + 1];
     }
 
-    // Extract ROI and process: fused darken + binarize in a single pass
+    // Extract ROI, process, then scale up 4x for sub-pixel precision.
+    //
+    // The Python implementation scales the ROI 4x before sampling. This matters
+    // because integer-division slice widths differ between 1x and 4x: at 1x,
+    // slice_width = 686/24 = 28 (loses 14px), but at 4x, slice_width = 2744/24 = 114
+    // (loses only 8px). The center positions therefore differ by up to 9px, which
+    // moves slice centers from just-outside a bar to well-inside it. Without
+    // scaling, bars that start 1-2px past a slice center are completely missed.
     let mut roi_processed = image::imageops::crop_imm(img, roi_x, roi_y, roi_width, roi_height).to_image();
     darken_and_binarize(&mut roi_processed);
 
-    let h = roi_height as usize;
-    let rw = roi_width as usize;
+    const SCALE: u32 = 4;
+    let roi_scaled = image::imageops::resize(
+        &roi_processed,
+        roi_width * SCALE,
+        roi_height * SCALE,
+        image::imageops::FilterType::Nearest,
+    );
+
+    let h = (roi_height * SCALE) as usize;
+    let rw = (roi_width * SCALE) as usize;
     let slice_width = rw / NUM_SLICES;
 
-    // reset_limit: exclude bottom 2 pixels (grid line buffer at original resolution).
-    // Python divides by scale_amount because it scaled up first, but we work at
-    // original resolution, so use LOWER_GRID_BUFFER directly.
-    let reset_limit = h.saturating_sub(LOWER_GRID_BUFFER).max(1);
+    // reset_limit: exclude bottom pixels (grid line buffer, scaled).
+    // Python uses lower_grid_buffer * scale_amount in the scaled image.
+    let reset_limit = h.saturating_sub(LOWER_GRID_BUFFER * SCALE as usize).max(1);
 
     let mut row = Vec::with_capacity(NUM_SLICES + 1);
 
     // Use raw buffer for direct pixel access (3 bytes per pixel)
-    let raw = roi_processed.as_raw();
+    let raw = roi_scaled.as_raw();
     let stride = rw * 3;
 
     for s in 0..NUM_SLICES {

@@ -2505,7 +2505,7 @@ dependencies = [
 
 [[package]]
 name = "ios-screen-time"
-version = "0.4.0"
+version = "0.5.1"
 dependencies = [
  "criterion",
  "dhat",
@@ -2531,7 +2531,7 @@ dependencies = [
 
 [[package]]
 name = "ios-screen-time-image-pipeline"
-version = "0.4.0"
+version = "0.5.1"
 dependencies = [
  "image",
  "lazy_static",
@@ -4840,7 +4840,7 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "screenshot-processor-rs"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "image",
  "ios-screen-time-image-pipeline",

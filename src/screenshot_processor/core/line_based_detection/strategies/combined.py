@@ -343,9 +343,10 @@ class CombinedStrategy(BaseGridStrategy):
         if len(clusters) < 2:
             return None, None
 
-        # The left edge is just before the first vertical line
-        # The right edge is just after the last vertical line
-        left_edge = x_start + clusters[0]
-        right_edge = x_start + clusters[-1]
+        # Pick cluster closest to expected position (x_start / x_end).
+        # Using first/last would pick up gray UI elements at extreme
+        # edges of the search window as false grid boundaries.
+        left_edge = x_start + min(clusters, key=lambda c: abs(c - 0))
+        right_edge = x_start + min(clusters, key=lambda c: abs(c - (x_end - x_start)))
 
         return left_edge, right_edge

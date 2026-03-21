@@ -39,6 +39,11 @@ fn process_image(
     let result = processing::process_image(path, img_type, method)
         .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
 
+    result_to_pydict(result)
+}
+
+/// Convert a ProcessingResult to a Python dict, handling Option types.
+fn result_to_pydict(result: processing::types::ProcessingResult) -> PyResult<HashMap<String, PyObject>> {
     Python::with_gil(|py| {
         let mut map = HashMap::new();
         map.insert("hourly_values".to_string(), result.hourly_values.into_pyobject(py)?.into_any().unbind());
@@ -48,6 +53,14 @@ fn process_image(
         map.insert("alignment_score".to_string(), result.alignment_score.into_pyobject(py)?.into_any().unbind());
         map.insert("detection_method".to_string(), result.detection_method.into_pyobject(py)?.into_any().unbind());
         map.insert("processing_time_ms".to_string(), result.processing_time_ms.into_pyobject(py)?.into_any().unbind());
+        map.insert("is_daily_total".to_string(), result.is_daily_total.into_pyobject(py)?.to_owned().into_any().unbind());
+        map.insert("has_blocking_issues".to_string(), result.has_blocking_issues.into_pyobject(py)?.to_owned().into_any().unbind());
+        map.insert("grid_detection_confidence".to_string(), result.grid_detection_confidence.into_pyobject(py)?.into_any().unbind());
+        map.insert("title_y_position".to_string(), result.title_y_position.into_pyobject(py)?.into_any().unbind());
+
+        // Convert Vec<String> issues to Python list
+        let issues_list = pyo3::types::PyList::new(py, &result.issues)?;
+        map.insert("issues".to_string(), issues_list.into_any().unbind());
 
         if let Some(ref bounds) = result.grid_bounds {
             let bounds_dict = PyDict::new(py);
@@ -76,14 +89,7 @@ fn process_image_with_grid(
     let result = processing::process_image_with_grid(path, upper_left, lower_right, img_type)
         .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
 
-    Python::with_gil(|py| {
-        let mut map = HashMap::new();
-        map.insert("hourly_values".to_string(), result.hourly_values.into_pyobject(py)?.into_any().unbind());
-        map.insert("total".to_string(), result.total.into_pyobject(py)?.into_any().unbind());
-        map.insert("alignment_score".to_string(), result.alignment_score.into_pyobject(py)?.into_any().unbind());
-        map.insert("processing_time_ms".to_string(), result.processing_time_ms.into_pyobject(py)?.into_any().unbind());
-        Ok(map)
-    })
+    result_to_pydict(result)
 }
 
 /// Extract only hourly data (fast path — no OCR).
@@ -181,6 +187,33 @@ fn ocr_extract(image_bytes: &[u8], psm: &str) -> PyResult<Vec<HashMap<String, Py
     })
 }
 
+/// Process a screenshot with automatic grid detection + boundary optimization.
+///
+/// Like process_image but also runs the boundary optimizer to fine-tune grid
+/// bounds so that extracted bar totals match the OCR total string.
+///
+/// Args:
+///     path: Path to the image file
+///     image_type: "screen_time" or "battery"
+///     detection_method: "line_based" or "ocr_anchored"
+///     max_shift: Maximum pixels to shift grid boundaries (e.g. 5)
+#[pyfunction]
+#[pyo3(signature = (path, image_type="screen_time", detection_method="line_based", max_shift=5))]
+fn process_image_optimized(
+    path: &str,
+    image_type: &str,
+    detection_method: &str,
+    max_shift: i32,
+) -> PyResult<HashMap<String, PyObject>> {
+    let img_type = ImageType::from_str(image_type);
+    let method = DetectionMethod::from_str(detection_method);
+
+    let result = processing::process_image_optimized(path, img_type, method, max_shift)
+        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
+
+    result_to_pydict(result)
+}
+
 /// Extract time from OCR text (e.g., "4h 36m" from "some text 4h 36m more").
 #[pyfunction]
 fn extract_time_from_text(text: &str) -> String {
@@ -197,6 +230,7 @@ fn normalize_ocr_digits(text: &str) -> String {
 #[pymodule]
 fn screenshot_processor_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(process_image, m)?)?;
+    m.add_function(wrap_pyfunction!(process_image_optimized, m)?)?;
     m.add_function(wrap_pyfunction!(process_image_with_grid, m)?)?;
     m.add_function(wrap_pyfunction!(extract_hourly_data, m)?)?;
     m.add_function(wrap_pyfunction!(detect_grid, m)?)?;

@@ -47,8 +47,8 @@ class OCRConfig:
 
     # Hybrid engine settings (fallback chain)
     use_hybrid: bool = False  # When True, use HybridOCREngine with automatic fallback
-    hybrid_enable_hunyuan: bool = True
-    hybrid_enable_paddleocr: bool = True
+    hybrid_enable_hunyuan: bool = False
+    hybrid_enable_paddleocr: bool = False
     hybrid_enable_tesseract: bool = True
 
     # Grid anchor detection: PaddleOCR bboxes are incompatible with find_left_anchor/find_right_anchor

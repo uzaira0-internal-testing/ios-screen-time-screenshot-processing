@@ -10,6 +10,7 @@ use image::RgbImage;
 use log::info;
 
 use super::bar_extraction::{compute_bar_alignment_score, slice_image};
+use super::boundary_optimizer::optimize_boundaries;
 use super::grid_detection;
 use super::image_utils::{convert_dark_mode, remove_all_but};
 use super::ocr;
@@ -42,10 +43,24 @@ fn extract_and_score(
 
     // For battery images, apply color isolation to a copy of the ROI only (not full image)
     let hourly_row = if image_type == ImageType::Battery {
-        let mut roi = image::imageops::crop_imm(img, roi_x, roi_y, roi_w, roi_h).to_image();
+        let roi_base = image::imageops::crop_imm(img, roi_x, roi_y, roi_w, roi_h).to_image();
         // Battery color in BGR [255, 121, 0] → RGB [0, 121, 255]
+        let mut roi = roi_base.clone();
         remove_all_but(&mut roi, [0, 121, 255], 30);
-        slice_image(&roi, 0, 0, roi_w, roi_h)
+        let values = slice_image(&roi, 0, 0, roi_w, roi_h);
+
+        // Dark mode fallback: if ROI is empty after color isolation,
+        // retry with inverted battery color (dark mode uses [255, 134, 0] RGB)
+        let total: f64 = values.iter().take(24).sum();
+        if total == 0.0 {
+            let mut roi2 = roi_base; // reuse cached crop, no second crop_imm
+            remove_all_but(&mut roi2, [255, 134, 0], 30);
+            let values2 = slice_image(&roi2, 0, 0, roi_w, roi_h);
+            let total2: f64 = values2.iter().take(24).sum();
+            if total2 > 0.0 { values2 } else { values }
+        } else {
+            values
+        }
     } else {
         slice_image(img, roi_x, roi_y, roi_w, roi_h)
     };
@@ -68,6 +83,31 @@ fn extract_and_score(
     (hourly_values, total, alignment_score)
 }
 
+/// Build a ProcessingResult for a daily total page (no bar chart).
+fn make_daily_total_result(
+    title: String,
+    total_text: String,
+    detection_method: DetectionMethod,
+    elapsed_ms: u64,
+    title_y: Option<i32>,
+) -> ProcessingResult {
+    ProcessingResult {
+        hourly_values: None,
+        total: 0.0,
+        title: Some(title),
+        total_text: if total_text.is_empty() { None } else { Some(total_text) },
+        grid_bounds: None,
+        alignment_score: None,
+        detection_method: detection_method.as_str().to_string(),
+        processing_time_ms: elapsed_ms,
+        is_daily_total: true,
+        issues: vec![],
+        has_blocking_issues: false,
+        grid_detection_confidence: None,
+        title_y_position: title_y,
+    }
+}
+
 /// Process a screenshot with automatic grid detection.
 pub fn process_image(
     path: &str,
@@ -78,6 +118,15 @@ pub fn process_image(
     let original_img = load_image(path)?;
     let mut img = original_img.clone();
     convert_dark_mode(&mut img);
+
+    // OCR first — needed for daily total check and always available even on grid failure
+    let (title, _title_y, total_text) = ocr::find_title_and_total(&img)?;
+    let is_daily_total = title == "Daily Total";
+
+    // Daily total pages have no bar chart — skip grid detection entirely.
+    if is_daily_total {
+        return Ok(make_daily_total_result(title, total_text, detection_method, start.elapsed().as_millis() as u64, _title_y));
+    }
 
     // Detect grid bounds (pass original for dark mode OCR fallback)
     let grid_result =
@@ -96,9 +145,6 @@ pub fn process_image(
 
     let (hourly_values, total, alignment_score) = extract_and_score(&img, &bounds, image_type);
 
-    // Extract title and total via OCR
-    let (title, _title_y, total_text) = ocr::find_title_and_total(&img)?;
-
     let elapsed = start.elapsed().as_millis() as u64;
     info!(
         "Processed {} in {elapsed}ms (method={}, title='{}', total_text='{}', alignment={alignment_score:.2})",
@@ -109,7 +155,7 @@ pub fn process_image(
     );
 
     Ok(ProcessingResult {
-        hourly_values,
+        hourly_values: Some(hourly_values),
         total,
         title: if title.is_empty() { None } else { Some(title) },
         total_text: if total_text.is_empty() {
@@ -118,9 +164,14 @@ pub fn process_image(
             Some(total_text)
         },
         grid_bounds: Some(bounds),
-        alignment_score,
+        alignment_score: Some(alignment_score),
         detection_method: grid_result.method,
         processing_time_ms: elapsed,
+        is_daily_total,
+        issues: vec![],
+        has_blocking_issues: false,
+        grid_detection_confidence: Some(grid_result.confidence),
+        title_y_position: _title_y,
     })
 }
 
@@ -140,8 +191,9 @@ pub fn process_image_with_grid(
 
     let (title, _title_y, total_text) = ocr::find_title_and_total(&img)?;
 
+    let is_daily_total = title == "Daily Total";
     Ok(ProcessingResult {
-        hourly_values,
+        hourly_values: Some(hourly_values),
         total,
         title: if title.is_empty() { None } else { Some(title) },
         total_text: if total_text.is_empty() {
@@ -150,9 +202,106 @@ pub fn process_image_with_grid(
             Some(total_text)
         },
         grid_bounds: Some(bounds),
-        alignment_score,
+        alignment_score: Some(alignment_score),
         detection_method: "manual".to_string(),
         processing_time_ms: start.elapsed().as_millis() as u64,
+        is_daily_total,
+        issues: vec![],
+        has_blocking_issues: false,
+        grid_detection_confidence: None,
+        title_y_position: _title_y,
+    })
+}
+
+/// Process with automatic grid detection + boundary optimization.
+///
+/// Runs the full pipeline then fine-tunes the detected grid bounds by trying
+/// small shifts to minimise the difference between extracted bar totals and
+/// the OCR total string.
+///
+/// If `detection_method` is `LineBased` and grid detection fails, automatically
+/// retries with `OcrAnchored` before returning an error.
+pub fn process_image_optimized(
+    path: &str,
+    image_type: ImageType,
+    detection_method: DetectionMethod,
+    max_shift: i32,
+) -> Result<ProcessingResult, ProcessingError> {
+    let start = Instant::now();
+    let original_img = load_image(path)?;
+    let mut img = original_img.clone();
+    convert_dark_mode(&mut img);
+
+    // OCR once — needed for daily total check and optimizer.
+    let (title, _title_y, total_text) = ocr::find_title_and_total(&img)?;
+    let is_daily_total = title == "Daily Total";
+
+    // Daily total pages have no bar chart — skip grid detection entirely.
+    if is_daily_total {
+        return Ok(make_daily_total_result(title, total_text, detection_method, start.elapsed().as_millis() as u64, _title_y));
+    }
+
+    // Grid detection — fall back from line_based to ocr_anchored automatically.
+    let grid_result =
+        grid_detection::detect_grid_with_original(&img, detection_method, Some(&original_img))?;
+
+    let initial_bounds = if grid_result.success {
+        grid_result.bounds.unwrap()
+    } else if detection_method == DetectionMethod::LineBased {
+        // line_based found nothing — try ocr_anchored before giving up.
+        let fallback = grid_detection::detect_grid_with_original(
+            &img,
+            DetectionMethod::OcrAnchored,
+            Some(&original_img),
+        )?;
+        match (fallback.success, fallback.bounds) {
+            (true, Some(b)) => b,
+            _ => {
+                return Err(ProcessingError::GridDetection(
+                    fallback
+                        .error
+                        .unwrap_or_else(|| "Grid detection failed (line_based + ocr_anchored)".to_string()),
+                ));
+            }
+        }
+    } else {
+        return Err(ProcessingError::GridDetection(
+            grid_result
+                .error
+                .unwrap_or_else(|| "Grid detection failed".to_string()),
+        ));
+    };
+
+    // Boundary optimization
+    let opt = optimize_boundaries(&img, &initial_bounds, &total_text, max_shift, image_type);
+    let bounds = opt.bounds;
+
+    let (hourly_values, total, alignment_score) = extract_and_score(&img, &bounds, image_type);
+
+    let elapsed = start.elapsed().as_millis() as u64;
+    info!(
+        "Processed (optimized) {} in {elapsed}ms (method={}, shift=({},{},{}), converged={}, title='{}', total_text='{}', is_daily_total={is_daily_total})",
+        Path::new(path).file_name().unwrap_or_default().to_string_lossy(),
+        grid_result.method,
+        opt.shift_x, opt.shift_y, opt.shift_width,
+        opt.converged,
+        title, total_text,
+    );
+
+    Ok(ProcessingResult {
+        hourly_values: Some(hourly_values),
+        total,
+        title: if title.is_empty() { None } else { Some(title) },
+        total_text: if total_text.is_empty() { None } else { Some(total_text) },
+        grid_bounds: Some(bounds),
+        alignment_score: Some(alignment_score),
+        detection_method: grid_result.method,
+        processing_time_ms: elapsed,
+        is_daily_total,
+        issues: vec![],
+        has_blocking_issues: false,
+        grid_detection_confidence: Some(grid_result.confidence),
+        title_y_position: _title_y,
     })
 }
 

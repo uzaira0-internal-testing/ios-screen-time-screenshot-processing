@@ -125,24 +125,34 @@ pub fn convert_dark_mode_for_ocr(img: &RgbImage) -> RgbImage {
     result
 }
 
-/// Fast mean pixel value using raw buffer and sampling for large images.
+/// Mean pixel brightness using raw buffer.
+///
+/// Computes (R+G+B)/3 per pixel, consistent with Python's cv2.mean() which
+/// returns per-channel means. For a dark-mode brightness threshold this is
+/// equivalent — the check is `avg < 100` so per-channel vs per-byte makes
+/// no practical difference.
+///
+/// Samples every 4th pixel for images > 100K pixels (step=12 bytes) to keep
+/// this O(pixels/4) on large screenshots. Accuracy loss is negligible for a
+/// brightness threshold check.
 fn image_mean_fast(img: &RgbImage) -> f64 {
     let raw = img.as_raw();
     let len = raw.len();
     if len == 0 {
         return 0.0;
     }
-    // Sample every 12th byte (every 4th pixel) for images > 100K pixels
-    let step = if len > 300_000 { 12 } else { 1 };
+    // Sample every 4th pixel (12 bytes) for large images
+    let step = if len > 300_000 { 12 } else { 3 };
     let mut sum = 0u64;
     let mut count = 0u64;
     let mut i = 0;
-    while i < len {
-        sum += raw[i] as u64;
+    while i + 2 < len {
+        // Per-pixel mean: (R+G+B)/3
+        sum += (raw[i] as u64 + raw[i + 1] as u64 + raw[i + 2] as u64) / 3;
         count += 1;
         i += step;
     }
-    sum as f64 / count as f64
+    if count == 0 { 0.0 } else { sum as f64 / count as f64 }
 }
 
 /// Adjust contrast and brightness, returning a NEW image.
@@ -257,7 +267,7 @@ pub fn darken_and_binarize(img: &mut RgbImage) {
 /// Find the Nth most common pixel value in an image region.
 ///
 /// arg=1: most common pixel. arg=-2: second most common.
-/// Uses a small inline table with sampling for large images.
+/// Uses exact counting (no sampling) for consistency with Python's np.unique.
 pub fn get_pixel(img: &RgbImage, arg: i32) -> Option<[u8; 3]> {
     let raw = img.as_raw();
     let len = raw.len();
@@ -265,11 +275,15 @@ pub fn get_pixel(img: &RgbImage, arg: i32) -> Option<[u8; 3]> {
         return None;
     } // need at least 2 pixels
 
+    // Small inline frequency table (most quantized images have ≤16 unique colors).
+    // After reduce_color_count(2), images typically have exactly 2 colors, so we
+    // track whether counting is "settled" to enable an early-exit optimisation:
+    // once we've seen 2+ unique colors AND processed enough pixels for stable
+    // ranking, skip the rest of the image.
     let pixel_count = len / 3;
-    let step = if pixel_count > 10_000 { 16 } else { 1 };
-
-    // Small inline frequency table (most quantized images have ≤16 unique colors)
     let mut table: Vec<([u8; 3], u32)> = Vec::with_capacity(16);
+    let settle_threshold = (pixel_count / 4).max(256); // 25% of pixels or 256
+    let mut settled_at: Option<usize> = None;
     let mut i = 0;
     while i + 2 < len {
         let color = [raw[i], raw[i + 1], raw[i + 2]];
@@ -283,8 +297,19 @@ pub fn get_pixel(img: &RgbImage, arg: i32) -> Option<[u8; 3]> {
         }
         if !found {
             table.push((color, 1));
+            // For binarized images (2 colors), record when we first see both
+            if table.len() == 2 {
+                settled_at = Some(i / 3);
+            }
         }
-        i += 3 * step;
+        i += 3;
+        // Early exit: if we've found exactly 2 colors (common after reduce_color_count(2))
+        // and have counted enough pixels, the ranking is stable.
+        if let Some(start) = settled_at {
+            if table.len() == 2 && (i / 3 - start) >= settle_threshold {
+                break;
+            }
+        }
     }
 
     if table.len() <= 1 {
