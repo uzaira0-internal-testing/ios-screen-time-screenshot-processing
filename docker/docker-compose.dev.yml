@@ -103,14 +103,10 @@ services:
       DEBUG: "true"
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5175,http://localhost:3000,http://cnrc-deni-p001.cnrc.bcm.edu}
       USE_FRACTIONAL_HOURLY_VALUES: "false"
-      # HunyuanOCR configuration (vision LLM for high-quality OCR)
-      HUNYUAN_OCR_URL: http://cnrc-rtx4090.ad.bcm.edu:8080
-      HUNYUAN_OCR_TIMEOUT: "120"
-      HUNYUAN_OCR_MAX_RETRIES: "3"
-      HUNYUAN_OCR_RATE_LIMIT: "5"  # Max requests per second
-      # PaddleOCR configuration (fallback with bounding boxes)
-      PADDLEOCR_URL: http://cnrc-rtx4090.ad.bcm.edu:8081
-      PADDLEOCR_TIMEOUT: "60"
+      # OCR engine: leptess (Rust) first, pytesseract fallback
+      HYBRID_ENABLE_HUNYUAN: "false"
+      HYBRID_ENABLE_PADDLEOCR: "false"
+      HYBRID_ENABLE_TESSERACT: "true"
       # Site password (set to require password on login)
       SITE_PASSWORD: ${SITE_PASSWORD:-}
     # Override CMD to use --reload for hot reloading
@@ -141,12 +137,13 @@ services:
   # Celery Worker (with hot reload)
   # ==========================================================================
 
+  # Slow worker: PHI detection + preprocessing (CPU-bound, long-running OCR)
   celery-worker:
     build:
       context: ..
       dockerfile: docker/backend/Dockerfile.dev
     container_name: ios-screen-time-screenshot-processing-celery-dev
-    command: celery -A src.screenshot_processor.web.celery_app worker --loglevel=info --concurrency=2
+    command: celery -A src.screenshot_processor.web.celery_app worker --loglevel=info --concurrency=2 --queues=default
     # Override Dockerfile healthcheck - Celery workers don't serve HTTP
     healthcheck:
       test: ["CMD-SHELL", "celery -A src.screenshot_processor.web.celery_app inspect ping"]
@@ -158,6 +155,41 @@ services:
       # Mount source code for hot reloading
       - ../src:/app/src:ro
       # Persistent data directories (production volumes)
+      - uploads_data:/app/uploads
+      - output_data:/app/output
+      - ../db:/app/db
+      - ../debug:/app/debug
+      - ${SCREENSHOT_SOURCE_PATH:-../screenshots}:/app/screenshots:ro
+    environment:
+      DATABASE_URL: postgresql+asyncpg://ios_screen_time_screenshot:${POSTGRES_PASSWORD:-ios_screen_time_screenshot}@postgres:5432/ios_screen_time_screenshot_processing
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-minimum-32-characters-long}
+      PYTHONUNBUFFERED: 1
+      USE_FRACTIONAL_HOURLY_VALUES: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+
+  # Fast worker: redaction, OCR, device detection, cropping (milliseconds each)
+  celery-worker-fast:
+    build:
+      context: ..
+      dockerfile: docker/backend/Dockerfile.dev
+    container_name: ios-screen-time-screenshot-processing-celery-fast-dev
+    command: celery -A src.screenshot_processor.web.celery_app worker --loglevel=info --concurrency=4 --queues=fast --hostname=fast@%h
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A src.screenshot_processor.web.celery_app inspect ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    volumes:
+      - ../src:/app/src:ro
       - uploads_data:/app/uploads
       - output_data:/app/output
       - ../db:/app/db
