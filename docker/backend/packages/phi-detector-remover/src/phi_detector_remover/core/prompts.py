@@ -42,7 +42,7 @@ Output JSON only:
     "entities": [
         {
             "text": "exact PHI text only",
-            "type": "PERSON|EMAIL|PHONE|ADDRESS|OTHER",
+            "type": "PERSON|OTHER",
             "confidence": 0.0-1.0,
             "reasoning": "brief explanation"
         }
@@ -53,27 +53,9 @@ If no PHI found: {"entities": []}"""
 
     positive_prompt: list[str] = field(
         default_factory=lambda: [
-            # Personal names - all contexts
+            # Personal names only — the only PHI that appears on Screen Time screenshots
             "Personal names of individuals (first names, last names, full names, nicknames)",
-            "Names extracted from device names (e.g., 'Sarah' from 'Sarah's iPhone', 'John's iPad', 'Mom's Phone')",
-            "Names extracted from WiFi/network names (e.g., 'Smith' from 'SmithFamilyWiFi', 'Johnson_Home')",
-            "Names from AirDrop device names (e.g., 'Mike's MacBook')",
-            "Names from Bluetooth device names (e.g., 'John's AirPods', 'Sarah's Watch')",
-            "Names in iCloud/Apple ID accounts shown in Settings",
-            "Contact names visible anywhere in the UI",
-            "Names in notifications, messages, or alerts",
-            # Contact info
-            "Email addresses (any format including iCloud, Gmail, work emails)",
-            "Phone numbers (any format - with or without country code, dashes, parentheses)",
-            "Physical/mailing addresses",
-            # Identifiers
-            "Medical record numbers or patient IDs",
-            "Social Security numbers",
-            "Device serial numbers (alphanumeric codes, with or without dashes, 10-17 characters)",
-            "IMEI numbers (15-digit device identifiers)",
-            "UUID identifiers (8-4-4-4-12 hex format)",
-            # Dates only when identifying
-            "Dates of birth when associated with a person",
+            "Names extracted from device names (e.g., 'Sarah' from 'Sarah's iPad', 'John's iPad', 'Mom's iPad')",
         ]
     )
 
@@ -146,9 +128,10 @@ If no PHI found: {"entities": []}"""
 - "SmithFamilyWiFi" contains name "Smith" -> DETECT "Smith" as PERSON
 - "Screen Time" is an app name -> IGNORE
 - "2h 30m" is usage time -> IGNORE
-- "john.doe@email.com" -> DETECT as EMAIL
+- "john.doe@email.com" -> IGNORE (email addresses do not appear on Screen Time screenshots)
 - Time in status bar (e.g., "9:41") -> IGNORE
-- "iPhone" or "iPad" alone (no name) -> IGNORE"""
+- "iPhone", "iPad", or "ipad" alone (no name) -> IGNORE
+- "John's ipad", "John's IPAD", "Johns ipad" -> DETECT "John" as PERSON"""
 
         if is_vision:
             prompt += """
@@ -228,23 +211,9 @@ PROMPTS = {
     "conservative": PHIDetectionPrompt(style=PromptStyle.CONSERVATIVE),
     "screen_time": PHIDetectionPrompt(
         positive_prompt=[
-            # Device/network names with personal info
-            "Device names showing ownership (e.g., 'Sarah's iPhone', 'John's iPad', 'Mom's Phone', 'Dad's MacBook')",
-            "WiFi network names with personal identifiers (e.g., 'SmithFamily', 'Johnson_Home', 'Mike's Network')",
-            "Bluetooth device names with names (e.g., 'John's AirPods', 'Sarah's Watch', 'Dad's Car')",
-            "AirDrop names with personal identifiers",
-            # Personal names in any context
-            "Contact names visible anywhere in the UI",
-            "Personal names in notifications, messages, or alerts",
-            "Names visible in iCloud/Apple ID account sections",
-            "Any first name, last name, or nickname of a person",
-            # Contact info
-            "Email addresses (any format)",
-            "Phone numbers (any format)",
-            # Device identifiers
-            "Device serial numbers (alphanumeric, 10-17 chars, with or without dashes)",
-            "IMEI numbers (15 digits)",
-            "UUID identifiers",
+            # Personal names only — the only PHI that realistically appears on Screen Time screenshots
+            "Device names showing ownership regardless of capitalisation (e.g., 'Sarah's iPad', 'John's ipad', 'Mom's IPAD', 'Dad's iPad')",
+            "Any first name, last name, or nickname of a person visible anywhere in the UI",
         ],
         negative_prompt=[
             # Comprehensive app list

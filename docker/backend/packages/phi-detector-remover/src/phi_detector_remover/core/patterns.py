@@ -106,6 +106,17 @@ SSN_PATTERN = CustomPHIPattern(
     score=0.95,
 )
 
+# iPad/device owner name patterns
+# Matches: "John's iPad", "Johns iPad", "Sarah ipad", "Mom's IPAD" (case-insensitive)
+# These appear at the top of screenshots when the device is named after its owner.
+# Score is high (0.95) because any word preceding "iPad" is almost certainly a person's name.
+IPAD_OWNER_PATTERN = CustomPHIPattern(
+    name="IPAD_OWNER",
+    pattern=re.compile(r"\b\w+(?:['\u2019]s?)?\s+iPad\b", re.IGNORECASE),
+    description="iPad named after owner (e.g. 'John\u2019s iPad', 'Johns iPad')",
+    score=0.95,
+)
+
 # Device serial numbers and identifiers
 # Covers various formats:
 #   - Apple serial: XXXXXXXXXXXX (12 chars) or with dashes XX-XXX-XXXXXXXXXXXX
@@ -135,18 +146,20 @@ DEVICE_SERIAL_PATTERN = CustomPHIPattern(
 # NOTE: SCREEN_TIME_NAME pattern removed - "Screen Time" is an APP NAME, not PHI!
 
 # Collection of all default patterns
-# Conservative set - excludes patterns that cause false positives in UI screenshots
+# Screen Time screenshots only contain owner names — everything else is app UI.
 DEFAULT_PATTERNS: dict[str, CustomPHIPattern] = {
-    "MRN": MRN_PATTERN,
-    "STUDY_ID": STUDY_ID_PATTERN,
-    # "DATE": DATE_PATTERN,  # Excluded - too many false positives in UI
-    # "TIME": TIME_PATTERN,  # Excluded - UI timestamps are not PHI
-    "AGE": AGE_PATTERN,
-    "ZIP_CODE": ZIP_CODE_PATTERN,
-    "PHONE": PHONE_PATTERN,
-    "EMAIL": EMAIL_PATTERN,
-    "SSN": SSN_PATTERN,
-    "DEVICE_SERIAL": DEVICE_SERIAL_PATTERN,
+    "IPAD_OWNER": IPAD_OWNER_PATTERN,
+    # All others excluded - don't appear on Screen Time screenshots:
+    # "MRN": MRN_PATTERN,
+    # "STUDY_ID": STUDY_ID_PATTERN,
+    # "AGE": AGE_PATTERN,
+    # "ZIP_CODE": ZIP_CODE_PATTERN,
+    # "PHONE": PHONE_PATTERN,
+    # "EMAIL": EMAIL_PATTERN,
+    # "SSN": SSN_PATTERN,
+    # "DEVICE_SERIAL": DEVICE_SERIAL_PATTERN,
+    # "DATE": DATE_PATTERN,
+    # "TIME": TIME_PATTERN,
 }
 
 # Extended patterns for medical record contexts (not UI screenshots)

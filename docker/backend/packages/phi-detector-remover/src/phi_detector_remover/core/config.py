@@ -64,11 +64,11 @@ class PresidioConfig:
     entities: list[str] = field(
         default_factory=lambda: [
             "PERSON",
-            "EMAIL_ADDRESS",
-            "PHONE_NUMBER",
-            "US_SSN",
-            "IP_ADDRESS",
-            "CREDIT_CARD",
+            # EMAIL_ADDRESS excluded - doesn't appear on Screen Time screenshots
+            # PHONE_NUMBER excluded - doesn't appear on Screen Time screenshots
+            # US_SSN excluded - doesn't appear on Screen Time screenshots
+            # IP_ADDRESS excluded - doesn't appear on Screen Time screenshots
+            # CREDIT_CARD excluded - doesn't appear on Screen Time screenshots
             # DATE_TIME excluded - too many false positives in UI screenshots
             # LOCATION excluded - too many false positives (app names, UI elements)
         ]

@@ -86,6 +86,10 @@ RUN uv pip install --system --no-cache-dir -e ".[web,preprocessing]" alembic
 COPY --from=rust-builder /tmp/rust-python/target/wheels/*.whl /tmp/
 RUN pip install --no-cache-dir /tmp/*.whl && rm -f /tmp/*.whl
 
+# Download NLP models for PHI detection (cache in Docker layer, not at runtime)
+RUN python -m spacy download en_core_web_lg && \
+    python -c "from gliner import GLiNER; GLiNER.from_pretrained('urchade/gliner_multi_pii-v1')"
+
 # Copy application source code
 COPY apps/ios-screen-time-screenshot-processing/src/ ./src/
 COPY apps/ios-screen-time-screenshot-processing/alembic/ ./alembic/

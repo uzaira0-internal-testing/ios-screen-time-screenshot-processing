@@ -3365,6 +3365,8 @@ export interface components {
             stage: string;
             /** Message */
             message: string;
+            /** Task Ids */
+            task_ids: string[];
         };
         /** StatsResponse */
         StatsResponse: {

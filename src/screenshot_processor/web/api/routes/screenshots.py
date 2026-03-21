@@ -1972,7 +1972,7 @@ async def _get_eligible_screenshot_ids(
         pp = (s.processing_metadata or {}).get("preprocessing", {})
         statuses = pp.get("stage_status", {})
         stage_status = statuses.get(stage, "pending")
-        if stage_status not in ("pending", "invalidated", "failed"):
+        if stage_status not in ("pending", "invalidated", "failed", "cancelled"):
             continue
         # Check all prerequisite stages are completed
         if all(statuses.get(prereq, "pending") == "completed" for prereq in prerequisite_stages):
@@ -2015,7 +2015,7 @@ async def reset_stage(
     for s in screenshots:
         pp = init_preprocessing_metadata(s)
         stage_status = pp.get("stage_status", {}).get(stage, "pending")
-        if stage_status in ("completed", "failed"):
+        if stage_status not in ("pending",):
             pp["stage_status"][stage] = "pending"
             pp["current_events"][stage] = None
             invalidate_downstream(s, stage)
@@ -2244,10 +2244,16 @@ async def run_cropping_stage(
 @router.post("/preprocess-stage/phi-detection", response_model=StagePreprocessResponse)
 async def run_phi_detection_stage(
     request: PHIDetectionStageRequest,
+    db: DatabaseSession,
     repo: ScreenshotRepo,
     current_user: CurrentUser,
 ):
     """Queue PHI detection for a batch of screenshots."""
+    from screenshot_processor.web.celery_app import celery_app
+
+    # Purge any leftover tasks from a previous run so they don't interfere.
+    celery_app.control.purge()
+
     ids = await _get_eligible_screenshot_ids(repo, "phi_detection", request.group_id, request.screenshot_ids)
     if not ids:
         return StagePreprocessResponse(
@@ -2257,23 +2263,23 @@ async def run_phi_detection_stage(
             message="No eligible screenshots for PHI detection",
         )
 
-    from celery import group as celery_group
-
     from screenshot_processor.web.tasks import phi_detection_task
 
-    task_group = celery_group(
-        phi_detection_task.s(
-            sid,
-            preset=request.phi_pipeline_preset,
-            ocr_engine=request.phi_ocr_engine,
-            ner_detector=request.phi_ner_detector,
-            llm_endpoint=request.llm_endpoint,
-            llm_model=request.llm_model,
-            llm_api_key=request.llm_api_key,
+    task_results = [
+        phi_detection_task.apply_async(
+            args=[sid],
+            kwargs={
+                "preset": request.phi_pipeline_preset,
+                "ocr_engine": request.phi_ocr_engine,
+                "ner_detector": request.phi_ner_detector,
+                "llm_endpoint": request.llm_endpoint,
+                "llm_model": request.llm_model,
+                "llm_api_key": request.llm_api_key,
+            },
         )
         for sid in ids
-    )
-    task_group.apply_async()
+    ]
+    task_ids = [r.id for r in task_results]
 
     logger.info("PHI detection queued", extra={"count": len(ids), "username": current_user.username})
     return StagePreprocessResponse(
@@ -2281,7 +2287,117 @@ async def run_phi_detection_stage(
         screenshot_ids=ids,
         stage="phi_detection",
         message=f"PHI detection queued for {len(ids)} screenshots",
+        task_ids=task_ids,
     )
+
+
+@router.post("/preprocess-stage/phi-detection/cancel", response_model=StagePreprocessResponse)
+async def cancel_phi_detection_stage(
+    request: StagePreprocessRequest,
+    db: DatabaseSession,
+    repo: ScreenshotRepo,
+    current_user: CurrentUser,
+):
+    """Revoke queued/running PHI detection tasks and reset affected screenshots to pending.
+
+    Accepts task_ids (from the original dispatch response) to revoke specific tasks.
+    Also resets any screenshots in the group that are still marked 'running' back to
+    'pending' so they can be re-queued.
+    """
+    from sqlalchemy.orm.attributes import flag_modified
+
+    from screenshot_processor.web.celery_app import celery_app
+    from screenshot_processor.web.services.preprocessing_service import (
+        init_preprocessing_metadata,
+    )
+
+    # Step 1: Purge all pending tasks from the broker queue.
+    # This stops any phi_detection tasks that haven't been picked up yet.
+    purged = celery_app.control.purge()
+    logger.info("Celery queue purged", extra={"purged": purged, "username": current_user.username})
+
+    # Step 2: Find and SIGKILL any actively running phi_detection tasks.
+    killed_ids: list[str] = []
+    try:
+        inspector = celery_app.control.inspect(timeout=2.0)
+        active = inspector.active() or {}
+        for worker_tasks in active.values():
+            for task in worker_tasks:
+                if "phi_detection_task" in task.get("name", ""):
+                    killed_ids.append(task["id"])
+        if killed_ids:
+            celery_app.control.revoke(killed_ids, terminate=True, signal="SIGKILL")
+            logger.info(
+                "Active PHI detection tasks killed",
+                extra={"count": len(killed_ids), "username": current_user.username},
+            )
+    except Exception as e:
+        logger.warning("Failed to inspect/kill active tasks", extra={"error": str(e)})
+
+    # Step 3: Mark all pending/running phi_detection screenshots as "cancelled"
+    # so that any task that somehow still executes will discard its results.
+    # Note: "cancelled" is distinct from "invalidated" (which means upstream re-run).
+    reset_ids: list[int] = []
+    if request.group_id or request.screenshot_ids:
+        screenshots = await repo.get_by_ids_or_group(
+            screenshot_ids=request.screenshot_ids, group_id=request.group_id
+        )
+        for s in screenshots:
+            pp = init_preprocessing_metadata(s)
+            status = pp.get("stage_status", {}).get("phi_detection")
+            if status in ("pending", "running"):
+                pp["stage_status"]["phi_detection"] = "cancelled"
+                pp["current_events"]["phi_detection"] = None
+                flag_modified(s, "processing_metadata")
+                reset_ids.append(s.id)
+        if reset_ids:
+            await db.commit()
+
+    return StagePreprocessResponse(
+        queued_count=0,
+        screenshot_ids=reset_ids,
+        stage="phi_detection",
+        message=f"Cancelled: purged queue, killed {len(killed_ids)} active tasks, reset {len(reset_ids)} screenshots",
+    )
+
+
+# ---------------------------------------------------------------------------
+# PHI text whitelist
+# ---------------------------------------------------------------------------
+
+
+class PHIWhitelistResponse(BaseModel):
+    whitelist: list[str]
+
+
+class PHIWhitelistTextRequest(BaseModel):
+    text: str
+
+
+@router.get("/phi-text-whitelist", response_model=PHIWhitelistResponse)
+async def get_phi_whitelist(current_user: CurrentUser):
+    """Return the current PHI text whitelist."""
+    from screenshot_processor.web.services.preprocessing.phi import load_phi_whitelist
+
+    return PHIWhitelistResponse(whitelist=load_phi_whitelist())
+
+
+@router.post("/phi-text-whitelist", response_model=PHIWhitelistResponse)
+async def add_to_phi_whitelist(request_body: PHIWhitelistTextRequest, current_user: CurrentUser):
+    """Add a text string to the PHI whitelist so it is never flagged again."""
+    from screenshot_processor.web.services.preprocessing.phi import add_to_phi_whitelist as _add
+
+    updated = _add(request_body.text)
+    return PHIWhitelistResponse(whitelist=updated)
+
+
+@router.delete("/phi-text-whitelist", response_model=PHIWhitelistResponse)
+async def remove_from_phi_whitelist(request_body: PHIWhitelistTextRequest, current_user: CurrentUser):
+    """Remove a text string from the PHI whitelist."""
+    from screenshot_processor.web.services.preprocessing.phi import remove_from_phi_whitelist as _remove
+
+    updated = _remove(request_body.text)
+    return PHIWhitelistResponse(whitelist=updated)
 
 
 @router.post("/preprocess-stage/phi-redaction", response_model=StagePreprocessResponse)
@@ -2823,6 +2939,28 @@ async def get_phi_regions(
                         text=r.get("text", ""),
                     )
                 )
+
+    # PERSON-only: drop any stored region whose label is not a person-name variant.
+    # This retroactively cleans up old detections (EMAIL, PHONE, etc.) without reprocessing.
+    from screenshot_processor.web.services.preprocessing.phi import _PERSON_LABELS
+
+    _LABEL_NORM = {"PERSON_NAME": "PERSON", "IPAD_OWNER": "PERSON", "OTHER": "PERSON"}
+    cleaned: list[PHIRegionRect] = []
+    for r in regions:
+        if r.label.upper() not in _PERSON_LABELS:
+            continue
+        # Normalize label to PERSON
+        normalized_label = _LABEL_NORM.get(r.label.upper(), r.label.upper())
+        cleaned.append(r.model_copy(update={"label": normalized_label}))
+    regions = cleaned
+
+    # Apply whitelist filter at read time so whitelisted text is hidden immediately
+    # across all screenshots without requiring re-detection.
+    from screenshot_processor.web.services.preprocessing.phi import load_phi_whitelist
+
+    whitelist: set[str] = set(load_phi_whitelist())
+    if whitelist:
+        regions = [r for r in regions if r.text.strip().lower() not in whitelist]
 
     return PHIRegionsResponse(
         regions=regions,

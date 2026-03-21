@@ -530,7 +530,15 @@ def phi_detection_task(
         if not screenshot:
             return {"success": False, "error": "Screenshot not found"}
 
-        init_preprocessing_metadata(screenshot)
+        pp = init_preprocessing_metadata(screenshot)
+        # Skip only if explicitly cancelled (not if invalidated by upstream re-run)
+        if pp.get("stage_status", {}).get("phi_detection") == "cancelled":
+            logger.info(
+                "PHI detection cancelled before start, skipping",
+                extra={"screenshot_id": screenshot_id},
+            )
+            return {"success": False, "error": "Cancelled"}
+
         set_stage_running(screenshot, "phi_detection")
         flag_modified(screenshot, "processing_metadata")
         db.commit()
@@ -542,6 +550,17 @@ def phi_detection_task(
             image_bytes, preset=preset, llm_endpoint=llm_endpoint, llm_model=llm_model, llm_api_key=llm_api_key,
             ocr_engine=ocr_engine, ner_detector=ner_detector,
         )
+
+        # Re-check cancellation: user may have clicked Stop while OCR was running.
+        # Re-read from DB to get the latest status.
+        db.refresh(screenshot)
+        pp_after = init_preprocessing_metadata(screenshot)
+        if pp_after.get("stage_status", {}).get("phi_detection") == "cancelled":
+            logger.info(
+                "PHI detection cancelled during OCR, discarding results",
+                extra={"screenshot_id": screenshot_id},
+            )
+            return {"success": False, "error": "Cancelled during OCR"}
 
         result_data = {
             "phi_detected": detection.phi_detected,
@@ -566,6 +585,24 @@ def phi_detection_task(
 
         return {"success": True, "screenshot_id": screenshot_id, "stage": "phi_detection"}
 
+    except SoftTimeLimitExceeded as e:
+        db.rollback()
+        logger.warning(
+            "PHI detection timed out, will retry",
+            extra={"screenshot_id": screenshot_id, "retry": self.request.retries},
+        )
+        try:
+            # Reset to pending so a retry can start cleanly
+            screenshot = db.query(Screenshot).filter(Screenshot.id == screenshot_id).first()
+            if screenshot:
+                init_preprocessing_metadata(screenshot)
+                pp = screenshot.processing_metadata["preprocessing"]
+                pp["stage_status"]["phi_detection"] = "pending"
+                flag_modified(screenshot, "processing_metadata")
+                db.commit()
+        except Exception:
+            pass
+        raise self.retry(exc=e, countdown=60)
     except Exception as e:
         db.rollback()
         logger.error(
@@ -799,3 +836,49 @@ def ocr_stage_task(
 def health_check() -> dict:
     """Health check."""
     return {"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()}
+
+
+def _reconcile_stuck_stages() -> None:
+    """On worker startup, reset any 'running' stages back to 'pending'.
+
+    A stage stuck in 'running' means the worker was killed mid-task. Since
+    task_reject_on_worker_lost=True requeues the Celery task, but the DB
+    stage_status was already written as 'running', the requeued task will
+    find 'running' (not 'pending') and may behave oddly. Reset them so the
+    retry starts clean.
+    """
+    from sqlalchemy.orm.attributes import flag_modified
+
+    db = SessionLocal()
+    try:
+        # Find all screenshots with any stage stuck in 'running'
+        stuck = (
+            db.query(Screenshot)
+            .filter(
+                Screenshot.processing_metadata["preprocessing"]["stage_status"]
+                .as_string()
+                .contains("running")
+            )
+            .all()
+        )
+        reset_count = 0
+        for screenshot in stuck:
+            pp = screenshot.processing_metadata.get("preprocessing", {})
+            stage_status = pp.get("stage_status", {})
+            changed = False
+            for stage, status in stage_status.items():
+                if status == "running":
+                    stage_status[stage] = "pending"
+                    changed = True
+                    reset_count += 1
+            if changed:
+                flag_modified(screenshot, "processing_metadata")
+        if reset_count:
+            db.commit()
+            logger.info("Reconciled %d stuck 'running' stages to 'pending' on startup", reset_count)
+    except Exception:
+        logger.warning("Startup reconciliation failed", exc_info=True)
+    finally:
+        db.close()
+
+

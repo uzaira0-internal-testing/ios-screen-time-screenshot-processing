@@ -2,11 +2,53 @@
 
 from __future__ import annotations
 
+import io
+import json
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+# Persisted whitelist of text strings that should never be flagged as PHI.
+# Stored in /app/output (writable Docker volume, owned by appuser) so it survives
+# container restarts. Falls back to next to this file for non-Docker environments.
+_WHITELIST_PATH = Path(
+    "/app/output/phi_text_whitelist.json"
+    if Path("/app/output").exists()
+    else Path(__file__).parent / "phi_text_whitelist.json"
+)
+
+
+def load_phi_whitelist() -> list[str]:
+    """Return the current user-defined PHI text whitelist (lowercase)."""
+    try:
+        if _WHITELIST_PATH.exists():
+            return [t.lower() for t in json.loads(_WHITELIST_PATH.read_text())]
+    except Exception:
+        logger.warning("Could not read PHI whitelist", exc_info=True)
+    return []
+
+
+def add_to_phi_whitelist(text: str) -> list[str]:
+    """Append text to the whitelist. Returns the updated list."""
+    current = load_phi_whitelist()
+    entry = text.strip().lower()
+    if entry and entry not in current:
+        current.append(entry)
+        _WHITELIST_PATH.write_text(json.dumps(current, indent=2))
+    return current
+
+
+def remove_from_phi_whitelist(text: str) -> list[str]:
+    """Remove text from the whitelist. Returns the updated list."""
+    current = load_phi_whitelist()
+    entry = text.strip().lower()
+    updated = [t for t in current if t != entry]
+    if len(updated) != len(current):
+        _WHITELIST_PATH.write_text(json.dumps(updated, indent=2))
+    return updated
 
 
 @dataclass
@@ -26,6 +68,74 @@ class PHIRedactionResult:
     image_bytes: bytes
     regions_redacted: int
     redaction_method: str
+
+
+def _region_bbox_wh(region: Any) -> tuple[int, int]:
+    """Return (width, height) of a PHIRegion's bounding box.
+
+    Handles both BoundingBox dataclass (.width/.height) and plain tuple (x,y,w,h).
+    Returns (0, 0) if no bbox is available.
+    """
+    bbox = getattr(region, "bbox", None)
+    if bbox is None:
+        return 0, 0
+    if hasattr(bbox, "width"):
+        return bbox.width, bbox.height
+    return bbox[2], bbox[3]
+
+
+# Entity types that represent a person — everything else is discarded.
+# PERSON (Presidio), PERSON_NAME (GLiNER), IPAD_OWNER (regex), OTHER (LLM catch-all).
+_PERSON_LABELS: frozenset[str] = frozenset({"PERSON", "PERSON_NAME", "IPAD_OWNER", "OTHER"})
+
+
+def _filter_phi_regions(regions: list[Any], image_bytes: bytes) -> list[Any]:
+    """Filter detected regions down to person-name PHI only.
+
+    Drops:
+    - Any entity type that is not a recognised person label (EMAIL, PHONE, etc.)
+    - Oversized regions (width > 30% or height > 15% of image) — UI elements / OCR artifacts
+    - Regions whose text is in the user-defined whitelist
+    """
+    if not regions:
+        return regions
+
+    # Get image dimensions for size filtering
+    try:
+        from PIL import Image
+        img = Image.open(io.BytesIO(image_bytes))
+        img_w, img_h = img.size
+    except Exception:
+        logger.warning("Could not determine image dimensions for PHI size filter", exc_info=True)
+        img_w, img_h = 0, 0
+
+    whitelist: set[str] = set(load_phi_whitelist())
+
+    filtered = []
+    for region in regions:
+        label = (getattr(region, "entity_type", "") or "").upper()
+
+        # PERSON-only gate — discard everything that isn't a person name
+        if label not in _PERSON_LABELS:
+            logger.debug("Filtered non-person PHI entity type=%r text=%r", label, getattr(region, "text", ""))
+            continue
+
+        # Size filter
+        if img_w > 0 and img_h > 0:
+            rw, rh = _region_bbox_wh(region)
+            if rw > img_w * 0.30 or rh > img_h * 0.15:
+                logger.debug("Filtered oversized PHI region %dx%d (image %dx%d)", rw, rh, img_w, img_h)
+                continue
+
+        # Whitelist filter
+        text = getattr(region, "text", "") or ""
+        if whitelist and text.strip().lower() in whitelist:
+            logger.debug("Filtered whitelisted PHI text: %r", text)
+            continue
+
+        filtered.append(region)
+
+    return filtered
 
 
 def detect_phi(
@@ -102,6 +212,17 @@ def detect_phi(
 
         # PipelineResult API: .has_phi, .region_count, .aggregated_regions, .get_regions_for_redaction()
         regions = result.get_regions_for_redaction()
+
+        # Post-detection filters (applied universally, regardless of detector)
+        regions = _filter_phi_regions(regions, image_bytes)
+
+        # Normalize all surviving labels to "PERSON" — single clean ontology.
+        # After the person-only gate above, everything left is a person-name variant.
+        for region in regions:
+            try:
+                region.entity_type = "PERSON"
+            except AttributeError:
+                pass
 
         detector_results: dict[str, float] = {}
         for region in regions:

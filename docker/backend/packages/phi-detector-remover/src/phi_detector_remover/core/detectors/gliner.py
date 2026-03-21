@@ -31,10 +31,10 @@ logger = logging.getLogger(__name__)
 # Default PHI labels for screen time screenshots
 DEFAULT_PHI_LABELS = [
     "person_name",
-    "phone_number",
-    "email",
-    "address",
-    "date_of_birth",
+    # "email" excluded - doesn't appear on Screen Time screenshots
+    # "phone_number" excluded - doesn't appear on Screen Time screenshots
+    # "address" excluded - false positives on app/game names (e.g. "Crossy Road")
+    # "date_of_birth" excluded - doesn't appear on Screen Time screenshots
 ]
 
 

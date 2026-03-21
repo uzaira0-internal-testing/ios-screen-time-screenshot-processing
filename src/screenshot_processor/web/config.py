@@ -118,11 +118,11 @@ class Settings(AuthSettingsMixin, BaseSettings):
         description="PaddleOCR request timeout in seconds",
     )
     HYBRID_ENABLE_HUNYUAN: bool = Field(
-        default=True,
+        default=False,
         description="Enable HunyuanOCR in hybrid engine fallback chain",
     )
     HYBRID_ENABLE_PADDLEOCR: bool = Field(
-        default=True,
+        default=False,
         description="Enable PaddleOCR in hybrid engine fallback chain",
     )
     HYBRID_ENABLE_TESSERACT: bool = Field(

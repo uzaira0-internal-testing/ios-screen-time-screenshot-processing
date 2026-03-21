@@ -573,7 +573,7 @@ class PreprocessRequest(BaseModel):
         description="NER detector: presidio (fast, 6ms), gliner (accurate, F1=0.98, 112ms)",
     )
     run_ocr_after: bool = Field(
-        default=False,
+        default=True,
         description="Whether to chain OCR processing after preprocessing",
     )
 
@@ -591,7 +591,7 @@ class BatchPreprocessRequest(BaseModel):
     phi_detection_enabled: bool = Field(default=True)
     phi_ocr_engine: Literal["pytesseract", "leptess"] = Field(default="pytesseract")
     phi_ner_detector: Literal["presidio", "gliner"] = Field(default="presidio")
-    run_ocr_after: bool = Field(default=False)
+    run_ocr_after: bool = Field(default=True)
 
 
 class BatchPreprocessResponse(BaseModel):
@@ -634,6 +634,10 @@ class StagePreprocessRequest(BaseModel):
         default=None,
         description="Stage name (used by reset endpoint).",
     )
+    task_ids: list[str] = Field(
+        default_factory=list,
+        description="Celery task IDs to cancel (used by cancel endpoint).",
+    )
 
 
 class PHIDetectionStageRequest(StagePreprocessRequest):
@@ -670,6 +674,7 @@ class StagePreprocessResponse(BaseModel):
     screenshot_ids: list[int]
     stage: str
     message: str
+    task_ids: list[str] = []
 
 
 class InvalidateFromStageRequest(BaseModel):
@@ -1235,7 +1240,7 @@ class PHIRegionRect(BaseModel):
     w: int = Field(..., ge=1)
     h: int = Field(..., ge=1)
     label: str = Field(default="OTHER", max_length=50)
-    source: str = Field(default="manual", max_length=20)
+    source: str = Field(default="manual", max_length=100)
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
     text: str = Field(default="", max_length=500)
 

@@ -299,21 +299,26 @@ STAGE_FILE_SUFFIX = {
     "phi_redaction": "redact",
 }
 
-# Pattern that matches pipeline-generated output suffixes: _crop_v1.png, _redact_v2.jpg, etc.
-_PIPELINE_SUFFIX_RE = re.compile(r"_(crop|redact)_v\d+(\.[^.]+)$")
+# Pattern that matches pipeline-generated output suffixes.
+# Handles: _crop_v1.png, _redact_v2.jpg, _redact_v1_preprocessed.png, etc.
+_PIPELINE_SUFFIX_RE = re.compile(r"_(crop|redact)_v\d+(?:_preprocessed)?(\.[^.]+)$")
+# Standalone _preprocessed suffix from the old full-pipeline code path.
+_PREPROCESSED_SUFFIX_RE = re.compile(r"_preprocessed(\.[^.]+)$")
 
 
 def _resolve_original_path(path: str) -> str:
-    """Strip pipeline output suffixes to recover the original upload path.
+    """Strip all pipeline output suffixes to recover the original upload path.
 
-    If path ends with _crop_v{N}.ext or _redact_v{N}.ext and the candidate
-    original path exists on disk, return the original. Otherwise return path
-    unchanged.  This ensures device_detection and cropping always use the
-    file that was actually uploaded, never a previously-generated crop or
-    redaction output.
+    Handles _crop_v{N}, _redact_v{N}, _preprocessed, and combinations like
+    _redact_v1_preprocessed.  If the candidate original path exists on disk,
+    return it. Otherwise return path unchanged.  This ensures device_detection
+    and cropping always use the file that was actually uploaded.
     """
     p = Path(path)
-    candidate_name = _PIPELINE_SUFFIX_RE.sub(r"\2", p.name)
+    # Strip pipeline suffixes iteratively (handles stacked suffixes)
+    candidate_name = p.name
+    candidate_name = _PIPELINE_SUFFIX_RE.sub(r"\2", candidate_name)
+    candidate_name = _PREPROCESSED_SUFFIX_RE.sub(r"\1", candidate_name)
     if candidate_name != p.name:
         candidate = p.parent / candidate_name
         if candidate.exists():
@@ -548,7 +553,39 @@ def get_stage_counts(screenshots: list, stage: str) -> dict:
                 event = next((e for e in pp.get("events", []) if e["event_id"] == eid), None)
                 if event and is_exception(stage, event.get("result", {})):
                     counts["exceptions"] += 1
+                    continue
+            # OCR: also check bar total vs OCR total mismatch on the screenshot model
+            if stage == "ocr" and _is_ocr_mismatch(s):
+                counts["exceptions"] += 1
     return counts
+
+
+def _parse_ocr_minutes(ocr_total: str | None) -> int | None:
+    """Parse '1h 31m' -> 91 minutes."""
+    if not ocr_total:
+        return None
+    import re
+    minutes = 0
+    h = re.search(r"(\d+)\s*h", ocr_total)
+    m = re.search(r"(\d+)\s*m", ocr_total)
+    if h:
+        minutes += int(h.group(1)) * 60
+    if m:
+        minutes += int(m.group(1))
+    return minutes if (h or m) else None
+
+
+def _is_ocr_mismatch(screenshot) -> bool:
+    """Check if bar total differs significantly from OCR total."""
+    hourly = getattr(screenshot, "extracted_hourly_data", None)
+    ocr_total = getattr(screenshot, "extracted_total", None)
+    if not hourly or not ocr_total:
+        return False
+    bar_total = sum(v for k, v in hourly.items() if k.isdigit() and isinstance(v, (int, float)))
+    ocr_minutes = _parse_ocr_minutes(ocr_total)
+    if ocr_minutes is None or ocr_minutes == 0:
+        return False
+    return abs(bar_total - ocr_minutes) > max(ocr_minutes * 0.1, 5)
 
 
 def is_exception(stage: str, result: dict) -> bool:
@@ -570,5 +607,13 @@ def is_exception(stage: str, result: dict) -> bool:
             return True
     elif stage == "phi_redaction":
         if result.get("phi_detected") and not result.get("redacted"):
+            return True
+    elif stage == "ocr":
+        if result.get("processing_status") == "failed":
+            return True
+        if result.get("has_blocking_issues"):
+            return True
+        align = result.get("alignment_score")
+        if isinstance(align, (int, float)) and align < 0.8:
             return True
     return False
