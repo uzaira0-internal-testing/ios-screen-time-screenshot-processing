@@ -17,7 +17,7 @@ import httpx
 import numpy as np
 from PIL import Image
 
-from ..ocr_protocol import OCREngineError, OCREngineNotAvailableError, OCRResult
+from ...ocr_protocol import OCREngineError, OCREngineNotAvailableError, OCRResult
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray

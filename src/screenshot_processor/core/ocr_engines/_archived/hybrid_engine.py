@@ -67,7 +67,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from ..ocr_protocol import IOCREngine, OCREngineError, OCREngineNotAvailableError, OCRResult
+from ...ocr_protocol import IOCREngine, OCREngineError, OCREngineNotAvailableError, OCRResult
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -115,6 +115,7 @@ class HybridOCREngine:
         enable_hunyuan: bool = True,
         enable_paddleocr: bool = True,
         enable_tesseract: bool = True,
+        enable_leptess: bool = True,
     ) -> None:
         """Initialize hybrid OCR engine.
 
@@ -126,6 +127,7 @@ class HybridOCREngine:
             enable_hunyuan: Whether to try HunyuanOCR
             enable_paddleocr: Whether to try PaddleOCR
             enable_tesseract: Whether to try Tesseract as final fallback
+            enable_leptess: Whether to try leptess (Rust Tesseract C API) before pytesseract
         """
         self.hunyuan_url = hunyuan_url
         self.paddleocr_url = paddleocr_url
@@ -134,6 +136,7 @@ class HybridOCREngine:
         self.enable_hunyuan = enable_hunyuan
         self.enable_paddleocr = enable_paddleocr
         self.enable_tesseract = enable_tesseract
+        self.enable_leptess = enable_leptess
 
         # Track which engine was used for the last call
         self.last_engine_used: str | None = None
@@ -142,15 +145,18 @@ class HybridOCREngine:
         self._hunyuan_engine: IOCREngine | None = None
         self._paddleocr_engine: IOCREngine | None = None
         self._tesseract_engine: IOCREngine | None = None
+        self._leptess_engine: IOCREngine | None = None
 
         # Track availability
         self._hunyuan_available: bool | None = None
         self._paddleocr_available: bool | None = None
         self._tesseract_available: bool | None = None
+        self._leptess_available: bool | None = None
 
         logger.info(
-            f"HybridOCREngine initialized: hunyuan={enable_hunyuan}, "
-            f"paddleocr={enable_paddleocr}, tesseract={enable_tesseract}"
+            f"HybridOCREngine initialized: leptess={enable_leptess}, "
+            f"tesseract={enable_tesseract}, hunyuan={enable_hunyuan}, "
+            f"paddleocr={enable_paddleocr}"
         )
 
     def _get_hunyuan_engine(self) -> IOCREngine | None:
@@ -216,7 +222,7 @@ class HybridOCREngine:
 
         if self._tesseract_engine is None and self._tesseract_available is not False:
             try:
-                from .tesseract_engine import TesseractOCREngine
+                from ..tesseract_engine import TesseractOCREngine
 
                 self._tesseract_engine = TesseractOCREngine()
                 self._tesseract_available = self._tesseract_engine.is_available()
@@ -232,6 +238,30 @@ class HybridOCREngine:
                 self._tesseract_available = False
 
         return self._tesseract_engine if self._tesseract_available else None
+
+    def _get_leptess_engine(self) -> IOCREngine | None:
+        """Lazy-load leptess engine (Rust Tesseract C API)."""
+        if not self.enable_leptess:
+            return None
+
+        if self._leptess_engine is None and self._leptess_available is not False:
+            try:
+                from ..leptess_engine import LeptessOCREngine
+
+                self._leptess_engine = LeptessOCREngine()
+                self._leptess_available = self._leptess_engine.is_available()
+
+                if not self._leptess_available:
+                    logger.warning("leptess (Rust) not available, will use pytesseract")
+                    self._leptess_engine = None
+                else:
+                    logger.info("leptess (Rust) engine loaded and available")
+
+            except Exception as e:
+                logger.warning(f"Failed to load leptess: {e}")
+                self._leptess_available = False
+
+        return self._leptess_engine if self._leptess_available else None
 
     def extract_text(
         self,
@@ -264,7 +294,23 @@ class HybridOCREngine:
         """
         errors: list[tuple[str, Exception]] = []
 
-        # Try HunyuanOCR first (best quality)
+        # Try leptess first (Rust Tesseract C API — fastest local option)
+        leptess = self._get_leptess_engine()
+        if leptess:
+            try:
+                logger.debug("Trying leptess (Rust)...")
+                results = leptess.extract_text(image, config)
+                self.last_engine_used = "leptess"
+                logger.debug(f"leptess succeeded: {len(results)} results")
+                return results
+            except OCREngineError as e:
+                logger.warning(f"leptess failed: {e}")
+                errors.append(("leptess", e))
+            except Exception as e:
+                logger.warning(f"leptess unexpected error: {e}")
+                errors.append(("leptess", e))
+
+        # Try HunyuanOCR (disabled by default — remote, slow to connect)
         hunyuan = self._get_hunyuan_engine()
         if hunyuan:
             try:
@@ -280,7 +326,7 @@ class HybridOCREngine:
                 logger.warning(f"HunyuanOCR unexpected error: {e}")
                 errors.append(("HunyuanOCR", e))
 
-        # Try PaddleOCR second (good quality with bboxes)
+        # Try PaddleOCR (disabled by default — remote, slow to connect)
         paddleocr = self._get_paddleocr_engine()
         if paddleocr:
             try:
@@ -296,20 +342,20 @@ class HybridOCREngine:
                 logger.warning(f"PaddleOCR unexpected error: {e}")
                 errors.append(("PaddleOCR", e))
 
-        # Try Tesseract as final fallback
+        # Try pytesseract as final fallback
         tesseract = self._get_tesseract_engine()
         if tesseract:
             try:
-                logger.debug("Trying Tesseract...")
+                logger.debug("Trying pytesseract...")
                 results = tesseract.extract_text(image, config)
                 self.last_engine_used = "Tesseract"
-                logger.debug(f"Tesseract succeeded: {len(results)} results")
+                logger.debug(f"pytesseract succeeded: {len(results)} results")
                 return results
             except OCREngineError as e:
-                logger.warning(f"Tesseract failed: {e}")
+                logger.warning(f"pytesseract failed: {e}")
                 errors.append(("Tesseract", e))
             except Exception as e:
-                logger.warning(f"Tesseract unexpected error: {e}")
+                logger.warning(f"pytesseract unexpected error: {e}")
                 errors.append(("Tesseract", e))
 
         # All engines failed
@@ -354,7 +400,17 @@ class HybridOCREngine:
         """
         errors: list[tuple[str, Exception]] = []
 
-        # Try PaddleOCR first (has bboxes, good quality)
+        # Try leptess first (Rust Tesseract C API — returns bboxes, fastest)
+        leptess = self._get_leptess_engine()
+        if leptess:
+            try:
+                results = leptess.extract_text(image, config)
+                self.last_engine_used = "leptess"
+                return results
+            except Exception as e:
+                errors.append(("leptess", e))
+
+        # Try PaddleOCR (disabled by default — remote, slow to connect)
         paddleocr = self._get_paddleocr_engine()
         if paddleocr:
             try:
@@ -364,7 +420,7 @@ class HybridOCREngine:
             except Exception as e:
                 errors.append(("PaddleOCR", e))
 
-        # Try Tesseract second (has bboxes, always available locally)
+        # Try pytesseract as final fallback (has bboxes, always available locally)
         tesseract = self._get_tesseract_engine()
         if tesseract:
             try:
@@ -374,12 +430,9 @@ class HybridOCREngine:
             except Exception as e:
                 errors.append(("Tesseract", e))
 
-        # NOTE: HunyuanOCR is intentionally NOT included here.
-        # It cannot return bounding boxes, which are required for grid detection.
-
         self.last_engine_used = None
         if not errors:
-            raise OCREngineNotAvailableError("No bbox-capable OCR engines available (PaddleOCR or Tesseract required)")
+            raise OCREngineNotAvailableError("No bbox-capable OCR engines available")
         raise OCREngineError(f"All bbox-capable OCR engines failed: {errors}")
 
     def is_available(self) -> bool:
@@ -390,9 +443,10 @@ class HybridOCREngine:
         """
         return any(
             [
+                self._get_leptess_engine() is not None,
+                self._get_tesseract_engine() is not None,
                 self._get_hunyuan_engine() is not None,
                 self._get_paddleocr_engine() is not None,
-                self._get_tesseract_engine() is not None,
             ]
         )
 
@@ -411,6 +465,8 @@ class HybridOCREngine:
             List of available engine names
         """
         available = []
+        if self._get_leptess_engine():
+            available.append("leptess")
         if self._get_hunyuan_engine():
             available.append("HunyuanOCR")
         if self._get_paddleocr_engine():

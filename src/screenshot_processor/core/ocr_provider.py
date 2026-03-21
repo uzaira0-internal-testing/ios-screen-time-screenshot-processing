@@ -39,10 +39,13 @@ class IOCREngineProvider(Protocol):
 
 
 class DefaultOCREngineProvider:
-    """Default OCR engine provider using HybridOCREngine.
+    """Default OCR engine provider using LeptessOCREngine (Rust/Tesseract).
 
     Uses lazy initialization and caches the engine instance.
     Supports injection of pre-configured engines for testing.
+
+    The remote engines (HunyuanOCR, PaddleOCR) have been archived — all OCR
+    now goes through leptess (Rust C API) or falls back to pytesseract.
     """
 
     def __init__(
@@ -68,23 +71,19 @@ class DefaultOCREngineProvider:
         return self._engine  # type: ignore
 
     def _create_engine(self) -> IOCREngine:
-        """Create a new OCR engine based on config."""
-        from .config import get_hybrid_ocr_config
-        from .ocr_engines import HybridOCREngine
+        """Create a new OCR engine — prefers leptess, falls back to Tesseract."""
+        from .ocr_engines import LeptessOCREngine, TesseractOCREngine
 
-        config = self._config or get_hybrid_ocr_config()
+        # Prefer leptess (Rust C API, no subprocess overhead)
+        leptess = LeptessOCREngine()
+        if leptess.is_available():
+            logger.info("Using LeptessOCREngine (Rust/Tesseract C API)")
+            return leptess
 
-        engine = HybridOCREngine(
-            hunyuan_url=config.hunyuan_url,
-            paddleocr_url=config.paddleocr_url,
-            hunyuan_timeout=config.hunyuan_timeout,
-            paddleocr_timeout=config.paddleocr_timeout,
-            enable_hunyuan=config.hybrid_enable_hunyuan,
-            enable_paddleocr=config.hybrid_enable_paddleocr,
-            enable_tesseract=config.hybrid_enable_tesseract,
-        )
-        logger.info(f"Initialized HybridOCREngine: {engine.get_available_engines()}")
-        return engine
+        # Fallback to pytesseract subprocess
+        tesseract = TesseractOCREngine()
+        logger.info("LeptessOCREngine not available, using TesseractOCREngine (subprocess)")
+        return tesseract
 
 
 # =============================================================================

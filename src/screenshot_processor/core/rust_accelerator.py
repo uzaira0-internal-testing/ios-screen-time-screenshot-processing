@@ -43,8 +43,8 @@ def normalize_ocr_digits(text: str) -> str:
     if _check_rust():
         try:
             return _rs.normalize_ocr_digits(text)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Rust normalize_ocr_digits failed, falling back to Python: %s", e)
     from .ocr import _normalize_ocr_digits
 
     return _normalize_ocr_digits(text)
@@ -55,8 +55,8 @@ def extract_time_from_text(text: str) -> str:
     if _check_rust():
         try:
             return _rs.extract_time_from_text(text)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Rust extract_time_from_text failed, falling back to Python: %s", e)
     from .ocr import _extract_time_from_text
 
     return _extract_time_from_text(text)
@@ -68,7 +68,7 @@ def detect_grid(image_path: str, method: str = "line_based") -> dict | None:
         try:
             return _rs.detect_grid(image_path, method)
         except Exception as e:
-            logger.debug(f"Rust detect_grid failed, falling back to Python: {e}")
+            logger.warning("Rust detect_grid failed, falling back to Python: %s", e)
 
     from .image_processor import load_and_validate_image
     from .line_based_detection import LineBasedDetector
@@ -88,6 +88,21 @@ def detect_grid(image_path: str, method: str = "line_based") -> dict | None:
     return None
 
 
+def process_image_optimized(
+    image_path: str,
+    image_type: str = "screen_time",
+    detection_method: str = "line_based",
+    max_shift: int = 5,
+) -> dict | None:
+    """Full pipeline + boundary optimizer, fully in Rust. Returns None if Rust unavailable."""
+    if _check_rust():
+        try:
+            return _rs.process_image_optimized(image_path, image_type, detection_method, max_shift)
+        except Exception as e:
+            logger.warning("Rust process_image_optimized failed, falling back to Python: %s", e)
+    return None
+
+
 def process_image(
     image_path: str,
     image_type: str = "screen_time",
@@ -98,7 +113,7 @@ def process_image(
         try:
             return _rs.process_image(image_path, image_type, detection_method)
         except Exception as e:
-            logger.debug(f"Rust process_image failed, falling back to Python: {e}")
+            logger.warning("Rust process_image failed, falling back to Python: %s", e)
 
     # Python fallback
     from .image_processor import process_image as py_process_image
@@ -142,7 +157,7 @@ def extract_hourly_data(
             )
             return list(result)
         except Exception as e:
-            logger.debug("Rust extract_hourly_data failed, falling back: %s", e)
+            logger.warning("Rust extract_hourly_data failed, falling back to Python: %s", e)
 
     # Python fallback
     from .image_processor import extract_hourly_data_only
@@ -150,7 +165,8 @@ def extract_hourly_data(
     is_battery = image_type == "battery"
     try:
         row = extract_hourly_data_only(image_path, upper_left, lower_right, is_battery)
-    except Exception:
+    except Exception as e:
+        logger.warning("Python extract_hourly_data_only failed for %s: %s", image_path, e)
         row = None
     return list(row[:24]) if row is not None else [0.0] * 24
 
@@ -180,7 +196,7 @@ def process_image_with_grid(
                 image_type,
             )
         except Exception as e:
-            logger.debug("Rust process_image_with_grid failed, falling back to Python: %s", e)
+            logger.warning("Rust process_image_with_grid failed, falling back to Python: %s", e)
 
     # Python fallback
     from .image_processor import extract_hourly_data_only
@@ -188,7 +204,8 @@ def process_image_with_grid(
     is_battery = image_type == "battery"
     try:
         row = extract_hourly_data_only(image_path, upper_left, lower_right, is_battery)
-    except Exception:
+    except Exception as e:
+        logger.warning("Python extract_hourly_data_only failed for %s: %s", image_path, e)
         row = None
     hourly = list(row[:24]) if row is not None else [0.0] * 24
     return {
